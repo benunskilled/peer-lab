@@ -48,9 +48,12 @@ const TRIAL_KEY = 'slot_fill_trial';
 // slot fill only starts an I2P candidate once Core holds an I2P connection,
 // so the session is up.
 const NO_CONNECT_MS = { clearnet: 5 * 60 * 1000, Tor: 10 * 60 * 1000, I2P: 15 * 60 * 1000 };
-// Connected, but not on our tip: long enough for the peer to answer the
-// headers Core asks every new peer for.
-const TRIAL_MS = 15 * 60 * 1000;
+// Connected, but not on our tip (or serving no blocks), counted from the
+// connection: long enough for the peer to answer the headers Core asks every
+// new peer for, which a peer on our chain does within seconds. It was a
+// quarter of an hour; on 14.11.2026 a candidate connected one minute in,
+// stayed below our tip, and held the slot fourteen more minutes for nothing.
+const TRIAL_MS = 3 * 60 * 1000;
 // Connected, serves blocks, but Core has no header height for it yet
 // (synced_headers -1). A peer one or two blocks behind our tip stays there
 // until it announces a block, and the next one may be half an hour away:
@@ -125,6 +128,20 @@ function withoutSession(peers, address) {
 // Core's session to a manual peer, if it has one.
 function manualSession(peers, address) {
   return peers.find((p) => p.connection_type === 'manual' && keyOf(p.addr) === keyOf(address)) || null;
+}
+
+// When the verdict on the candidate is due: from the trial's start while Core
+// has no connection to it, from the connection once there is one - a
+// connection that came late, over Tor, say, still gets its minutes to answer.
+function decideAt(trial, session) {
+  if (!session) return trial.startedAt + (NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet);
+  const headersOpen = servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
+  if (headersOpen) return trial.startedAt + HEADERS_OPEN_MS;
+  const connectWindow = NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet;
+  const connectedAt = Number(session.conntime) > 0 ? Number(session.conntime) * 1000 : trial.startedAt;
+  // Never before the trial (a session from before it), never after the time a
+  // connection had (a clock that runs ahead would push the verdict out).
+  return Math.min(Math.max(trial.startedAt, connectedAt), trial.startedAt + connectWindow) + TRIAL_MS;
 }
 
 // What the slot needs from the peer: blocks and segwit, and our chain. Core
@@ -239,12 +256,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // How long the verdict waits depends on what Core has to show for it so
   // far: no connection at all, a connection with no header height yet, or a
   // height that is not ours.
-  const elapsed = now - trial.startedAt;
-  const headersOpen = Boolean(session) && servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
-  const limit = !session
-    ? NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet
-    : headersOpen ? HEADERS_OPEN_MS : TRIAL_MS;
-  if (!force && !fake && elapsed < limit) return 'waiting';
+  if (!force && !fake && now < decideAt(trial, session)) return 'waiting';
 
   // Out of the set first, then the trial is closed: a crash in between leaves
   // a trial whose candidate is gone, which the next pass reads as 'left'.
@@ -385,12 +397,9 @@ function trialView(trial, peers, now = Date.now()) {
   const session = manualSession(peers, trial.address);
   const headersOpen = Boolean(session) && servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
   const phase = !session ? 'connecting' : headersOpen ? 'headers' : 'checking';
-  const limit = !session
-    ? NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet
-    : headersOpen ? HEADERS_OPEN_MS : TRIAL_MS;
   const { region, country } = spread.placeOf({ address: trial.address });
   return {
-    address: trial.address, startedAt: trial.startedAt, phase, decideBy: trial.startedAt + limit,
+    address: trial.address, startedAt: trial.startedAt, phase, decideBy: decideAt(trial, session),
     // Where, in words a person reads: the country, or Tor, I2P, the region.
     country: country || null, region: spread.REGION_NAMES[region] || null,
   };

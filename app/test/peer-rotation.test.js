@@ -746,7 +746,7 @@ test('slot fill: a connection that serves no blocks, or is not on our tip, does 
   const asia = inBook('198.18.0.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 10 * MIN)).confirmed, 0);
+  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 2 * MIN)).confirmed, 0);
 
   const sent = [];
   rpc.addNode.mock.mockImplementation(async (a, c) => { sent.push(`${c} ${a}`); });
@@ -1203,14 +1203,50 @@ test('slot fill: still no header height after 30 minutes - out', async () => {
   assert.ok(!isManual(asia));
 });
 
-test('slot fill: a height that is not ours is out at 15 minutes, as before', async () => {
+// 14.11.2026: a candidate connected a minute in, stayed below our tip and
+// held the slot fourteen minutes more. Three minutes from the connection: a
+// peer on our chain shows the tip within seconds.
+test('slot fill: a height that is not ours is out three minutes after the connection', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
   const asia = inBook('198.18.0.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
+  const behind = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 + 2 * MIN) / 1000) });
 
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 14 * MIN)).reverted, 0);
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 15 * MIN)).reverted, 1);
+  assert.equal((await step(setPeers([coreOut(), behind]), t0 + 4 * MIN)).reverted, 0, 'two minutes after it connected');
+  assert.equal((await step(setPeers([coreOut(), behind]), t0 + 5 * MIN)).reverted, 1);
+  assert.equal(fill.lastTry().reason, 'height_wrong');
+});
+
+test('slot fill: the three minutes count from the trial when the connection is older, and never from far ahead', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  // A session that was there before the trial began: timed from the trial.
+  const old = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 - 60 * MIN) / 1000) });
+  assert.equal((await step(setPeers([coreOut(), old]), t0 + 2 * MIN)).reverted, 0);
+  assert.equal((await step(setPeers([coreOut(), old]), t0 + 3 * MIN)).reverted, 1);
+});
+
+test('slot fill: a connection time from a clock far ahead does not hold the slot longer', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const ahead = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 + 600 * MIN) / 1000) });
+  // At most the five minutes a clearnet connection had, then three.
+  assert.equal((await step(setPeers([coreOut(), ahead]), t0 + 8 * MIN)).reverted, 1);
+});
+
+test('slot fill: a peer on our tip is kept at the first check after it connected', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const fresh = manualSession(asia, { conntime: Math.floor((t0 + 30 * 1000) / 1000) });
+
+  assert.equal((await step(setPeers([coreOut(), fresh]), t0 + MIN)).confirmed, 1);
 });
 
 // Moves the open trial back in time, as if it had been running that long.
