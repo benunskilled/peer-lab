@@ -39,6 +39,8 @@ const META_KEY = 'peer_rotation_enabled';
 // is on trial (watchTrial).
 const PASS_EVERY_MS = 10 * 60 * 1000;
 const TRIAL_CHECK_MS = 60 * 1000;
+// How long the page mentions a candidate that went again.
+const LAST_TRY_SHOWN_MS = 30 * 60 * 1000;
 
 // What the last pass saw and decided, for the line on the page that says what
 // Slot Fill is doing. Written by the pass in the profiler, read by the
@@ -90,6 +92,7 @@ function setEnabled(enabled) {
   if (enabled) put.run(ON_AT_KEY, `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   // What a pass saw before the switch is not what Slot Fill is doing now.
   db.instance.prepare('DELETE FROM meta WHERE key = ?').run(STATUS_KEY);
+  db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_last_try'").run();
   logger.info('manual slot fill toggled', { enabled: Boolean(enabled) });
 }
 
@@ -274,6 +277,10 @@ function reportPass(peers, chain) {
   const trial = fill.currentTrial();
   const slots = slotsOf(queries.peerRanking(), now);
   const base = { at: now, nextAt: nextCheckAt(Boolean(trial), now), slots };
+  // The candidate before, when it went again lately: the page's top row says
+  // why, under what is going on now.
+  const last = fill.lastTry();
+  if (last && now - last.at < LAST_TRY_SHOWN_MS) base.lastTry = last;
   if (trial) return writeStatus({ ...base, state: 'trial', trial: fill.trialView(trial, peers, now) });
   if (chain.initialblockdownload) return writeStatus({ ...base, state: 'catching_up' });
   if (slots.used >= slots.max) return writeStatus({ ...base, state: 'full' });

@@ -25,7 +25,8 @@
     network: /\.onion/.test(r.address) ? "onion" : /\.i2p/.test(r.address) ? "i2p" : r.address.startsWith("[") ? "ipv6" : "ipv4",
     cc: (r.where && r.where.country) || "", region: "", operator: (r.where && r.where.operator) || "",
     kind: "Offline", subver: r.client || "", services: [], bytes_sent: 0, bytes_recv: 0, min_ping_ms: null, conntime: 0,
-    about: "Not connected right now. It still holds its manual slot" + (r.kept ? ", and it is locked." : "."),
+    about: dashboard().onTrial?.(r.address) ? "Core is connecting to it."
+      : "Not connected right now. It still holds its manual slot" + (r.kept ? ", and it is locked." : "."),
   });
   const rankOf = (p) => dashboard().peer(p.addr);
 

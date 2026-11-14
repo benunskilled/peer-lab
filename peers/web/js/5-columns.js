@@ -291,9 +291,11 @@
           if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
           sub.append(span("addr-txt", p.addr));
           const what = span("pc-what");
-          const label = p.linking_lion ? "LinkingLion" : p.kind;
-          const pill = span("kind " + (p.offline ? "never" : p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first"),
-            (p.no_relay ? "\u2298 " : "") + label);
+          const testing = onTrial(p);
+          const label = testing ? "Testing" : p.linking_lion ? "LinkingLion" : p.kind;
+          const pill = span("kind " + (testing || p.offline ? "never" : p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first"),
+            (p.no_relay && !testing ? "\u2298 " : "") + label);
+          if (testing) pill.title = TRIAL_TITLE;
           for (const [active, symbol] of [[p.hb_to, "\u26a1"], [p.hb_from, "\ud83d\udce1"], [isLocked(p), "\ud83d\udd12"]]) if (active) what.append(span("hb", symbol));
           what.append(pill);
           // Filled column by column (style.css): each pair is one column of the card.
@@ -365,22 +367,23 @@
         // that never can, red for a disguise or LinkingLion even when it could.
         // LinkingLion has its own pill whatever software it claims; the
         // software stays in the line under it.
-        pill.className = "kind " + (p.offline ? "never" : p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
+        const testing = onTrial(p);
+        pill.className = "kind " + (testing || p.offline ? "never" : p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // The pill says the kind and nothing else, for every peer: what Core
         // saw (no services, no tx, no headers) is in the panel. Software that
         // passes no blocks on gets the ⊘ and a muted row; "never first" is
         // said on hover and in the panel (28.10.2026: beside "offers no
         // services" it said the same twice).
         // One layout in every row, and the pill is never cut.
-        const label = p.linking_lion ? "LinkingLion" : p.kind;
-        if (p.no_relay) {
+        const label = testing ? "Testing" : p.linking_lion ? "LinkingLion" : p.kind;
+        if (p.no_relay && !testing) {
           const ico = document.createElement("span");
           ico.className = "ico";
           ico.textContent = "⊘";
           pill.append(ico, " ");
         }
         pill.append(label);
-        fit(pill, label, [p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
+        fit(pill, label, [testing ? TRIAL_TITLE : "", p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
         // The grey line under the pill, on a wide screen only, is for what

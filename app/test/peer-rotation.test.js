@@ -101,7 +101,7 @@ test.afterEach(() => {
   require('../src/lib/peer-rotation/addrbook').resetForTests();
   db.instance.exec(`DELETE FROM slot_fill_tried;
     DELETE FROM meta WHERE key IN ('slot_fill_trial', 'slot_fill_swap_rest_until', 'peer_rotation_enabled',
-      'slot_fill_last_pass', 'slot_fill_core_down', 'slot_fill_core_down_last', 'slot_fill_gaps');`);
+      'slot_fill_last_pass', 'slot_fill_core_down', 'slot_fill_core_down_last', 'slot_fill_gaps', 'slot_fill_last_try');`);
 });
 
 // Core's chain tip in these tests.
@@ -691,6 +691,40 @@ test('slot fill: a candidate Core cannot connect to goes again, and is not tried
   assert.ok(sent.includes(`remove ${asia}`), `Core is told to drop it too: ${sent.join(', ')}`);
   assert.deepEqual(logRows(), [], 'a candidate that did not work is not news');
   assert.equal((await step(setPeers([coreOut()]), t0 + 17 * MIN)).started, 0, 'the only candidate failed');
+});
+
+test('slot fill: a candidate that goes again is remembered with the reason, for the top row of the page', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  assert.equal(fill.lastTry(), null, 'nothing has gone yet');
+
+  await step(setPeers([coreOut()]), t0 + 16 * MIN);
+
+  const last = fill.lastTry();
+  assert.equal(last.reason, 'no_connection');
+  assert.equal(last.at, t0 + 16 * MIN);
+  assert.equal(last.region, 'Asia');
+  assert.ok(!JSON.stringify(last).includes(asia.split(':')[0]), 'where it was, not its address');
+  assert.deepEqual(logRows(), [], 'and still no log entry');
+});
+
+test('slot fill: a candidate that keeps its slot clears the one before from the top row', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const two = [inBook('198.18.0.10', 'AS'), inBook('198.18.0.12', 'AF')];
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const first = fill.currentTrial().address;
+  // The pass that lets the first one go puts the other on trial.
+  await step(setPeers([coreOut()]), t0 + 16 * MIN);
+  assert.ok(fill.lastTry());
+  const second = fill.currentTrial().address;
+  assert.deepEqual([first, second].sort(), [...two].sort());
+
+  await step(setPeers([coreOut(), manualSession(second)]), t0 + 20 * MIN);
+
+  assert.equal(fill.lastTry(), null);
 });
 
 test('slot fill: blocks found during the trial do not fail a candidate that had the tip when it connected', async () => {

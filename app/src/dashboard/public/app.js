@@ -11,6 +11,7 @@ const REFRESH_MS = 20000;
 // Slot Fill acts at most once every ten minutes, so its panel has no
 // reason to be on the same schedule as the peer list.
 const ROTATION_REFRESH_MS = 2 * 60 * 1000;
+const ROTATION_TRIAL_REFRESH_MS = 20 * 1000;
 // Which pool apps are installed: asked when the page opens, then every five
 // minutes, the server's own pace (see refreshPools).
 const LOCAL_POOLS_EVERY_MS = 5 * 60 * 1000;
@@ -633,6 +634,15 @@ let lastPeerRanking = null;
 // action just taken); an answer that left before a newer one must not be
 // drawn over it - a lock just closed would open again for twenty seconds.
 let peerRequestSeq = 0;
+let lastManualKey = null;
+// A trial runs: the status says so, or the ranking already does - the pass
+// writes the status a moment after the candidate went in, and a ranking that
+// came in between would otherwise leave the slow round at two minutes.
+function trialRunning() {
+  const s = lastSlotStatus;
+  if (s && s.enabled && s.status && s.status.state === 'trial') return true;
+  return (lastPeerRanking || []).some((p) => p.status === 'TESTING');
+}
 async function refreshPeers() {
   const seq = ++peerRequestSeq;
   rankingAtMs = Date.now();
@@ -648,6 +658,12 @@ async function refreshPeers() {
   lastPeerRanking = peers;
   rankingByAddress = new Map(peers.map((p) => [p.address, p]));
   window.dispatchEvent(new Event('peerlab:ranking'));
+  // The manual set changed (a candidate went in or out, a peer was removed):
+  // the Slot Fill panel says why at once, not at its next slow round
+  // (14.11.2026: the list showed eight while the log still showed nothing).
+  const manualKey = peers.filter((p) => p.trusted).map((p) => p.address).sort().join(' ');
+  if (lastManualKey !== null && manualKey !== lastManualKey) refreshRotation().catch(() => {});
+  lastManualKey = manualKey;
 }
 
 // The peer list on this page is drawn by the other script (/peers/app.js).
@@ -667,6 +683,9 @@ window.addEventListener('peerlab:list', (ev) => {
 const pendingPeers = new Set();
 window.peerLab = {
   peer: (address) => rankingByAddress.get(address) || null,
+  // The candidate Slot Fill is testing: the ranking says so (TESTING), on
+  // the same clock as the list.
+  onTrial: (address) => (rankingByAddress.get(address) || {}).status === 'TESTING',
   // Manual peers that are not connected: they still hold their slot, and the
   // list shows them so they can be unlocked or removed.
   offlineManual: () => (lastPeerRanking || []).filter((p) => p.trusted && !p.live && !justGone.has(p.address)),
@@ -944,6 +963,9 @@ async function refreshRotation() {
 
   lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null };
   renderSlotStatus();
+  // The slow round speeds up while a trial runs.
+  const trialNow = Boolean(data.enabled && data.status && data.status.state === 'trial');
+  window.dispatchEvent(new CustomEvent('peerlab:slotstatus', { detail: { trial: trialNow } }));
   lastRotationLog = data.log || [];
   renderRotationLog(lastRotationLog);
 }
@@ -953,6 +975,21 @@ async function refreshRotation() {
 // between two fetches of it, so the line is drawn again every half minute.
 let lastSlotStatus = null;
 const minutes = (ms) => (ms < 90 * 1000 ? '1 min' : ms < 90 * 60 * 1000 ? `${Math.round(ms / 60000)} min` : `${Math.round(ms / 3600000)} h`);
+// Why the candidate before went again (st.lastTry, fill.js), as a sentence
+// added to the top row while Slot Fill is testing or looking.
+const LAST_TRY_WHY = {
+  no_connection: "couldn't be reached",
+  no_services: 'connected, but serves no blocks',
+  height_unknown: 'connected, but never showed which chain it is on',
+  height_wrong: 'is not on our chain',
+  disguised: "is not the Core it names",
+};
+function lastTryText(st) {
+  const l = st && st.lastTry;
+  if (!l) return '';
+  const where = l.country ? countryName(l.country) : l.region;
+  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${LAST_TRY_WHY[l.reason] || 'was not kept'}.`;
+}
 function slotStatusText(st, now) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
   const slots = st.slots || { used: 0, max: MAX_MANUAL_PEERS, offline: [] };
@@ -968,7 +1005,7 @@ function slotStatusText(st, now) {
       return {
         state: 'trial',
         head: `Testing a new peer${where ? ` in ${escapeHtml(where)}` : ''}.`,
-        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.`,
+        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${lastTryText(st)}`,
         short: 'on · testing a peer',
       };
     }
@@ -993,7 +1030,7 @@ function slotStatusText(st, now) {
         core: 'Bitcoin Core did not respond.',
         refused: "Core didn't take the last peers it was offered.",
       }[l.why] || 'No peer from a missing region found yet.';
-      return { state: 'looking', head: `${free} slot${free === 1 ? '' : 's'} free.`, rest: `${why} ${again}`, short: `on · ${free} slot${free === 1 ? '' : 's'} free` };
+      return { state: 'looking', head: `${free} slot${free === 1 ? '' : 's'} free.`, rest: `${why} ${again}${lastTryText(st)}`, short: `on · ${free} slot${free === 1 ? '' : 's'} free` };
     }
   }
 }
@@ -1944,9 +1981,19 @@ function startRefreshLoop() {
       console.warn('Slot Fill or traffic refresh failed', err);
     } finally {
       clearTimeout(rotationTimer);
-      if (!resting()) rotationTimer = setTimeout(runRotation, ROTATION_REFRESH_MS);
+      // While a candidate is on trial the answer comes within minutes, and
+      // its row should show it then: every 20 s instead of every 2 min.
+      if (!resting()) rotationTimer = setTimeout(runRotation, trialRunning() ? ROTATION_TRIAL_REFRESH_MS : ROTATION_REFRESH_MS);
     }
   };
+
+  // A trial seen between two slow rounds (the manual set changed): the next
+  // round comes in 20 s, not in what is left of the two minutes.
+  window.addEventListener('peerlab:slotstatus', (e) => {
+    if (!trialRunning() || resting()) return;
+    clearTimeout(rotationTimer);
+    rotationTimer = setTimeout(runRotation, ROTATION_TRIAL_REFRESH_MS);
+  });
 
   const wake = () => {
     if (resting()) {

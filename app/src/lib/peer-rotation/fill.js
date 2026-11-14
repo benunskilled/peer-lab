@@ -140,6 +140,30 @@ function works(session, chain, since = null) {
   return Number.isFinite(tip) && Number(session.synced_headers) >= tip - 2;
 }
 
+// How the last candidate that did not keep its slot ended, for the top row of
+// the page's log: that row says what Slot Fill is doing now, and with this
+// also why the peer before went again (14.11.2026: a candidate showed in the
+// manual list and left it again, and the log said nothing). Not a log entry:
+// on a bad day ten of them would push the real changes out of the log.
+const LAST_TRY_KEY = 'slot_fill_last_try';
+function writeLastTry(value) {
+  if (!value) {
+    db.instance.prepare('DELETE FROM meta WHERE key = ?').run(LAST_TRY_KEY);
+    return;
+  }
+  db.instance
+    .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(LAST_TRY_KEY, JSON.stringify(value));
+}
+function lastTry() {
+  try {
+    const row = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(LAST_TRY_KEY);
+    return row ? JSON.parse(row.value) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Why a trial ended without the slot, as a short code (kept in the database)
 // and as words (the app log). "No connection" is what was seen at the checks:
 // a session that came and went between two of them leaves no trace.
@@ -186,6 +210,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // stands.
   if (row && row.kept) {
     writeTrial(null);
+    writeLastTry(null);
     return 'left';
   }
   // Taken out by hand - or the app stopped, or the add failed, after Core was
@@ -197,12 +222,15 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   if (!row) {
     await peerSync.removeTrustedPeer(trial.address, { disconnect: false });
     writeTrial(null);
+    // Ended by a person: the one before is no longer the peer before.
+    writeLastTry(null);
     return 'left';
   }
   const session = manualSession(peers, trial.address);
   const fake = disguised(session, peers);
   if (!fake && works(session, chain, trial.tip)) {
     writeTrial(null);
+    writeLastTry(null);
     markTried(trial.address, true, now, { reason: 'ok', startedAt: trial.startedAt });
     logAction({ action: 'promote', address: trial.address, note: trial.note });
     logger.info('slot fill: Core connected, the candidate keeps the slot', { address: trial.address });
@@ -225,8 +253,14 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   await peerSync.removeTrustedPeer(trial.address);
   writeTrial(null);
   const why = whyNot(session, fake);
-  if (!force) markTried(trial.address, false, now, { reason: why.code, startedAt: trial.startedAt });
   const minutes = Math.max(1, Math.round((now - trial.startedAt) / 60000));
+  if (!force) {
+    markTried(trial.address, false, now, { reason: why.code, startedAt: trial.startedAt });
+    const { region, country } = spread.placeOf({ address: trial.address });
+    writeLastTry({ at: now, reason: why.code, minutes, country: country || null, region: spread.REGION_NAMES[region] || null });
+  } else {
+    writeLastTry(null);
+  }
   logger.info('slot fill: candidate not kept', {
     address: trial.address, what: trial.what, reason: force ? 'switched off' : `${why.text} in ${minutes} min`,
   });
@@ -389,4 +423,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastLook: () => lastLook };
+module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook };

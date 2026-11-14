@@ -12,6 +12,11 @@
   // ("6 locked") promise it, not only in the opened detail.
   const LOCKED_TITLE = "Locked: once it has connected, it keeps its manual slot, even while offline";
   const isLocked = (p) => p.group === "manual" && Boolean(window.peerLab.peer(p.addr)?.kept);
+  // The candidate Slot Fill is testing right now: it is in the manual list
+  // from its addnode on, minutes before the log can say whether it stays.
+  // Its pill says so instead of its kind (14.11.2026).
+  const onTrial = (p) => p.group === "manual" && Boolean(window.peerLab.onTrial?.(p.addr));
+  const TRIAL_TITLE = "Slot Fill is testing this peer: it keeps the slot only if Core can use it";
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions

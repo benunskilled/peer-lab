@@ -535,6 +535,8 @@ function resetPeerData() {
                      AND peer_id IN (SELECT p.id FROM peer p JOIN trusted_peer tp ON tp.address = p.address))`,
       ).run();
       db.prepare(`DELETE FROM slot_fill_tried`).run();
+      // The top row's "peer before" (peer-rotation/fill.js) is history too.
+      db.prepare(`DELETE FROM meta WHERE key = 'slot_fill_last_try'`).run();
       db.prepare(`DELETE FROM rotation_log`).run();
       db.prepare(`DELETE FROM peer WHERE id NOT IN (SELECT peer_id FROM peer_session)`).run();
     } finally {
