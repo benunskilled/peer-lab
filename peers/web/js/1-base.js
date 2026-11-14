@@ -102,12 +102,15 @@
     });
   }
   foldable($("mapCard"), $("mapHead"), "map");
-  // The legend: folded on a phone the first time, open on a wide screen; after
-  // that it stays as the reader left it.
+  // The legend: folded the first time, on every width (14.11.2026: open, it
+  // stood between the map and the tables on every visit); after that it stays
+  // as the reader left it. A new key, so a page that met the old rule (open on
+  // a wide screen) folds it once too.
   if ($("keyCard")) {
-    if (store.get("peerlab.keyDefault") == null) {
-      store.set("peerlab.keyDefault", "1");
-      if (window.matchMedia("(max-width: 600px)").matches) { folded.add("key"); store.set(FOLD_KEY, JSON.stringify([...folded])); }
+    if (store.get("peerlab.keyFolded") == null) {
+      store.set("peerlab.keyFolded", "1");
+      folded.add("key");
+      store.set(FOLD_KEY, JSON.stringify([...folded]));
     }
     foldable($("keyCard"), $("keyHead"), "key");
   }
