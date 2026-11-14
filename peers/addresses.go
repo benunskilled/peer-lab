@@ -27,11 +27,15 @@ var linkingLion = []netip.Prefix{
 	netip.MustParsePrefix("143.20.137.0/24"), netip.MustParsePrefix("31.58.215.0/24"),
 	netip.MustParsePrefix("87.229.79.0/24"), netip.MustParsePrefix("2602:f5c0:0:ace::/64"),
 	netip.MustParsePrefix("104.234.118.2/32"), netip.MustParsePrefix("69.17.52.1/32"),
-	// used until the end of 2025
-	netip.MustParsePrefix("162.218.65.0/24"), netip.MustParsePrefix("209.222.252.0/24"),
-	netip.MustParsePrefix("91.198.115.0/24"), netip.MustParsePrefix("2604:d500:4:1::/64"),
-	// 199.116.84.0/24 is gone: bnoc took it out on 14.11.2026, as a range it
-	// had never actually documented.
+	// The ranges used before (162.218.65.0/24, 209.222.252.0/24,
+	// 91.198.115.0/24, 2604:d500:4:1::/64) are left out: bnoc marks them
+	// removed on 2025-12-05, and by RIPE RIS on 14.11.2026 AS54098 announces
+	// none of them any more. 209.222.252.0/24 is now announced by AS26383 and
+	// 91.198.115.0/24 by AS21840; AS54098 withdrew 162.218.65.0/24 on
+	// 25.02.2026 and 2604:d500::/32 on 17.04.2026. Whoever uses them now would
+	// be named LinkingLion wrongly.
+	// 199.116.84.0/24 is gone too: bnoc took it out on 14.11.2026, as a range
+	// it had never actually documented.
 }
 
 func isLinkingLion(addr string) bool {
