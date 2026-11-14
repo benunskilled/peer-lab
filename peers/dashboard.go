@@ -49,6 +49,10 @@ type dashboardClient struct {
 	blockAt         time.Time
 	blockDetectedAt int64
 	block           *lastBlock
+	// The dashboard answered, and had no block yet: a fresh install. Told
+	// apart from a dashboard that did not answer, which also leaves block nil
+	// - the page says "waiting for the next block" only for the first.
+	empty bool
 	// When a page last asked past the cache for a block it had just heard
 	// of: at most once a second, whatever the pages ask.
 	askedAt time.Time
@@ -226,6 +230,17 @@ func (s *dashboardClient) up(ctx context.Context) bool {
 	return s.present
 }
 
+// noBlockYet: the dashboard's last answer was that it has seen no block yet
+// (not that it did not answer).
+func (s *dashboardClient) noBlockYet() bool {
+	if s.url == "off" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.present && s.block == nil && s.empty
+}
+
 // latest returns the newest block the dashboard knows about, or nil when it
 // is down, did not answer, or has not seen a block yet.
 //
@@ -251,7 +266,7 @@ func (s *dashboardClient) latest(ctx context.Context, want string) *lastBlock {
 	// A dashboard that answers badly has answered: no block for this window,
 	// so a broken dashboard costs one request per interval and no more.
 	miss := func() *lastBlock {
-		s.blockAt, s.block = now, nil
+		s.blockAt, s.block, s.empty = now, nil, false
 		return nil
 	}
 	// Detached from the browser request for the same reason as the probe
@@ -331,9 +346,12 @@ func (s *dashboardClient) latest(ctx context.Context, want string) *lastBlock {
 		if err != nil {
 			s.problem(fmt.Sprintf("the dashboard's latest block reply could not be read: %v", err))
 		}
-		return miss()
+		miss()
+		s.empty = err == nil && strings.TrimSpace(string(body)) == "null"
+		return nil
 	}
 	s.problem("")
+	s.empty = false
 	age := now.UnixMilli() - got.DetectedAt
 	if age < 0 {
 		age = 0

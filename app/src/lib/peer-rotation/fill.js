@@ -285,17 +285,41 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
 let lastLook = null;
 const looked = (why, counts = {}) => { lastLook = { why, ...counts }; return 0; };
 
+// How many addresses Slot Fill could pick from at its last look, and how many
+// per region, for the line on the page ("4,812 addresses to pick from"):
+// those from "tried", Core has connected to them before - what the page says.
+// A region a usable network could reach but nobody in the book sits in is
+// there with 0, so the page can name it; Tor and I2P only where Core uses them.
+// Cleared at every look, so a look that could not read the book shows none
+// rather than an old count beside a status that says the book is empty.
+let lastBook = null;
+function noteBook(candidates, nets, now) {
+  const book = candidates.filter((c) => !c.fromNew);
+  const regions = {};
+  if (nets.has('ipv4') || nets.has('ipv6')) for (const r of ['AF', 'AS', 'EU', 'NA', 'OC', 'SA']) regions[r] = 0;
+  if (nets.has('onion')) regions.TOR = 0;
+  if (nets.has('i2p')) regions.I2P = 0;
+  for (const c of book) {
+    const { region } = spread.placeOf(c);
+    if (region in regions) regions[region] += 1;
+  }
+  lastBook = { at: now, total: book.length, regions };
+}
+
 /**
  * Put the next candidate on trial, if a slot is free. `peers` is getpeerinfo
  * from this pass. Returns the candidate's address, or 0.
  */
 async function start(ranking, peers, chain, now = Date.now()) {
   lastLook = null;
+  lastBook = null;
   // A node still catching up has no tip to test a candidate against.
   if (chain.initialblockdownload) return looked('catching_up');
   const trusted = ranking.filter((p) => p.trusted);
   const max = config.maxManualPeers;
-  if (trusted.length >= max) return looked('full');
+  // With every slot in use the book is still counted, for the page: how
+  // much there would be to pick from (noteBook). Nothing is tried.
+  const full = trusted.length >= max;
 
   let networkInfo;
   try {
@@ -321,6 +345,8 @@ async function start(ranking, peers, chain, now = Date.now()) {
   const book = reachable
     .filter((c) => !inUse.has(hostFromAddress(c.address)) && !banned(c.address) && !failed.has(keyOf(c.address)));
   const counts0 = { known: all.length, reachable: reachable.length, untried: book.length };
+  if (all.length) noteBook(book, nets, now);
+  if (full) return looked('full');
   if (!all.length) return looked('no_book', counts0);
 
   // Counted over all outbound connections, Core's own too (spread.js).
@@ -432,4 +458,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook };
+module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook };

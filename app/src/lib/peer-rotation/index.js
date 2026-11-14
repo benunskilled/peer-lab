@@ -281,6 +281,9 @@ function reportPass(peers, chain) {
   // why, under what is going on now.
   const last = fill.lastTry();
   if (last && now - last.at < LAST_TRY_SHOWN_MS) base.lastTry = last;
+  // What there is to pick from, as of the last look at Core's address book.
+  const book = fill.lastBook();
+  if (book) base.book = book;
   if (trial) return writeStatus({ ...base, state: 'trial', trial: fill.trialView(trial, peers, now) });
   if (chain.initialblockdownload) return writeStatus({ ...base, state: 'catching_up' });
   if (slots.used >= slots.max) return writeStatus({ ...base, state: 'full' });

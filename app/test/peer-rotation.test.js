@@ -570,6 +570,30 @@ test('slot fill: a missing region "tried" has nobody from is looked for in "new"
   assert.equal(fill.currentTrial().fromNew, true);
 });
 
+test('slot fill: with every slot in use it adds nobody, but counts what there is to pick from, per region', async () => {
+  for (let i = 0; i < 8; i += 1) at(seedLivePeer({ eligible: 144, first: 10, trusted: true }), 'EU');
+  inBook('198.18.0.20', 'EU');
+  inBook('198.18.0.21', 'AS');
+  inBook('198.18.0.22', 'AS');
+  const peers = setPeers([coreOut()]);
+
+  const result = await step(peers, Date.now());
+
+  assert.equal(result.started, 0, 'nobody is added to a full set');
+  const book = fill.lastBook();
+  assert.equal(book.total, 3);
+  assert.equal(book.regions.AS, 2);
+  assert.equal(book.regions.EU, 1);
+  assert.equal(book.regions.AF, 0, 'a continent nobody in the book sits in is named, with 0');
+  assert.equal('TOR' in book.regions, false, 'Tor only where Core uses it');
+
+  // A look that cannot read the book shows no count, not the old one.
+  rpc.call.mock.mockImplementation(async () => { throw new Error('down'); });
+  require('../src/lib/peer-rotation/addrbook').resetForTests();
+  await step(peers, Date.now());
+  assert.equal(fill.lastBook(), null);
+});
+
 test('slot fill: Core\'s own outbound peers count too - a region they crowd waits behind a thin one', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'AS');
   for (let i = 0; i < 3; i++) at(seedLivePeer({ eligible: 144 }), 'EU');

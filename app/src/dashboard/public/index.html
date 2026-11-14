@@ -58,6 +58,8 @@
          a single line that opens onto who delivered it: then the summary is
          the fold's own label and #blockSummary stays hidden. -->
     <section class="card block-card" id="blockCard" hidden>
+      <!-- A fresh install until its first block: what comes here, and that it comes. -->
+      <p class="block-wait" id="blockWait" hidden>Waiting for the next block. Peer Lab notes who mined it and which peer brought it to you.</p>
       <div class="block-summary" id="blockSummary" hidden></div>
       <div class="block-route" id="blockRoute" hidden></div>
       <div class="block-recon" id="blockRecon" hidden></div>
@@ -207,6 +209,13 @@
           </ul>
         </details>
       </div>
+      <!-- What there is to pick from: Core's address book after Slot Fill's
+           own filters, per region on a tap. Only while Slot Fill is on. -->
+      <details class="how slot-book" id="slot-book" hidden>
+        <summary id="slot-book-sum"></summary>
+        <p class="hint" id="slot-book-regions"></p>
+        <p class="hint">Peers from Core's address book that Core has connected to before, serve blocks and are not connected now.</p>
+      </details>
       <h3>Log</h3>
       <div class="table-wrap">
         <table id="rotation-log-table" class="rotation-log-table">
