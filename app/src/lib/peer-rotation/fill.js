@@ -48,9 +48,12 @@ const TRIAL_KEY = 'slot_fill_trial';
 // slot fill only starts an I2P candidate once Core holds an I2P connection,
 // so the session is up.
 const NO_CONNECT_MS = { clearnet: 5 * 60 * 1000, Tor: 10 * 60 * 1000, I2P: 15 * 60 * 1000 };
-// Connected, but not on our tip: long enough for the peer to answer the
-// headers Core asks every new peer for.
-const TRIAL_MS = 15 * 60 * 1000;
+// Connected, but not on our tip (or serving no blocks), counted from the
+// connection: long enough for the peer to answer the headers Core asks every
+// new peer for, which a peer on our chain does within seconds. It was a
+// quarter of an hour; on 14.11.2026 a candidate connected one minute in,
+// stayed below our tip, and held the slot fourteen more minutes for nothing.
+const TRIAL_MS = 3 * 60 * 1000;
 // Connected, serves blocks, but Core has no header height for it yet
 // (synced_headers -1). A peer one or two blocks behind our tip stays there
 // until it announces a block, and the next one may be half an hour away:
@@ -127,6 +130,20 @@ function manualSession(peers, address) {
   return peers.find((p) => p.connection_type === 'manual' && keyOf(p.addr) === keyOf(address)) || null;
 }
 
+// When the verdict on the candidate is due: from the trial's start while Core
+// has no connection to it, from the connection once there is one - a
+// connection that came late, over Tor, say, still gets its minutes to answer.
+function decideAt(trial, session) {
+  if (!session) return trial.startedAt + (NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet);
+  const headersOpen = servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
+  if (headersOpen) return trial.startedAt + HEADERS_OPEN_MS;
+  const connectWindow = NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet;
+  const connectedAt = Number(session.conntime) > 0 ? Number(session.conntime) * 1000 : trial.startedAt;
+  // Never before the trial (a session from before it), never after the time a
+  // connection had (a clock that runs ahead would push the verdict out).
+  return Math.min(Math.max(trial.startedAt, connectedAt), trial.startedAt + connectWindow) + TRIAL_MS;
+}
+
 // What the slot needs from the peer: blocks and segwit, and our chain. Core
 // asks every new peer for headers from just below its own tip, so a peer on
 // this chain answers with the tip within seconds - on a real node, fresh
@@ -138,6 +155,30 @@ function works(session, chain, since = null) {
   if (!session || !servesBlocks(session.services)) return false;
   const tip = Number(since ?? chain.headers ?? chain.blocks);
   return Number.isFinite(tip) && Number(session.synced_headers) >= tip - 2;
+}
+
+// How the last candidate that did not keep its slot ended, for the top row of
+// the page's log: that row says what Slot Fill is doing now, and with this
+// also why the peer before went again (14.11.2026: a candidate showed in the
+// manual list and left it again, and the log said nothing). Not a log entry:
+// on a bad day ten of them would push the real changes out of the log.
+const LAST_TRY_KEY = 'slot_fill_last_try';
+function writeLastTry(value) {
+  if (!value) {
+    db.instance.prepare('DELETE FROM meta WHERE key = ?').run(LAST_TRY_KEY);
+    return;
+  }
+  db.instance
+    .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(LAST_TRY_KEY, JSON.stringify(value));
+}
+function lastTry() {
+  try {
+    const row = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(LAST_TRY_KEY);
+    return row ? JSON.parse(row.value) : null;
+  } catch {
+    return null;
+  }
 }
 
 // Why a trial ended without the slot, as a short code (kept in the database)
@@ -186,6 +227,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // stands.
   if (row && row.kept) {
     writeTrial(null);
+    writeLastTry(null);
     return 'left';
   }
   // Taken out by hand - or the app stopped, or the add failed, after Core was
@@ -197,12 +239,15 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   if (!row) {
     await peerSync.removeTrustedPeer(trial.address, { disconnect: false });
     writeTrial(null);
+    // Ended by a person: the one before is no longer the peer before.
+    writeLastTry(null);
     return 'left';
   }
   const session = manualSession(peers, trial.address);
   const fake = disguised(session, peers);
   if (!fake && works(session, chain, trial.tip)) {
     writeTrial(null);
+    writeLastTry(null);
     markTried(trial.address, true, now, { reason: 'ok', startedAt: trial.startedAt });
     logAction({ action: 'promote', address: trial.address, note: trial.note });
     logger.info('slot fill: Core connected, the candidate keeps the slot', { address: trial.address });
@@ -211,12 +256,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // How long the verdict waits depends on what Core has to show for it so
   // far: no connection at all, a connection with no header height yet, or a
   // height that is not ours.
-  const elapsed = now - trial.startedAt;
-  const headersOpen = Boolean(session) && servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
-  const limit = !session
-    ? NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet
-    : headersOpen ? HEADERS_OPEN_MS : TRIAL_MS;
-  if (!force && !fake && elapsed < limit) return 'waiting';
+  if (!force && !fake && now < decideAt(trial, session)) return 'waiting';
 
   // Out of the set first, then the trial is closed: a crash in between leaves
   // a trial whose candidate is gone, which the next pass reads as 'left'.
@@ -225,8 +265,14 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   await peerSync.removeTrustedPeer(trial.address);
   writeTrial(null);
   const why = whyNot(session, fake);
-  if (!force) markTried(trial.address, false, now, { reason: why.code, startedAt: trial.startedAt });
   const minutes = Math.max(1, Math.round((now - trial.startedAt) / 60000));
+  if (!force) {
+    markTried(trial.address, false, now, { reason: why.code, startedAt: trial.startedAt });
+    const { region, country } = spread.placeOf({ address: trial.address });
+    writeLastTry({ at: now, reason: why.code, minutes, country: country || null, region: spread.REGION_NAMES[region] || null });
+  } else {
+    writeLastTry(null);
+  }
   logger.info('slot fill: candidate not kept', {
     address: trial.address, what: trial.what, reason: force ? 'switched off' : `${why.text} in ${minutes} min`,
   });
@@ -351,12 +397,9 @@ function trialView(trial, peers, now = Date.now()) {
   const session = manualSession(peers, trial.address);
   const headersOpen = Boolean(session) && servesBlocks(session.services) && !(Number(session.synced_headers) >= 0);
   const phase = !session ? 'connecting' : headersOpen ? 'headers' : 'checking';
-  const limit = !session
-    ? NO_CONNECT_MS[unreachableNetwork(trial.address)] || NO_CONNECT_MS.clearnet
-    : headersOpen ? HEADERS_OPEN_MS : TRIAL_MS;
   const { region, country } = spread.placeOf({ address: trial.address });
   return {
-    address: trial.address, startedAt: trial.startedAt, phase, decideBy: trial.startedAt + limit,
+    address: trial.address, startedAt: trial.startedAt, phase, decideBy: decideAt(trial, session),
     // Where, in words a person reads: the country, or Tor, I2P, the region.
     country: country || null, region: spread.REGION_NAMES[region] || null,
   };
@@ -389,4 +432,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastLook: () => lastLook };
+module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook };

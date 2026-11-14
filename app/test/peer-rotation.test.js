@@ -101,7 +101,7 @@ test.afterEach(() => {
   require('../src/lib/peer-rotation/addrbook').resetForTests();
   db.instance.exec(`DELETE FROM slot_fill_tried;
     DELETE FROM meta WHERE key IN ('slot_fill_trial', 'slot_fill_swap_rest_until', 'peer_rotation_enabled',
-      'slot_fill_last_pass', 'slot_fill_core_down', 'slot_fill_core_down_last', 'slot_fill_gaps');`);
+      'slot_fill_last_pass', 'slot_fill_core_down', 'slot_fill_core_down_last', 'slot_fill_gaps', 'slot_fill_last_try');`);
 });
 
 // Core's chain tip in these tests.
@@ -693,6 +693,40 @@ test('slot fill: a candidate Core cannot connect to goes again, and is not tried
   assert.equal((await step(setPeers([coreOut()]), t0 + 17 * MIN)).started, 0, 'the only candidate failed');
 });
 
+test('slot fill: a candidate that goes again is remembered with the reason, for the top row of the page', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  assert.equal(fill.lastTry(), null, 'nothing has gone yet');
+
+  await step(setPeers([coreOut()]), t0 + 16 * MIN);
+
+  const last = fill.lastTry();
+  assert.equal(last.reason, 'no_connection');
+  assert.equal(last.at, t0 + 16 * MIN);
+  assert.equal(last.region, 'Asia');
+  assert.ok(!JSON.stringify(last).includes(asia.split(':')[0]), 'where it was, not its address');
+  assert.deepEqual(logRows(), [], 'and still no log entry');
+});
+
+test('slot fill: a candidate that keeps its slot clears the one before from the top row', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const two = [inBook('198.18.0.10', 'AS'), inBook('198.18.0.12', 'AF')];
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const first = fill.currentTrial().address;
+  // The pass that lets the first one go puts the other on trial.
+  await step(setPeers([coreOut()]), t0 + 16 * MIN);
+  assert.ok(fill.lastTry());
+  const second = fill.currentTrial().address;
+  assert.deepEqual([first, second].sort(), [...two].sort());
+
+  await step(setPeers([coreOut(), manualSession(second)]), t0 + 20 * MIN);
+
+  assert.equal(fill.lastTry(), null);
+});
+
 test('slot fill: blocks found during the trial do not fail a candidate that had the tip when it connected', async () => {
   // Core only moves synced_headers when that peer announces a block first, so
   // a good peer can sit a few blocks behind the tip a quarter of an hour on.
@@ -712,7 +746,7 @@ test('slot fill: a connection that serves no blocks, or is not on our tip, does 
   const asia = inBook('198.18.0.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 10 * MIN)).confirmed, 0);
+  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 2 * MIN)).confirmed, 0);
 
   const sent = [];
   rpc.addNode.mock.mockImplementation(async (a, c) => { sent.push(`${c} ${a}`); });
@@ -1169,14 +1203,50 @@ test('slot fill: still no header height after 30 minutes - out', async () => {
   assert.ok(!isManual(asia));
 });
 
-test('slot fill: a height that is not ours is out at 15 minutes, as before', async () => {
+// 14.11.2026: a candidate connected a minute in, stayed below our tip and
+// held the slot fourteen minutes more. Three minutes from the connection: a
+// peer on our chain shows the tip within seconds.
+test('slot fill: a height that is not ours is out three minutes after the connection', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
   const asia = inBook('198.18.0.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
+  const behind = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 + 2 * MIN) / 1000) });
 
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 14 * MIN)).reverted, 0);
-  assert.equal((await step(setPeers([coreOut(), manualSession(asia, { synced: TIP - 50 })]), t0 + 15 * MIN)).reverted, 1);
+  assert.equal((await step(setPeers([coreOut(), behind]), t0 + 4 * MIN)).reverted, 0, 'two minutes after it connected');
+  assert.equal((await step(setPeers([coreOut(), behind]), t0 + 5 * MIN)).reverted, 1);
+  assert.equal(fill.lastTry().reason, 'height_wrong');
+});
+
+test('slot fill: the three minutes count from the trial when the connection is older, and never from far ahead', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  // A session that was there before the trial began: timed from the trial.
+  const old = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 - 60 * MIN) / 1000) });
+  assert.equal((await step(setPeers([coreOut(), old]), t0 + 2 * MIN)).reverted, 0);
+  assert.equal((await step(setPeers([coreOut(), old]), t0 + 3 * MIN)).reverted, 1);
+});
+
+test('slot fill: a connection time from a clock far ahead does not hold the slot longer', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const ahead = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 + 600 * MIN) / 1000) });
+  // At most the five minutes a clearnet connection had, then three.
+  assert.equal((await step(setPeers([coreOut(), ahead]), t0 + 8 * MIN)).reverted, 1);
+});
+
+test('slot fill: a peer on our tip is kept at the first check after it connected', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const fresh = manualSession(asia, { conntime: Math.floor((t0 + 30 * 1000) / 1000) });
+
+  assert.equal((await step(setPeers([coreOut(), fresh]), t0 + MIN)).confirmed, 1);
 });
 
 // Moves the open trial back in time, as if it had been running that long.
