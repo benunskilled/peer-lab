@@ -130,6 +130,9 @@ type lastBlock struct {
 	// the block (1 or 0): it decides how many pings the hop into Core takes.
 	// Absent where the dashboard did not know, or is older than this.
 	FirstHb *int `json:"first_hb,omitempty"`
+	// How many peers fit the moment the block came: more than one, and
+	// nobody is credited (first_peers stays empty).
+	FirstCount *int `json:"first_count,omitempty"`
 	// How many transactions that template carried: a pool spends time on
 	// every one, so this is why one block's job is slower than the next.
 	TemplateTx *int `json:"template_tx,omitempty"`
@@ -291,6 +294,7 @@ func (s *dashboardClient) latest(ctx context.Context, want string) *lastBlock {
 		TemplateTx    *int     `json:"templateTx"`
 		FirstPingMs   *float64 `json:"firstPingMs"`
 		FirstHb       *int     `json:"firstHb"`
+		FirstCount    *int     `json:"firstCount"`
 		DeliveredEver []string `json:"deliveredEver"`
 		Recon         *string  `json:"recon"`
 		ReconMissing  *int64   `json:"reconMissingBytes"`
@@ -382,6 +386,7 @@ func (s *dashboardClient) latest(ctx context.Context, want string) *lastBlock {
 		TemplateTx:        got.TemplateTx,
 		FirstPingMs:       got.FirstPingMs,
 		FirstHb:           got.FirstHb,
+		FirstCount:        got.FirstCount,
 		RouteMedian:       med,
 		Recon:             recon,
 		ReconMissingBytes: got.ReconMissing,

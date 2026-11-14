@@ -353,9 +353,9 @@
 
   function togglePlace(b) {
     state.place = state.place && state.place.key === b.key ? null : { key: b.key, label: b.sub && b.key[0] === "r" ? `${b.title}, ${b.sub}` : b.title };
-    renderPlaceFilter();
-    renderMarkers();
-    renderTables();
+    // The same way as every other filter, history entry included: swiping
+    // back after a click on the map clears the place, as it clears a chip.
+    applyFilters();
   }
   function renderPlaceFilter() {
     $("placeFilter").hidden = !state.place;

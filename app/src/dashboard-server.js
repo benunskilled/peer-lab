@@ -697,6 +697,8 @@ const routes = {
       poolTag: race.poolTag,
       poolSource: race.poolSource,
       firstPeers: race.firstPeers.map((p) => p.address),
+      // How many peers fit the moment: more than one, and nobody is credited.
+      firstCount: race.firstCount ?? null,
       // The same block seen from the mining side, when a race was recorded
       // for it. null is the normal answer with Stratum Race switched off.
       stratum: race.stratum,
