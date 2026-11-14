@@ -1,0 +1,20 @@
+# Dependency updates, one PR per ecosystem, on the 1st and 15th of each
+# month. Every PR still has to pass Peer Lab CI before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule: { interval: cron, cronjob: "0 6 1,15 * *" }
+    groups: { npm: { patterns: ["*"] } }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: cron, cronjob: "0 6 1,15 * *" }
+    groups: { actions: { patterns: ["*"] } }
+  # Base images: patches only. A new Go or Node minor is its own change.
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: cron, cronjob: "0 6 1,15 * *" }
+    groups: { docker: { patterns: ["*"] } }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
