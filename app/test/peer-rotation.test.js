@@ -581,6 +581,25 @@ test('slot fill: Core\'s own outbound peers count too - a region they crowd wait
   assert.equal(fill.currentTrial().address, asia, 'Asia has one connection, Europe three of Core\'s own');
 });
 
+// 14.11.2026: Europe, Asia and Africa had one outbound connection each, and
+// the slot went to Europe, where hundreds of peers had come in on their own.
+test('slot fill: between regions with as few outbound connections, the one with fewer inbound peers goes first', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'AS');
+  at(seedLivePeer({ eligible: 144 }), 'EU');
+  for (let i = 0; i < 5; i++) at(seedLivePeer({ direction: 'inbound', connectionType: 'inbound' }), 'AS');
+  const europe = inBook('198.18.0.50', 'EU');
+  // A country the manual peers do not have yet, like Europe's: only the
+  // inbound peers can tell the two apart.
+  inBook('198.18.0.51', 'AS', { country: 'SG' });
+  // Several orders of the address book: the shuffle must not decide it.
+  for (let round = 0; round < 5; round++) {
+    await step(setPeers([coreOut()]), Date.now());
+    assert.equal(fill.currentTrial().address, europe, 'one outbound each; Asia has five inbound, Europe none');
+    await fill.abandon(europe);
+    db.instance.exec(`DELETE FROM meta WHERE key = 'slot_fill_trial'; DELETE FROM trusted_peer WHERE address = '${europe}';`);
+  }
+});
+
 test('slot fill: with clearnet, no second I2P connection - Core\'s own counts - and the note says how few', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
   at(seedLivePeer({ eligible: 144 }), 'AS');

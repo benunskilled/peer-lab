@@ -356,14 +356,47 @@
   // the peers become cards, so the fourth step - Operator - is never shown as
   // a table. The address always stays.
   const DROP_LEVELS = 4, KIND_LEVEL = 3, CARD_LEVEL = 3;
+  // The columns hold still between refreshes (14.11.2026: every ten seconds
+  // a peer with a longer name came or went, and every column of all three
+  // tables moved, wider or narrower). They are measured anew only when the
+  // reader changes something: the page's width, a filter, a group opened or
+  // closed. Between those a longer text is cut, whole on hover, until then.
+  // Held both ways: a table that gave up a column, or became cards, for a
+  // long text stays so until then too - a column coming back is a jump as well.
+  // The card's own width, not the window's: a scrollbar that comes and goes
+  // changes the one and not the other.
+  let held = null;
+  const cardWidth = (wraps) => (wraps.find((w) => w.querySelector("table.peers")?.offsetWidth) || wraps[0] || {}).clientWidth || 0;
+  const layoutKey = (wraps) => [cardWidth(wraps), JSON.stringify([state.group, state.sub, state.label, state.place && state.place.key]),
+    wraps.map((w) => (w.querySelector("table.peers")?.offsetWidth ? 1 : 0)).join("")].join("|");
+  function reuseLayout(wraps, key) {
+    if (!held || held.key !== key) return false;
+    const tables = wraps.map((w) => w.querySelector("table.peers")).filter((t) => t && t.offsetWidth);
+    for (const w of wraps) { w.dataset.drops = String(held.level); w.classList.toggle("cards", held.cards); }
+    if (held.cards) return true;
+    for (const t of tables) {
+      const cells = [...t.tHead.rows[0].cells];
+      if (cells.some((th) => !held.widths.has(colKey(th)))) return false;
+      cells.forEach((th) => { th.style.width = held.widths.get(colKey(th)) + "px"; });
+      t.classList.add("aligned");
+    }
+    // Whatever was missed above: a table past its card is measured anew.
+    return !overflows(wraps);
+  }
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
+    const key = layoutKey(wraps);
     // A second reason never decides which columns go: measured with the first
     // alone, and put back below where it fits whole.
     const seconds = [...document.querySelectorAll("#tables [data-one]")];
     for (const e of seconds) e.textContent = e.dataset.one;
     const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
+    if (reuseLayout(wraps, key)) {
+      finishFit(wraps, held.cards, seconds);
+      if (window.scrollY !== y) window.scrollTo(0, y);
+      return;
+    }
     for (const w of wraps) w.classList.remove("cards");
     // Tight when the shared widths (alignColumns) together are wider than
     // the card. Each table is measured there too; asking whether one table
@@ -396,6 +429,12 @@
     // (12.11.2026).
     if (level >= CARD_LEVEL && !cards) { cards = true; unalign(); }
     for (const w of wraps) w.classList.toggle("cards", cards);
+    const first = wraps.map((w) => w.querySelector("table.peers")).find((t) => t && t.offsetWidth);
+    held = { key, level, cards, widths: new Map(first && !cards ? [...first.tHead.rows[0].cells].map((th) => [colKey(th), parseFloat(th.style.width) || 0]) : []) };
+    finishFit(wraps, cards, seconds);
+    if (window.scrollY !== y) window.scrollTo(0, y);
+  }
+  function finishFit(wraps, cards, seconds) {
     // A second reason only where it fits whole, never cut short (09.11.2026):
     // on a card its own line, in the wide list the grey line it sits in.
     for (const e of seconds) {
@@ -410,7 +449,6 @@
       if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
       else row.style.removeProperty("--kind-space");
     }
-    if (window.scrollY !== y) window.scrollTo(0, y);
   }
   const overflows = (wraps) => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
   const kindCut = (wraps) => wraps.some((w) =>
