@@ -970,6 +970,7 @@ async function refreshRotation() {
 
   lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null };
   renderSlotStatus();
+  renderSlotBook();
   // The slow round speeds up while a trial runs.
   const trialNow = Boolean(data.enabled && data.status && data.status.state === 'trial');
   window.dispatchEvent(new CustomEvent('peerlab:slotstatus', { detail: { trial: trialNow } }));
@@ -996,6 +997,24 @@ function lastTryText(st) {
   if (!l) return '';
   const where = l.country ? countryName(l.country) : l.region;
   return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${LAST_TRY_WHY[l.reason] || 'was not kept'}.`;
+}
+// "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
+// per region under it. Text only, so an open list stays open on a redraw.
+const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
+function renderSlotBook() {
+  const box = document.getElementById('slot-book');
+  if (!box) return;
+  const s = lastSlotStatus;
+  const b = s && s.enabled && s.status && s.status.book;
+  box.hidden = !b;
+  if (!b) return;
+  const slots = s.status.slots || { used: 0, max: MAX_MANUAL_PEERS };
+  const n = (x) => Number(x).toLocaleString('en-US');
+  const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
+  const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
+  document.getElementById('slot-book-sum').textContent = `${slots.used} of ${slots.max} slots used \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
+    + (none.length ? ` \u00b7 none in ${none.join(', ')}` : '');
+  document.getElementById('slot-book-regions').textContent = regions.map(([r, c]) => `${BOOK_REGIONS[r] || r} ${n(c)}`).join(' \u00b7 ');
 }
 function slotStatusText(st, now) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
