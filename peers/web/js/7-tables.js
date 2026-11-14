@@ -97,6 +97,33 @@
     restoreFocus(root, focused, focusKey);
   }
 
+  // "Brought by" in a block's details leads here: the peer's row, open, in
+  // view and lit up once, whatever hid it - a filter, a folded card or the
+  // inbound top ten. The open row is a history entry like any other, so
+  // swiping back closes it. False when the peer is gone.
+  function revealPeer(addr) {
+    const p = state.data.peers.find((x) => x.addr === addr);
+    if (!p) return false;
+    const g = p.group;
+    const key = g + " " + addr;
+    if (!groupPeers(g).peers.some((x) => x.addr === addr)) {
+      state.group = state.kind = state.sub = state.label = state.place = null;
+    }
+    if (folded.delete("group-" + g)) store.set(FOLD_KEY, JSON.stringify([...folded]));
+    state.openRows.clear();
+    state.openRows.add(key);
+    const find = () => document.querySelector(`#tables tr[data-anchor="${CSS.escape(key)}"]`);
+    applyFilters();
+    if (!find() && g === "inbound") { state.showAllInbound = true; renderTables(); }
+    const tr = find();
+    if (!tr) return false;
+    tr.scrollIntoView({ block: "center", behavior: glide() });
+    tr.classList.remove("jumped");
+    void tr.offsetWidth; // restart the light-up on a second click
+    tr.classList.add("jumped");
+    return true;
+  }
+
   // The peers of one group as the filters leave them: `all` before any
   // filter, `kindPool` before this group's own kind filter (its chips count
   // those), `peers` what the table shows.

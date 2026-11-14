@@ -608,6 +608,15 @@ test('GET /api/blocks/latest serves the neighbour', async () => {
   assert.deepEqual(body.firstPeers, ['1.2.3.4:8333']);
   // Addresses, not the owner's own labels for them.
   assert.equal('trustedLabel' in body, false);
+  assert.equal(body.firstCount, null, 'older rows have no count');
+
+  // Two peers fit the moment: nobody credited, and the page is told how many.
+  db.instance.prepare('INSERT INTO relay_race (block_hash, block_height, detected_at, first_count) VALUES (?, ?, ?, ?)')
+    .run('00cafe', 967725, 1_700_000_600_000, 2);
+  const unclear = await api('/api/blocks/latest');
+  assert.equal(unclear.body.height, 967725);
+  assert.deepEqual(unclear.body.firstPeers, []);
+  assert.equal(unclear.body.firstCount, 2);
 });
 
 // The peers service decodes this reply into a struct of its own

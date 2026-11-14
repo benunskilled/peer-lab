@@ -63,12 +63,23 @@
     const firsts = b.first_peers || [];
     const known = new Map(((state.data && state.data.peers) || []).map((p) => [p.addr, p]));
     const lead = firsts.map((a) => known.get(a)).find(Boolean);
-    const more = firsts.length > 1 ? ` +${firsts.length - 1}` : "";
-    if (!firsts.length) row("Brought by", span("miss", "nobody credited"));
+    // More than one peer fit the moment: nobody is credited, and the block
+    // says why rather than leave it at "nobody".
+    if (!firsts.length) row("Brought by", span("miss", b.first_count > 1 ? `${b.first_count} peers at once, nobody credited` : "nobody credited"));
     else {
       const where = lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
         : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
-      const v = row("Brought by", span("", where + more, firsts.join("\n")));
+      // A peer still connected is a way to its row: open, in view, lit up.
+      let shown = span("", where, firsts[0]);
+      if (lead) {
+        shown = document.createElement("button");
+        shown.type = "button";
+        shown.className = "b-peer";
+        shown.textContent = where;
+        shown.title = firsts[0] + "\nShow this peer";
+        shown.addEventListener("click", () => revealPeer(lead.addr));
+      }
+      const v = row("Brought by", shown);
       if (b.first_hb === 1) v.append(" ", span("hb", "\u26a1", HB_TITLE));
     }
 
