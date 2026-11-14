@@ -328,7 +328,7 @@ async function start(ranking, peers, chain, now = Date.now()) {
   const coreKeys = spread.coreOperatorsOf(ranking);
   const counts = spread.totalCounts(trusted, coreRegions);
   const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
-  const ranked = spread.rankForGap(shuffle(book), trusted, coreRegions);
+  const ranked = spread.rankForGap(shuffle(book), trusted, coreRegions, spread.inboundRegionsOf(ranking));
   const inGap = (c) => gaps.has(spread.placeOf(c).region);
   // Where clearnet works, one Tor and one I2P connection are enough, Core's
   // own counted (10.11.2026): an I2P or Tor peer may sit anywhere, and those
