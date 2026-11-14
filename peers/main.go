@@ -201,6 +201,9 @@ type snapshot struct {
 	// The newest block the dashboard has seen: who mined it, and which peer
 	// here delivered it. Absent while it has not seen one or is not up.
 	LastBlock *lastBlock `json:"last_block,omitempty"`
+	// The dashboard answered and has no block yet (a fresh install), as
+	// opposed to not answering: only then does the page say it is waiting.
+	NoBlockYet bool `json:"no_block_yet,omitempty"`
 	// Where this node is (a region), so the map can draw the lines to it.
 	Home    *Home  `json:"home,omitempty"`
 	Version string `json:"version"`
@@ -336,6 +339,7 @@ func newHandler(src *source, dash *dashboardClient) http.Handler {
 			defer cancel()
 			snap := src.get(ctx)
 			snap.LastBlock = dash.latest(ctx, want)
+			snap.NoBlockYet = snap.LastBlock == nil && dash.noBlockYet()
 			return snap
 		})
 		var snap snapshot

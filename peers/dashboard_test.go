@@ -405,3 +405,30 @@ func TestDashboardReconUnclear(t *testing.T) {
 		}
 	}
 }
+
+// "No block yet" is said only when the dashboard answered so (a fresh
+// install), never when it did not answer: then the page leaves the card out
+// instead of "waiting" on a node with hundreds of blocks.
+func TestNoBlockYetOnlyWhenTheDashboardSaysSo(t *testing.T) {
+	answer := "null"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/blocks/latest" {
+			w.Write([]byte(answer))
+		}
+	}))
+	defer srv.Close()
+	s := &dashboardClient{url: srv.URL + "/api/health", blockURL: srv.URL + "/api/blocks/latest", client: srv.Client(), every: time.Minute, now: time.Now}
+	if b := s.latest(context.Background(), ""); b != nil || !s.noBlockYet() {
+		t.Fatalf("answered null: block %v, noBlockYet %v", b, s.noBlockYet())
+	}
+	answer = "{not json"
+	s.blockAt = time.Time{}
+	if b := s.latest(context.Background(), ""); b != nil || s.noBlockYet() {
+		t.Fatalf("unreadable answer: block %v, noBlockYet %v", b, s.noBlockYet())
+	}
+	srv.Close()
+	down := &dashboardClient{url: srv.URL + "/api/health", blockURL: srv.URL + "/api/blocks/latest", client: &http.Client{Timeout: time.Second}, every: time.Minute, now: time.Now}
+	if b := down.latest(context.Background(), ""); b != nil || down.noBlockYet() {
+		t.Fatalf("dashboard down: block %v, noBlockYet %v", b, down.noBlockYet())
+	}
+}

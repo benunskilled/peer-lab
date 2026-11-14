@@ -286,11 +286,15 @@ let lastLook = null;
 const looked = (why, counts = {}) => { lastLook = { why, ...counts }; return 0; };
 
 // How many addresses Slot Fill could pick from at its last look, and how many
-// per region, for the line on the page ("4,812 addresses to pick from"). A
-// region a usable network could reach but nobody in the book sits in is
+// per region, for the line on the page ("4,812 addresses to pick from"):
+// those from "tried", Core has connected to them before - what the page says.
+// A region a usable network could reach but nobody in the book sits in is
 // there with 0, so the page can name it; Tor and I2P only where Core uses them.
+// Cleared at every look, so a look that could not read the book shows none
+// rather than an old count beside a status that says the book is empty.
 let lastBook = null;
-function noteBook(book, nets, now) {
+function noteBook(candidates, nets, now) {
+  const book = candidates.filter((c) => !c.fromNew);
   const regions = {};
   if (nets.has('ipv4') || nets.has('ipv6')) for (const r of ['AF', 'AS', 'EU', 'NA', 'OC', 'SA']) regions[r] = 0;
   if (nets.has('onion')) regions.TOR = 0;
@@ -308,6 +312,7 @@ function noteBook(book, nets, now) {
  */
 async function start(ranking, peers, chain, now = Date.now()) {
   lastLook = null;
+  lastBook = null;
   // A node still catching up has no tip to test a candidate against.
   if (chain.initialblockdownload) return looked('catching_up');
   const trusted = ranking.filter((p) => p.trusted);

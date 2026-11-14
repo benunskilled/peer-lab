@@ -586,6 +586,12 @@ test('slot fill: with every slot in use it adds nobody, but counts what there is
   assert.equal(book.regions.EU, 1);
   assert.equal(book.regions.AF, 0, 'a continent nobody in the book sits in is named, with 0');
   assert.equal('TOR' in book.regions, false, 'Tor only where Core uses it');
+
+  // A look that cannot read the book shows no count, not the old one.
+  rpc.call.mock.mockImplementation(async () => { throw new Error('down'); });
+  require('../src/lib/peer-rotation/addrbook').resetForTests();
+  await step(peers, Date.now());
+  assert.equal(fill.lastBook(), null);
 });
 
 test('slot fill: Core\'s own outbound peers count too - a region they crowd waits behind a thin one', async () => {

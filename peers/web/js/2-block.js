@@ -106,9 +106,21 @@
   function renderBlockCard() {
     const card = $("blockCard");
     if (!card) return;
-    const b = state.data && state.data.last_block;
-    card.hidden = !b;
+    if (!state.data) { card.hidden = true; return; }
+    const b = state.data.last_block;
+    // No block since Peer Lab started - a fresh install: the card says what
+    // will come, rather than leave the page to begin with the map. Only when
+    // the dashboard said so: a dashboard that did not answer (restarting,
+    // slow) leaves the card out, as before, not "waiting" on a node with
+    // hundreds of blocks.
+    if (!b && !state.data.no_block_yet) { card.hidden = true; return; }
+    card.hidden = false;
+    $("blockWait").hidden = Boolean(b);
+    const verdictBox = $("blockVerdict");
+    for (const el of [$("blockSummary"), $("blockRoute"), $("blockRecon"), $("blockMore"), verdictBox]) if (el && !b) el.hidden = true;
     if (!b) return;
+    if (verdictBox) verdictBox.hidden = false;
+    $("blockMore").hidden = false;
     const more = $("blockMore");
     // The route and the compact block line belong to the details.
     for (const id of ["blockRoute", "blockRecon"]) if ($(id).parentElement !== more) more.insertBefore($(id), $("blockBody"));
@@ -685,6 +697,7 @@
     const card = $("blockCard"), box = $("blockMore");
     card.addEventListener("click", (ev) => {
       if (!card.contains(ev.target) || ev.target.closest("summary, a, button, input, select, textarea, label")) return;
+      if (!$("blockWait").hidden) return; // nothing to open before the first block
       if (String(window.getSelection()).length > 0) return;
       // Inside an open fold of its own (Pools): that one shuts, as a tap in
       // any other fold does. It shut the whole Details instead, and left

@@ -705,7 +705,7 @@ window.peerLab = {
   },
   foldable,
   // The peer list's counts of connected peers per group, for the tiles.
-  liveCounts: (counts) => { listCounts = counts; listCountsAt = Date.now(); drawTiles(counts); },
+  liveCounts: (counts) => { listCounts = counts; listCountsAt = Date.now(); drawTiles(counts); renderSlotBook(); },
   foldInPlace,
   flagOf: (cc) => flagOf(cc),
   fmtDuration: (ms) => fmtDuration(ms),
@@ -1008,12 +1008,14 @@ function renderSlotBook() {
   const b = s && s.enabled && s.status && s.status.book;
   box.hidden = !b;
   if (!b) return;
-  const slots = s.status.slots || { used: 0, max: MAX_MANUAL_PEERS };
+  // The slots as the manual list counts them right now, not as of the last
+  // pass: the two sit close together on the page and must agree.
+  const used = manualSlotsUsed();
   const n = (x) => Number(x).toLocaleString('en-US');
   const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
   const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
-  document.getElementById('slot-book-sum').textContent = `${slots.used} of ${slots.max} slots used \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
-    + (none.length ? ` \u00b7 none in ${none.join(', ')}` : '');
+  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
+    + (none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
   document.getElementById('slot-book-regions').textContent = regions.map(([r, c]) => `${BOOK_REGIONS[r] || r} ${n(c)}`).join(' \u00b7 ');
 }
 function slotStatusText(st, now) {
