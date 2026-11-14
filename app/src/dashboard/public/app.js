@@ -329,12 +329,19 @@ const LIST_COUNTS_MAX_AGE_MS = 45000;
 // own colour. Outbound leaves out the manual peers, which have a tile of
 // their own - as in the peer list, so the three groups add up to the total.
 // Full relay and block relay are told apart in the Outbound table below.
+// The Manual tile counts connected peers, but a locked peer that is offline
+// still holds its slot: with one, the tile says how many slots are used, so
+// it never reads "7 of 8" above a list that has no slot free.
+function manualSlotsUsed() {
+  return (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address)).length;
+}
 function drawTiles({ inbound, outbound, manual }) {
+  const used = manualSlotsUsed();
   const stats = [
     ['Total', inbound + outbound + manual, ''],
     ['Inbound', inbound, 'inbound'],
     ['Outbound', outbound, 'outbound'],
-    ['Manual', manual, 'manual', `of ${MAX_MANUAL_PEERS}`],
+    ['Manual', manual, 'manual', used > manual ? `${used}/${MAX_MANUAL_PEERS} slots used` : `of ${MAX_MANUAL_PEERS}`],
   ];
   document.getElementById('live-stats').innerHTML = stats
     .map(([label, n, k, sub]) => `<div class="stat${k ? ' s-' + k : ''}"><div class="l">${label}</div><div class="n">${n}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`)
@@ -693,7 +700,7 @@ window.peerLab = {
   manualSummary: () => {
     const manual = (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address));
     const kept = manual.filter((p) => p.kept).length;
-    const free = Math.max(0, MAX_MANUAL_PEERS - manual.length);
+    const free = Math.max(0, MAX_MANUAL_PEERS - manualSlotsUsed());
     return `${free} of ${MAX_MANUAL_PEERS} slots free` + (kept ? ` \u00b7 ${kept === manual.length ? 'all locked' : `${kept} locked`}` : '');
   },
   foldable,

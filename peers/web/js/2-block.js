@@ -164,6 +164,7 @@
         btn.type = "button";
         btn.textContent = label;
         btn.className = v === view ? "on" : "";
+        btn.setAttribute("aria-pressed", String(v === view));
         btn.addEventListener("click", () => setRouteView(v));
         sw.appendChild(btn);
       }
@@ -478,6 +479,7 @@
       btn.type = "button";
       btn.textContent = label;
       btn.className = v === view ? "on" : "";
+      btn.setAttribute("aria-pressed", String(v === view));
       btn.addEventListener("click", () => setRouteView(v));
       sw.appendChild(btn);
     }
