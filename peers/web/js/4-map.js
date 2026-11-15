@@ -82,7 +82,9 @@
     const delivered = deliveredNow;
     const by = new Map();
     for (const p of visiblePeers()) {
-      if (!p.cc || mapHidden.has(p.group)) continue;
+      // A hidden group's peers are left off - but not the one that brought the
+      // last block: the star is the one place the map says who did.
+      if (!p.cc || (mapHidden.has(p.group) && !delivered.has(p.addr))) continue;
       const key = placeKey(p, byRegion);
       let b = by.get(key);
       if (!b) {
@@ -161,7 +163,7 @@
       g.dataset.key = b.key;
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
-      g.setAttribute("aria-label", `${b.title}${b.sub ? ", " + b.sub : ""}: ${GROUPS.map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
+      g.setAttribute("aria-label", `${b.title}${b.sub ? ", " + b.sub : ""}: ${GROUPS.filter((k) => !mapHidden.has(k) || b[k]).map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
 
       // A light, not a pie: the colour is the place's leading group - manual
       // whenever it holds one of yours - and the split is in the tooltip.
@@ -464,7 +466,9 @@
       s.textContent = b.sub;
       tip.appendChild(s);
     }
-    for (const k of GROUPS) {
+    // A group hidden in the legend has no row: "Inbound 0" where thirty are
+    // connected would be wrong. Only the delivering peer can bring one back.
+    for (const k of GROUPS.filter((g) => !mapHidden.has(g) || b[g])) {
       const row = document.createElement("div");
       row.className = "row";
       const sw = document.createElement("span");
