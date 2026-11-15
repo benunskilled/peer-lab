@@ -24,8 +24,65 @@ const keyOf = (address) => addressKey(address, config.bitcoin.network);
  * simply stays queued in our own trusted_peer table and gets picked up
  * automatically once a slot frees up (another manual peer removed/dropped).
  */
+/**
+ * A manual peer Core holds in another spelling than ours - "1.2.3.4" from
+ * bitcoin.conf against our "1.2.3.4:8333", an IPv6 written out long - takes
+ * Core's: Core names the connection by its own addnode string, and in ours
+ * the live peer showed without its padlock beside an offline copy holding
+ * it (review G3, regtest 15.11.2026). Padlock, label and date go along; two
+ * rows for one peer become one, locked if either was.
+ */
+function takeCoreSpelling(addedNodes) {
+  const core = new Map();
+  for (const n of addedNodes) if (n && n.addednode) core.set(keyOf(n.addednode), n.addednode);
+  if (!core.size) return;
+  const justRemoved = recentRemovals();
+  const del = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
+  // A row in Core's spelling written meanwhile (a parallel add) keeps its own
+  // and gains the padlock if either had it.
+  const put = db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(address) DO UPDATE SET kept = MAX(trusted_peer.kept, excluded.kept),
+      label = COALESCE(trusted_peer.label, excluded.label), created_at = MIN(trusted_peer.created_at, excluded.created_at)`);
+  const renamed = [];
+  // Read and written in one go: the dashboard removes peers from another
+  // process, and a row it removed in between must not come back (review).
+  db.instance.transaction(() => {
+    const byKey = new Map();
+    for (const r of db.instance.prepare('SELECT address, label, kept, created_at FROM trusted_peer').all()) {
+      const k = keyOf(r.address);
+      if (!core.has(k) || justRemoved[k]) continue;
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k).push(r);
+    }
+    for (const [k, list] of byKey) {
+      const spelling = core.get(k);
+      if (list.length === 1 && list[0].address === spelling) continue;
+      const label = (list.find((r) => r.address === spelling && r.label) || list.find((r) => r.label) || {}).label || null;
+      const kept = list.some((r) => r.kept) ? 1 : 0;
+      const createdAt = Math.min(...list.map((r) => r.created_at));
+      for (const r of list) del.run(r.address);
+      put.run(spelling, label, kept, createdAt);
+      renamed.push({ from: list.map((r) => r.address), to: spelling });
+    }
+  }).immediate();
+  for (const r of renamed) {
+    // The ranking lists a manual peer by its peer row, as adoption makes one.
+    db.getOrCreatePeer(r.to);
+    logger.info('manual peer takes the spelling Core holds it under', r);
+  }
+}
+
+// The row of a manual peer by any spelling of its address: a page drawn
+// before takeCoreSpelling renamed it still sends the old one.
+function trustedSpelling(address) {
+  if (db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ?').get(address)) return address;
+  const k = keyOf(address);
+  const row = db.instance.prepare('SELECT address FROM trusted_peer').all().find((r) => keyOf(r.address) === k);
+  return row ? row.address : address;
+}
+
 async function syncTrustedToAddnode(knownAddedNodes) {
-  const trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
+  let trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
   let addedNodes = [];
   try {
     // Callers that already hold this list can pass it in. adoptExternalManualPeers
@@ -40,6 +97,14 @@ async function syncTrustedToAddnode(knownAddedNodes) {
   // Compared by key: Core echoes an addnode in the spelling it was given, and
   // the same node written another way is still the same entry to Core.
   const existingAddrs = new Set(addedNodes.map((n) => keyOf(n.addednode)));
+  // Cosmetic next to restoring the peers below: a failure here (a busy
+  // database) must not cost the re-add after a Core restart.
+  try {
+    takeCoreSpelling(addedNodes);
+  } catch (err) {
+    logger.warn('taking Core\'s spelling failed, next sync', { error: err.message });
+  }
+  trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't
   // starve them out just because they sort later than a newly-queued one.
@@ -563,7 +628,8 @@ const notAdded = (err) => /not been added|not added/i.test((err && err.message) 
  * swap: a manual connection left up keeps its addnode grant, and with eight
  * of them Core never dials the newcomer (test/integration/regtest.js).
  */
-async function removeTrustedPeer(address, { disconnect = true } = {}) {
+async function removeTrustedPeer(address0, { disconnect = true } = {}) {
+  const address = trustedSpelling(address0);
   // Noted before the row goes: an adoption pass already holding Core's list
   // from a moment ago would otherwise see the entry there and none here, and
   // take it back in as somebody else's addnode - padlocked.
@@ -622,7 +688,8 @@ async function removeTrustedPeer(address, { disconnect = true } = {}) {
  * Returns false for an address that is not a manual peer, so the caller can
  * say so rather than silently doing nothing.
  */
-function setKept(address, kept) {
+function setKept(address0, kept) {
+  const address = trustedSpelling(address0);
   const result = db.instance
     .prepare(`UPDATE trusted_peer SET kept = ? WHERE address = ?`)
     .run(kept ? 1 : 0, address);

@@ -289,13 +289,23 @@ async function pass({ quick = false } = {}) {
 // profiler runs the first pass at its next poll, seconds away. Once per
 // switching on: a pass that fails before it writes a status is not tried
 // again every 15 seconds, it waits for the ten-minute pass.
+// And once when the profiler starts with Slot Fill on (15.11.2026): after
+// an update a free slot is filled now, not at the ten-minute pass.
 let firstPassFor;
+let startPassDone = false;
 function waitsForFirstPass() {
   // A pass still under way (the timer's, from before the switch) would make
   // tick() return without one; the switching on is then asked for next poll.
-  if (running || !isEnabled() || readStatus() != null) return false;
+  if (running || !isEnabled()) return false;
   const row = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(ON_AT_KEY);
   const on = row ? row.value : null;
+  // The pass at start counts as this switching on's first one too.
+  if (!startPassDone) {
+    startPassDone = true;
+    firstPassFor = on;
+    return true;
+  }
+  if (readStatus() != null) return false;
   if (firstPassFor === on) return false;
   firstPassFor = on;
   return true;
@@ -353,6 +363,7 @@ module.exports = {
   waitsForFirstPass,
   scheduled,
   reportPassForTest: reportPass,
+  _resetStartPassForTest: () => { startPassDone = false; },
   isEnabled,
   setEnabled,
   settleOnSwitchOff,
