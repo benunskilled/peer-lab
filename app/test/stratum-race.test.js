@@ -611,3 +611,16 @@ test('a race from before a reset is not written into the emptied history', async
   assert.deepEqual(observationsFor(prevhash(197)), []);
   db.instance.prepare("DELETE FROM meta WHERE key = 'stratum_reset_at'").run();
 });
+
+// Review G4, Ben: Miss is "connected and silent". A pool with no connection
+// during the race, or one that came up only mid-race, is not charged.
+test('a pool with no connection during the race is not charged a miss', async () => {
+  const at = Date.now();
+  const pools = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C'), fakePool(4, 'D')];
+  race.active.clear();
+  const since = { 1: at - 60_000, 2: at - 60_000, 3: null, 4: at + 1000 };
+  for (const p of pools) race.active.set(p.id, { conn: { stop() {}, connectedSince: since[p.id] }, pool: p });
+  race.handleNotify(pools[0], prevhash(198), hr(), at);
+  await race.finalizeRace(prevhash(198));
+  assert.deepEqual(observationsFor(prevhash(198)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B connected and silent; C down, D came up late');
+});

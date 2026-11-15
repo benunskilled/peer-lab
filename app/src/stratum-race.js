@@ -398,7 +398,14 @@ function finalizeRace(hash) {
   if (!race) return Promise.resolve();
   openRaces.delete(prevhash);
   clearTimeout(race.timer);
-  race.watched = [...active.keys()];
+  // Charged a miss only if its connection stood for the whole race (Ben,
+  // review G4): a pool we could not reach, or that dropped meanwhile, had no
+  // chance, and Miss says "connected and silent" - how fast pools are, not
+  // whether this node reaches them.
+  race.watched = [...active].filter(([, { conn }]) => {
+    const since = conn.connectedSince;
+    return since === undefined || (since != null && since <= race.createdAt);
+  }).map(([id]) => id);
   race.generation = generation;
   return settleRace(race);
 }

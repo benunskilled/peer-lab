@@ -77,6 +77,12 @@ class StratumPoolConnection extends EventEmitter {
     this._connect();
   }
 
+  // When the open connection was made, null while there is none: a pool
+  // with no connection when a race ran is not charged a miss for it.
+  get connectedSince() {
+    return this._connectedAt;
+  }
+
   stop() {
     this.stopped = true;
     clearTimeout(this._reconnectTimer);
