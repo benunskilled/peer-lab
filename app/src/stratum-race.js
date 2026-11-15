@@ -211,10 +211,24 @@ function syncConnections() {
  * timestamp. (Two blocks inside one window would still overlap one race's
  * write with the other's timing - a coincidence too rare to build for.)
  */
+// When the pool history was last reset (db.resetPoolHistory, in the
+// dashboard's process): a race from before it, still waiting for Core then,
+// is not written into the emptied history (review G4).
+function resetAt() {
+  const row = db.instance.prepare(`SELECT value FROM meta WHERE key = 'stratum_reset_at'`).get();
+  return row ? Number(row.value) : 0;
+}
+
 function writeRace(race, { misses }) {
+  if (race.written) return;
+  race.written = true;
   let s;
   let id;
   try {
+    if (race.createdAt <= resetAt()) {
+      logger.debug('race from before a reset, not recorded', { prevhash: race.prevhash });
+      return;
+    }
     s = statements();
     const info = s.openRace.run(race.prevhash, race.createdAt);
     if (info.changes === 0) {
@@ -272,17 +286,33 @@ function writeRace(race, { misses }) {
  * getblockheader per block is all it costs.
  *
  * Asked only once the race is over, on the side: the timing itself still never
- * waits for Core. true when Core has the header, false when it says it has no
- * such block in any of the spellings, null when Core could not be asked.
+ * waits for Core. true when Core has the header and it is one of the last few
+ * blocks, 'old' when Core has it but it is not (a job on the genesis block won
+ * a race alone and charged everybody else a miss: review G4, 15.11.2026),
+ * false when Core has no such block in any of the spellings, null when Core
+ * could not be asked.
  */
+// A block this far below the tip is not what a new job is built on. Six
+// covers the ten-minute check again and a quick run of blocks; a block that
+// lost a race to another one (confirmations -1) counts while this close too.
+const RECENT_BLOCKS = 6;
 async function blockKnown(prevhash) {
   let unreachable = false;
   for (const hash of encodings(prevhash)) {
+    let header;
     try {
-      await rpc.getBlockHeader(hash);
-      return true;
+      header = await rpc.getBlockHeader(hash);
     } catch (err) {
       if (!/\(code -5\)/.test(err.message || '')) unreachable = true;
+      continue;
+    }
+    const conf = Number(header && header.confirmations);
+    if (conf >= 1) return conf <= RECENT_BLOCKS ? true : 'old';
+    try {
+      const tip = Number(await rpc.getBlockCount());
+      return Number(header.height) >= tip - RECENT_BLOCKS ? true : 'old';
+    } catch {
+      return null;
     }
   }
   return unreachable ? null : false;
@@ -303,6 +333,10 @@ const MAX_PENDING_RACES = 50;
 
 let verify = blockKnown;
 
+// Moves on at every switching off and shutdown: a race being checked with
+// Core when that happened knows it belongs to the time before.
+let generation = 0;
+
 // Races waiting for Core to be asked again. A restart or the switch going off
 // writes them without misses, like a race still open (abandonOpenRaces).
 const pendingRaces = new Set();
@@ -313,6 +347,20 @@ async function settleRace(race, attempt = 0) {
     known = await verify(race.prevhash);
   } catch (err) {
     known = null;
+  }
+  // Switched off or restarted while Core was asked: written as abandoned
+  // races are, with no misses (review G4: it was written with them).
+  // Not a block Core knows as recent: not written at all.
+  if (race.generation !== generation) {
+    if (!race.written && (known === true || known === null)) writeRace(race, { misses: false });
+    return undefined;
+  }
+  if (known === 'old') {
+    logger.warn('a pool sent a job on an old block - race not recorded', {
+      prevhash: race.prevhash,
+      first: race.results.length ? race.results[0].label : null,
+    });
+    return undefined;
   }
   if (known === true) return writeRace(race, { misses: true });
   if (attempt < VERIFY_RETRY_MS.length) {
@@ -351,7 +399,15 @@ function finalizeRace(hash) {
   if (!race) return Promise.resolve();
   openRaces.delete(prevhash);
   clearTimeout(race.timer);
-  race.watched = [...active.keys()];
+  // Charged a miss only if its connection stood for the whole race (Ben,
+  // review G4): a pool we could not reach, or that dropped meanwhile, had no
+  // chance, and Miss says "connected and silent" - how fast pools are, not
+  // whether this node reaches them.
+  race.watched = [...active].filter(([, { conn }]) => {
+    const since = conn.connectedSince;
+    return since === undefined || (since != null && since <= race.createdAt);
+  }).map(([id]) => id);
+  race.generation = generation;
   return settleRace(race);
 }
 
@@ -505,6 +561,7 @@ function abandonOpenRaces() {
 // Everything the worker holds, released. Idempotent: with nothing open and
 // nothing connected this does nothing at all.
 function shutDownRace() {
+  generation += 1;
   abandonOpenRaces();
   stopAllConnections();
   active.clear();

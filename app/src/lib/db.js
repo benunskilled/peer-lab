@@ -166,6 +166,11 @@ CREATE TABLE IF NOT EXISTS relay_observation (
 -- its own if the planner ever reaches for it again; recentRelayStats() pins
 -- itself to the primary key regardless (see queries/peer-ranking.js).
 CREATE INDEX IF NOT EXISTS idx_relay_obs_peer_race ON relay_observation(peer_id, race_id, first);
+-- "The latest block" and "the last N races" go by when they came, not by the
+-- order they were written in: a race checked with Core again is written ten
+-- minutes late, and of two blocks moments apart the second can be written
+-- first (review G5, 15.11.2026).
+CREATE INDEX IF NOT EXISTS idx_relay_race_detected ON relay_race(detected_at DESC, id DESC);
 -- Partial on purpose: one row per block rather than one per peer per block,
 -- which is the difference between 2,208 rows and 415,490 on a node with a
 -- fortnight of history. Counting the blocks that credited more than one peer
@@ -239,6 +244,7 @@ CREATE TABLE IF NOT EXISTS stratum_race (
   prevhash TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_stratum_race_created ON stratum_race(created_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS stratum_observation (
   race_id INTEGER NOT NULL REFERENCES stratum_race(id),
@@ -575,6 +581,9 @@ function resetPoolHistory() {
   const tx = db.transaction(() => {
     db.prepare(`DELETE FROM stratum_observation`).run();
     db.prepare(`DELETE FROM stratum_race`).run();
+    // The race worker writes a race still being checked with Core later; this
+    // tells it the race belongs to the history just thrown away.
+    db.prepare(`INSERT INTO meta (key, value) VALUES ('stratum_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(Date.now()));
   });
   tx();
   logger.warn('stratum pool history reset', { freedBytes: before.bytes, deletedRows: before.rows });

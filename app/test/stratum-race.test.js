@@ -554,7 +554,7 @@ test('blockKnown tries every spelling and tells "no such block" from "Core did n
   const rpc = require('../src/lib/rpc');
   const real = '00000000000000000001a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7';
   t.mock.method(rpc, 'getBlockHeader', async (h) => {
-    if (h === real) return { hash: real };
+    if (h === real) return { hash: real, confirmations: 1, height: 900000 };
     throw new Error('RPC getblockheader failed: Block not found (code -5)');
   });
   const { encodings } = require('../src/lib/prevhash');
@@ -562,4 +562,65 @@ test('blockKnown tries every spelling and tells "no such block" from "Core did n
   assert.equal(await race.blockKnown(prevhash(94)), false);
   rpc.getBlockHeader.mock.mockImplementation(async () => { throw new Error('RPC getblockheader: timed out after 10000ms'); });
   assert.equal(await race.blockKnown(prevhash(94)), null);
+});
+
+// Review G4 (15.11.2026): a job on the genesis block won a race alone, and
+// every other pool was charged a miss. Only one of the last few blocks counts.
+test('blockKnown takes only a recent block, a fresh orphan too, never an old one', async (t) => {
+  const rpc = require('../src/lib/rpc');
+  const headers = { a: { confirmations: 1, height: 900000 }, b: { confirmations: 900000, height: 0 }, c: { confirmations: -1, height: 899999 }, d: { confirmations: -1, height: 800000 } };
+  t.mock.method(rpc, 'getBlockHeader', async (h) => {
+    const k = Object.keys(headers).find((x) => h === x.repeat(64));
+    if (k) return headers[k];
+    throw new Error('RPC getblockheader failed: Block not found (code -5)');
+  });
+  t.mock.method(rpc, 'getBlockCount', async () => 900000);
+  assert.equal(await race.blockKnown('a'.repeat(64)), true);
+  assert.equal(await race.blockKnown('b'.repeat(64)), 'old', 'genesis');
+  assert.equal(await race.blockKnown('c'.repeat(64)), true, 'an orphan from a moment ago');
+  assert.equal(await race.blockKnown('d'.repeat(64)), 'old');
+});
+
+// Review G4: switched off while Core was being asked about the block, the
+// race came back and charged every silent pool a miss.
+test('a race being checked with Core when the switch goes off is written without misses', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  let answer;
+  race.setVerifier(() => new Promise((r) => { answer = r; }));
+  race.handleNotify(a, prevhash(196), hr());
+  const settling = race.finalizeRace(prevhash(196));
+  race.shutDownRace();
+  answer(true);
+  await settling;
+  assert.deepEqual(observationsFor(prevhash(196)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]], 'B is not charged');
+});
+
+// Review G4: a reset while a race waited for Core put that race back into
+// the history just emptied.
+test('a race from before a reset is not written into the emptied history', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  let answer;
+  race.setVerifier(() => new Promise((r) => { answer = r; }));
+  race.handleNotify(a, prevhash(197), hr(), Date.now() - 5);
+  const settling = race.finalizeRace(prevhash(197));
+  db.resetPoolHistory();
+  answer(true);
+  await settling;
+  assert.deepEqual(observationsFor(prevhash(197)), []);
+  db.instance.prepare("DELETE FROM meta WHERE key = 'stratum_reset_at'").run();
+});
+
+// Review G4, Ben: Miss is "connected and silent". A pool with no connection
+// during the race, or one that came up only mid-race, is not charged.
+test('a pool with no connection during the race is not charged a miss', async () => {
+  const at = Date.now();
+  const pools = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C'), fakePool(4, 'D')];
+  race.active.clear();
+  const since = { 1: at - 60_000, 2: at - 60_000, 3: null, 4: at + 1000 };
+  for (const p of pools) race.active.set(p.id, { conn: { stop() {}, connectedSince: since[p.id] }, pool: p });
+  race.handleNotify(pools[0], prevhash(198), hr(), at);
+  await race.finalizeRace(prevhash(198));
+  assert.deepEqual(observationsFor(prevhash(198)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B connected and silent; C down, D came up late');
 });

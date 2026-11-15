@@ -37,7 +37,7 @@ let liveTipStmt = null;
  */
 function newManualGraceStartedAt() {
   const row = db.instance
-    .prepare(`SELECT detected_at AS at FROM relay_race ORDER BY id DESC LIMIT 1 OFFSET ?`)
+    .prepare(`SELECT detected_at AS at FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT 1 OFFSET ?`)
     .get(Math.max(0, config.newManualGraceBlocks - 1));
   return row ? row.at : 0;
 }
