@@ -139,8 +139,6 @@
   function renderMarkers() {
     if (!state.world || !state.data) return;
     renderedMode = regionMode();
-    $("mapLevel").textContent = renderedMode ? "Regions" : "Countries";
-    $("mapLevelHint").hidden = renderedMode;
     const layer = $("markers");
     layer.textContent = "";
     const bs = buckets();
