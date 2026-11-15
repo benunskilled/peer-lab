@@ -34,6 +34,7 @@ const logger = require('../logger').make('peer-rotation');
 const { logAction } = require('./log');
 const { addressKey, hostFromAddress, unreachableNetwork } = require('../address');
 const spread = require('./spread');
+const { pickedRegions } = require('./picks');
 const { bookEntries, usableNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
 
 const TRIAL_KEY = 'slot_fill_trial';
@@ -293,6 +294,9 @@ const looked = (why, counts = {}) => { lastLook = { why, ...counts }; return 0; 
 // Cleared at every look, so a look that could not read the book shows none
 // rather than an old count beside a status that says the book is empty.
 let lastBook = null;
+// The picked regions as the last look found them, for the page: still
+// candidates there, or back to the usual pick.
+let lastPicks = null;
 function noteBook(candidates, nets, now) {
   const book = candidates.filter((c) => !c.fromNew);
   const regions = {};
@@ -313,6 +317,7 @@ function noteBook(candidates, nets, now) {
 async function start(ranking, peers, chain, now = Date.now()) {
   lastLook = null;
   lastBook = null;
+  lastPicks = null;
   // A node still catching up has no tip to test a candidate against.
   if (chain.initialblockdownload) return looked('catching_up');
   const trusted = ranking.filter((p) => p.trusted);
@@ -352,18 +357,26 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // Counted over all outbound connections, Core's own too (spread.js).
   const coreRegions = spread.coreRegionsOf(ranking);
   const coreKeys = spread.coreOperatorsOf(ranking);
-  const counts = spread.totalCounts(trusted, coreRegions);
+  const inbound = spread.inboundRegionsOf(ranking);
+  // With the one more for a region many peers came to on their own: that
+  // decides which region is missing and which goes first. The note in the log
+  // says the outbound count alone, what the reader can count in the tables.
+  const counts = spread.totalCounts(trusted, coreRegions, inbound);
+  const outbound = spread.totalCounts(trusted, coreRegions);
   const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
-  const ranked = spread.rankForGap(shuffle(book), trusted, coreRegions, spread.inboundRegionsOf(ranking));
+  const ranked = spread.rankForGap(shuffle(book), trusted, coreRegions, inbound);
+  const picked = new Set(pickedRegions());
+  const inPicked = (c) => picked.has(spread.placeOf(c).region);
   const inGap = (c) => gaps.has(spread.placeOf(c).region);
   // Where clearnet works, one Tor and one I2P connection are enough, Core's
   // own counted (10.11.2026): an I2P or Tor peer may sit anywhere, and those
   // networks are small, so a further one says less than a continent. A node
   // on Tor alone takes all it can get there.
   const clearnet = nets.has('ipv4') || nets.has('ipv6');
+  // A picked Tor or I2P is the reader's word against that rule.
   const capped = (c) => {
     const { region } = spread.placeOf(c);
-    return clearnet && (region === 'TOR' || region === 'I2P') && (counts[region] || 0) >= 1;
+    return clearnet && (region === 'TOR' || region === 'I2P') && (outbound[region] || 0) >= 1 && !picked.has(region);
   };
   for (let i = ranked.length - 1; i >= 0; i--) if (capped(ranked[i])) ranked.splice(i, 1);
   const tried = ranked.filter((c) => !c.fromNew);
@@ -376,7 +389,13 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // has none; once none of them can be filled - a node that reaches only
   // Tor, say - anyone the spread lets in from "tried", so that no slot stays
   // empty for want of a perfect candidate.
-  const ordered = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
+  const usual = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
+  // Picked regions (picks.js): theirs only, "tried" first, then "new" - and
+  // the usual pick once none of them has a candidate the spread lets in.
+  const mine = picked.size ? [...tried.filter(inPicked), ...ranked.filter((c) => c.fromNew && inPicked(c))] : [];
+  const pickedLeft = mine.some((c) => spread.admit(c, trusted, max, coreKeys));
+  lastPicks = picked.size ? { regions: [...picked], empty: !pickedLeft } : null;
+  const ordered = pickedLeft ? mine : usual;
 
   const fitting = ordered.filter((c) => spread.admit(c, trusted, max, coreKeys)).length;
   if (!fitting) return looked('none_fit', { ...counts0, fitting });
@@ -387,7 +406,8 @@ async function start(ranking, peers, chain, now = Date.now()) {
     const { region } = spread.placeOf(c);
     // Where it is shows under its address in the log; the note says why.
     // How many connections its region had: none, or only as few as any.
-    const why = region ? `${spread.REGION_NAMES[region]} had ${counts[region] ? `only ${counts[region]}` : 'none'}` : 'free slot';
+    const why = pickedLeft ? `${spread.REGION_NAMES[region] || 'a region'} picked by you`
+      : region ? `${spread.REGION_NAMES[region]} had ${outbound[region] ? `only ${outbound[region]}` : 'none'}` : 'free slot';
     // Written before the add: if the app stops between the two, the next pass
     // finds the trial and either its candidate (and judges it) or nothing.
     writeTrial({
@@ -458,4 +478,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook };
+module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks };

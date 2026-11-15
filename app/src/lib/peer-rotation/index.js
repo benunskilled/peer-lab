@@ -284,6 +284,9 @@ function reportPass(peers, chain) {
   // What there is to pick from, as of the last look at Core's address book.
   const book = fill.lastBook();
   if (book) base.book = book;
+  // Regions the reader picked, and whether they still have a candidate.
+  const picks = fill.lastPicks();
+  if (picks) base.picks = picks;
   // Every candidate tried since the slot came free, under the top row.
   const tries = slots.used < slots.max || trial ? triesSinceFree() : null;
   if (tries) base.tries = tries;

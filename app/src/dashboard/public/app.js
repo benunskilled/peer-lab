@@ -974,7 +974,7 @@ async function refreshRotation() {
   if (toggle) toggle.checked = Boolean(data.enabled);
   foldSums();
 
-  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null };
+  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, picked: data.picked || [] };
   renderSlotStatus();
   renderSlotBook();
   // The slow round speeds up while a trial runs.
@@ -1023,9 +1023,21 @@ function renderSlotBook() {
   // A candidate on trial holds its slot before Core has connected to it: the
   // Manual tile, which counts connected peers, is then one lower (15.11.2026).
   const testing = s.status.state === 'trial' ? ' \u00b7 1 being tested' : '';
+  const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
+  const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
   document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
-    + (none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
-  document.getElementById('slot-book-regions').textContent = regions.map(([r, c]) => `${BOOK_REGIONS[r] || r} ${n(c)}`).join(' \u00b7 ');
+    + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
+  // Each region a switch (15.11.2026): picked, the next free slots go there.
+  // One with nothing to pick from cannot be picked, but stays to be unpicked.
+  document.getElementById('slot-book-regions').innerHTML = regions.map(([r, c]) => {
+    const on = picked.includes(r);
+    return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${!c && !on ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
+  }).join('');
+  const empty = s.status.picks && s.status.picks.empty && picked.length;
+  document.getElementById('slot-pick-note').textContent = !picked.length
+    ? 'Tap a region to give it the next free slots.'
+    : empty ? `No address left in ${names(picked)}, back to the usual pick.`
+    : `The next free slots go to ${names(picked)}. Tap again to undo.`;
 }
 function slotStatusText(st, now) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
@@ -1559,6 +1571,23 @@ function manualAddResult(text, kind) {
   resultEl.textContent = text;
   resultEl.className = kind === 'error' ? 'hint result-error' : 'hint result-ok';
 }
+
+// A tap on a region: the whole set goes to the node, which keeps it.
+document.getElementById('slot-book-regions').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button.region-pick');
+  if (!btn || btn.disabled || !lastSlotStatus) return;
+  const r = btn.dataset.region;
+  const now = new Set(lastSlotStatus.picked || []);
+  if (now.has(r)) now.delete(r); else now.add(r);
+  for (const b of document.querySelectorAll('#slot-book-regions button')) b.disabled = true;
+  try {
+    const result = await api('/api/rotation/regions', { method: 'POST', body: JSON.stringify({ regions: [...now] }) });
+    lastSlotStatus.picked = result.picked;
+  } catch (err) {
+    showToast(`Could not change the regions: ${err.message}`, 'error');
+  }
+  renderSlotBook();
+});
 
 document.getElementById('manual-test-button').addEventListener('click', async () => {
   const input = document.getElementById('manual-add-input');

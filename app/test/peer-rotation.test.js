@@ -1747,3 +1747,43 @@ test('with two slots free and one filled since, the other one\'s tries still sho
   db.instance.prepare('DELETE FROM rotation_log').run();
   db.instance.prepare('DELETE FROM slot_fill_tried').run();
 });
+
+// 15.11.2026: regions picked on the page take the next free slot, spread
+// among them; with none left there, the usual pick takes over and says so.
+test('slot fill: a picked region takes the free slot, and with none left the usual pick does', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.90', 'AS');
+  const oceania = inBook('198.18.0.91', 'OC');
+  const peers = setPeers([coreOut()]);
+  // Without a pick, either missing region; with Oceania picked, Oceania.
+  assert.deepEqual(setPickedRegions(['OC', 'nowhere']), ['OC'], 'only regions are kept');
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, oceania);
+  assert.equal(fill.currentTrial().note, 'Oceania picked by you');
+  assert.deepEqual(fill.lastPicks(), { regions: ['OC'], empty: false });
+  await fill.abandon(fill.currentTrial().address);
+
+  // Picked South America, which has no candidate: the usual pick, said so.
+  setPickedRegions(['SA']);
+  fill.markTried(oceania, false, Date.now(), { reason: 'no_connection', startedAt: Date.now() });
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, asia);
+  assert.equal(fill.currentTrial().note, 'Asia had none');
+  assert.deepEqual(fill.lastPicks(), { regions: ['SA'], empty: true });
+  setPickedRegions([]);
+});
+
+// The same day: Europe had one outbound and 163 inbound, Oceania two outbound
+// and 12 inbound, and the slot went to Europe. A region twenty or more peers
+// came to on their own counts one more - only one.
+test('slot fill: a region with twenty inbound peers counts one more, and no more than one', () => {
+  const spread = require('../src/lib/peer-rotation/spread');
+  const counts = spread.totalCounts([], { EU: 1, OC: 2 }, { EU: 163, OC: 12, NA: 19 });
+  assert.deepEqual(counts, { EU: 2, OC: 2 });
+  // EU and OC both at 2 now: the one fewer peers came to on their own goes first.
+  const eu = at('198.18.1.1:8333', 'EU');
+  const oc = at('198.18.1.2:8333', 'OC');
+  const ranked = spread.rankForGap([{ address: eu }, { address: oc }], [], { EU: 1, OC: 2 }, { EU: 163, OC: 12 });
+  assert.equal(ranked[0].address, oc);
+});

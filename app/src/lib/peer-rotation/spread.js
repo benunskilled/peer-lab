@@ -32,6 +32,7 @@ const network = require('../network');
 const { unreachableNetwork } = require('../address');
 
 const TARGET_PER_REGION = config.manualPerRegion;
+const INBOUND_BONUS_AT = config.inboundBonusAt;
 
 // Tor and I2P count as regions of their own: a path that runs through
 // neither your provider nor any continent's routing is the most different
@@ -78,9 +79,15 @@ function countriesByRegion(peers) {
 }
 
 // Outbound connections per region, Core's own and the manual ones together.
-function totalCounts(trusted, coreRegions) {
+// Outbound connections per region, Core's and the manual ones together, and
+// one more for a region at least INBOUND_BONUS_AT peers came to on their own
+// (15.11.2026: Europe had one outbound and 163 inbound, Oceania two outbound
+// and 12 inbound, and the slot went to Europe). Never more than one: inbound
+// peers are others' choice (config.inboundBonusAt).
+function totalCounts(trusted, coreRegions, inboundRegions = {}) {
   const counts = { ...coreRegions };
   for (const [r, n] of Object.entries(regionCounts(trusted))) counts[r] = (counts[r] || 0) + n;
+  for (const [r, n] of Object.entries(inboundRegions)) if (n >= INBOUND_BONUS_AT) counts[r] = (counts[r] || 0) + 1;
   return counts;
 }
 
@@ -95,7 +102,7 @@ function totalCounts(trusted, coreRegions) {
  * node without an open port has no inbound peers, and for it nothing changes.
  */
 function rankForGap(candidates, trusted, coreRegions, inboundRegions = {}) {
-  const counts = totalCounts(trusted, coreRegions);
+  const counts = totalCounts(trusted, coreRegions, inboundRegions);
   const held = countriesByRegion(trusted);
   const keyOf = (c) => {
     const { region, country } = placeOf(c);
@@ -180,6 +187,6 @@ function leastMissed(newcomer, evictable, trusted, ranking, weakest) {
 }
 
 module.exports = {
-  TARGET_PER_REGION, REGION_NAMES, placeOf, totalCounts, rankForGap, admit, describe, coreRegionsOf,
+  TARGET_PER_REGION, INBOUND_BONUS_AT, REGION_NAMES, placeOf, regionCounts, totalCounts, rankForGap, admit, describe, coreRegionsOf,
   coreOperatorsOf, inboundRegionsOf, leastMissed,
 };
