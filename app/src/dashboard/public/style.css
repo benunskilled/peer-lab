@@ -270,7 +270,7 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 :where(#map) .link { fill: none; stroke-width: 0.7; stroke-opacity: 0.16; stroke-linecap: round; pointer-events: none; }
 .l-manual { stroke: var(--manual); stroke-opacity: 0.5; stroke-width: 1; }
 .l-inbound { stroke: var(--inbound); stroke-opacity: 0.08; }
-.l-outbound { stroke: var(--outbound); stroke-opacity: 0.3; }
+.l-outbound { stroke: var(--outbound); stroke-opacity: 0.5; stroke-width: 1; } /* as clear as manual (15.11.2026): at 0.3 and thin they vanished beside it */
 .home-mark { pointer-events: none; }
 .home-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 1.2; }
 .fx-head { fill: #ffd29a; }
@@ -445,6 +445,11 @@ table.peers.aligned { table-layout: fixed; }
 /* ---- V2 design ---- */
 .map-legend { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .map-legend .swatch { width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; }
+/* The three groups are switches for the map: off, faded and struck through. */
+.map-card .map-legend .legend-pick { all: unset; cursor: pointer; display: inline-flex; align-items: center; color: var(--muted); font-size: 12px; border-radius: 4px; }
+.map-card .map-legend .legend-pick:hover { color: var(--text); }
+.map-card .map-legend .legend-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.map-card .map-legend .legend-pick[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 .s-home { background: var(--accent); }
 
 /* Group heading: the name, then the count and the kinds as chips. */
