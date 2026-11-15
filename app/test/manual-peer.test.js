@@ -25,6 +25,14 @@ test.before(() => {
   db.open();
 });
 
+// Core's word that IPv4 and IPv6 go out directly: a direct test needs a fresh
+// answer (G1, 15.11.2026). A plain assignment, so mock.restoreAll() comes
+// back to it; a test that wants Core silent or on Tor mocks it.
+rpc.getNetworkInfo = async () => ({ networks: [
+  { name: 'ipv4', limited: false, reachable: true, proxy: '' },
+  { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+] });
+
 test.afterEach(() => {
   mock.restoreAll();
   _resetNetInfo();
@@ -665,5 +673,67 @@ test('Add as Manual on an outbound Tor peer drops its relay session; I2P always 
   } finally {
     mock.restoreAll();
     _resetNetInfo();
+  }
+});
+
+// GPT review G1 (15.11.2026): only a fresh answer from Core clears a direct
+// test. Each case on a real listener that counts every connection made.
+test('G1: no direct test unless Core has just said no proxy is in the way', async () => {
+  let connections = 0;
+  const { server, port } = await withListeningPort((socket) => { connections += 1; socket.destroy(); });
+  const direct = { networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] };
+  const viaTor = { networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '10.21.21.11:9050' }, { name: 'ipv6', limited: false, reachable: true, proxy: '10.21.21.11:9050' }] };
+  const down = async () => { throw new Error('timeout'); };
+  try {
+    // 1. Core has never answered: an IPv4 address is not tested.
+    _resetNetInfo();
+    mock.method(rpc, 'getNetworkInfo', down);
+    const ipv4 = await probePeer(`127.0.0.1:${port}`);
+    assert.equal(ipv4.ok, false);
+    assert.match(ipv4.error, /didn't answer.*Try again/);
+    // 2. Nor a name.
+    assert.match((await probePeer(`localhost:${port}`)).error, /Try again/);
+    assert.equal(connections, 0, 'cases 1-2: no connection');
+
+    // 3. Direct a moment ago, then Core restarted with Tor: the new answer counts at once.
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', async () => direct);
+    await probePeer(`127.0.0.1:${port}`);
+    assert.equal(connections, 1, 'a fresh direct answer is tested');
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', async () => viaTor);
+    assert.equal((await probePeer(`127.0.0.1:${port}`)).via, 'Tor');
+    assert.equal(connections, 1, 'case 3: no connection after the switch to Tor');
+
+    // 4. Direct a moment ago, Core does not answer now: no test on the old word.
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', async () => direct);
+    await probePeer(`127.0.0.1:${port}`);
+    const seen = connections;
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', down);
+    assert.match((await probePeer(`127.0.0.1:${port}`)).error, /Try again/);
+    assert.equal(connections, seen, 'case 4: no connection');
+
+    // 5. An answer that says nothing about IPv4 and IPv6 clears no test.
+    for (const answer of [null, {}, { networks: [] }, { networks: [{ name: 'onion', limited: false, reachable: true, proxy: '' }] },
+      { networks: [{ name: 'ipv4', limited: false, reachable: true }, { name: 'ipv6', limited: false, reachable: true }] }]) {
+      mock.restoreAll();
+      mock.method(rpc, 'getNetworkInfo', async () => answer);
+      assert.match((await probePeer(`127.0.0.1:${port}`)).error, /Try again/, JSON.stringify(answer));
+    }
+    // An IPv4 address written as IPv6 goes by IPv4's proxy too.
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+    ] }));
+    assert.equal((await probePeer(`[::ffff:127.0.0.1]:${port}`)).via, 'Tor');
+    assert.equal((await probePeer(`[::ffff:7f00:1]:${port}`)).via, 'Tor');
+    assert.equal(connections, seen, 'case 5: no connection');
+  } finally {
+    mock.restoreAll();
+    _resetNetInfo();
+    server.close();
   }
 });

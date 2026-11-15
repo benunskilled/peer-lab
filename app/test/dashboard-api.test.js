@@ -742,6 +742,9 @@ test('Add as Manual keeps the port of a peer this node dialled, and only then', 
   const address = `127.0.0.1:${node.address().port}`;
   const added = [];
   const add = mock.method(peerSync, 'addTrustedPeer', async (addr) => { added.push(addr); return { ok: true }; });
+  // Core says IPv4 and IPv6 go out directly: a direct test needs that answer (G1).
+  const rpc = require('../src/lib/rpc');
+  const netInfo = mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] }));
   try {
     const peer = db.getOrCreatePeer(address);
     db.instance
@@ -759,6 +762,7 @@ test('Add as Manual keeps the port of a peer this node dialled, and only then', 
     assert.deepEqual(added, [address]);
   } finally {
     add.mock.restore();
+    netInfo.mock.restore();
     node.close();
     db.instance.prepare('DELETE FROM rotation_log').run();
   }
