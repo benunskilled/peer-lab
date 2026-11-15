@@ -385,9 +385,14 @@
     // A peer just disconnected or removed here leaves the list at once, not
     // when this service next asks Core: its answer can be ten seconds old.
     d.peers = d.peers.filter((p) => !dashboard().gone(p.addr));
-    // The tiles at the top count these same peers.
+    // The tiles at the top count these same peers - but for a candidate Slot
+    // Fill is testing, which comes and goes every few seconds: counted once
+    // it is added (15.11.2026).
     const counts = { manual: 0, inbound: 0, outbound: 0 };
-    for (const p of d.peers) counts[p.group]++;
+    for (const p of d.peers) {
+      if (p.group === "manual" && dashboard().onTrial && dashboard().onTrial(p.addr)) continue;
+      counts[p.group]++;
+    }
     dashboard().liveCounts(counts);
     $("demo").hidden = !d.demo;
     showError([d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "", state.worldError || ""].filter(Boolean).join(" "));
