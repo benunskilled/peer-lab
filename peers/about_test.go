@@ -16,7 +16,7 @@ func TestOtherAbouts(t *testing.T) {
 		version int
 		about   string
 	}{
-		{"/pynode:0.0.1/", 70016, "Probably Bitcoin Core handing over a transaction privately"},
+		{"/pynode:0.0.1/", 70016, "Bitcoin Core handing over a transaction privately"},
 		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
 		{"", 70016, "Introduced itself without a name"},
 		{"", 0, "Has not said what it is"},
@@ -32,7 +32,8 @@ func TestOtherAbouts(t *testing.T) {
 		{"/reset-header-agent:1.0/", 70016, "Named like RESET"},
 		{"/RESET-Headers:1.0/", 70016, "Named like RESET"},
 		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
-		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "Probably a program built from the example code in btcd's Go library"},
+		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "A program built from the example code in btcd's Go library"},
+		{"/btcwire:0.4.0/peer:1.0.0/", 70016, "Probably a program built from the example code in btcd's Go library"},
 		{"/mantle-replay-iouring:0.1.0/", 70016, "Mantle's replay tool"},
 		{"/mantle-discover:0.1.0/", 70016, "Mantle's peer finder"},
 		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
