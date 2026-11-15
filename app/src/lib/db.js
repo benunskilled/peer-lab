@@ -575,6 +575,9 @@ function resetPoolHistory() {
   const tx = db.transaction(() => {
     db.prepare(`DELETE FROM stratum_observation`).run();
     db.prepare(`DELETE FROM stratum_race`).run();
+    // The race worker writes a race still being checked with Core later; this
+    // tells it the race belongs to the history just thrown away.
+    db.prepare(`INSERT INTO meta (key, value) VALUES ('stratum_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(Date.now()));
   });
   tx();
   logger.warn('stratum pool history reset', { freedBytes: before.bytes, deletedRows: before.rows });
