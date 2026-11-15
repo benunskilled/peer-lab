@@ -629,6 +629,7 @@ function setKept(address, kept) {
 }
 
 module.exports = {
+  recentRemovals,
   syncTrustedToAddnode,
   setKept,
   adoptExternalManualPeers,

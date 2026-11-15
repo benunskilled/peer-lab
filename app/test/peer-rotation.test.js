@@ -1838,3 +1838,22 @@ test('slot fill: an address not reached is tried again after a day, a wrong one 
   assert.equal(failed.has('203.0.113.52:8333'), true, 'not reached an hour ago: not yet');
   db.instance.prepare('DELETE FROM slot_fill_tried').run();
 });
+
+// 15.11.2026: a manual peer removed by hand still had its live session in the
+// last snapshot, the pass the removal asked for counted eight, and the slot
+// stayed empty ten minutes. That session no longer holds a slot.
+test('slot fill: right after a removal by hand, the freed slot is filled in the same pass', async () => {
+  const regions = ['EU', 'NA', 'OC', 'SA', 'AF', 'EU', 'NA', 'OC'].slice(0, config.maxManualPeers);
+  const live = regions.map((r, i) => at(seedLivePeer({ eligible: 144, first: 5, trusted: true, connectionType: 'manual', address: `198.51.100.${120 + i}:8333` }), r, `op-r${i}`));
+  const asia = inBook('198.18.4.1', 'AS', { operator: 'Sakura' });
+  const peers = setPeers([coreOut()]);
+  // Removed by hand: the row goes, the session in the last snapshot stays.
+  await peerSync.removeTrustedPeer(live[live.length - 1]);
+  peerRotation.setEnabled(true);
+  await peerRotation.tick();
+  assert.ok(fill.currentTrial(), 'a candidate went in at once');
+  assert.equal(peerRotation.readStatus().state, 'trial');
+  await fill.abandon(fill.currentTrial().address);
+  peerRotation.setEnabled(false);
+  assert.ok(asia && peers);
+});
