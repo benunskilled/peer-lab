@@ -33,6 +33,10 @@ const { retireOfflineManualPeers } = require('./retire');
 const fill = require('./fill');
 const { offlineGraceMs, offlineForMs } = require('./rules');
 const clock = require('./clock');
+const peerSync = require('../peer-sync');
+const { addressKey } = require('../address');
+
+const keyOfAddress = (address) => addressKey(address, config.bitcoin.network);
 
 const META_KEY = 'peer_rotation_enabled';
 // A pass every ten minutes (peer-profiler.js), every minute while a candidate
@@ -64,6 +68,18 @@ function readStatus() {
 // The manual set as the page tells it: how full, and of the peers that are
 // offline, which keeps its slot (locked, and Core has held it before) and when
 // each other one gives its slot back.
+// The ranking as a pass must count it: a manual peer removed a moment ago
+// still has its live session in the profiler's last snapshot (up to 15 s
+// old), and counted, the pass a removal by hand asks for found every slot in
+// use and filled none until ten minutes later (15.11.2026). Its row is gone;
+// only the session made it manual.
+function freshRanking() {
+  const gone = peerSync.recentRemovals();
+  if (!Object.keys(gone).length) return queries.peerRanking();
+  return queries.peerRanking().map((p) => (p.trusted && p.trustedSince == null && gone[keyOfAddress(p.address)]
+    ? { ...p, trusted: false } : p));
+}
+
 function slotsOf(ranking, now) {
   const trusted = ranking.filter((p) => p.trusted);
   const offline = trusted.filter((p) => !p.live).map((p) => {
@@ -218,7 +234,7 @@ async function pass() {
   // answered already, so nothing more is removed or added from here on.
   if (!isEnabled()) return { ...idle, enabled: false, confirmed: settled === 'confirmed' ? 1 : 0, reverted: settled === 'reverted' ? 1 : 0 };
   const onTrial = fill.currentTrial();
-  const ranking = queries.peerRanking();
+  const ranking = freshRanking();
   const retired = gap ? 0 : await retireOfflineManualPeers(ranking, onTrial && onTrial.address, peers, isEnabled);
   // Switched off while the retiring waited for Core: no candidate goes in.
   if (!isEnabled()) {
@@ -227,7 +243,7 @@ async function pass() {
   // One move per pass: nothing new while a candidate is on trial.
   let started = onTrial
     ? 0
-    : await fill.start(retired > 0 ? queries.peerRanking() : ranking, peers, chain);
+    : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
   // Switched off while this pass was adding: the switch-off could not see the
   // row yet, so the candidate is taken out here, rather than left in a slot
   // no later pass would look at.
@@ -275,7 +291,7 @@ function nextCheckAt(trial, now) {
 function reportPass(peers, chain) {
   const now = Date.now();
   const trial = fill.currentTrial();
-  const slots = slotsOf(queries.peerRanking(), now);
+  const slots = slotsOf(freshRanking(), now);
   const base = { at: now, nextAt: nextCheckAt(Boolean(trial), now), slots };
   // The candidate before, when it went again lately: the page's top row says
   // why, under what is going on now.
