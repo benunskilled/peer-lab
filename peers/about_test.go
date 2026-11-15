@@ -354,7 +354,8 @@ func TestFutureBitApolloAbout(t *testing.T) {
 func TestNodeSetupLabels(t *testing.T) {
 	for ua, want := range map[string]string{
 		"/Satoshi:31.0.0(Samourai Dojo 1.29.3)/":         "Labelled by Samourai Dojo",
-		"/Satoshi:29.0.0(RoninDojo 2.3.0)/":              "Labelled RoninDojo",
+		"/Satoshi:29.0.0(RoninDojo 2.3.0)/":              "Labelled by RoninDojo",
+		"/Satoshi:23.0.0(RoninDojo )/":                   "Labelled by RoninDojo",
 		"/Satoshi:31.1.0(MiniBolt node)/":                "Labelled by MiniBolt",
 		"/Satoshi:29.0.0(MiniBolt_Node)/":                "Labelled by MiniBolt",
 		"/Satoshi:32.0.0(Official MiniBolt node)/":       "Labelled by MiniBolt",
