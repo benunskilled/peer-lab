@@ -1006,7 +1006,7 @@ const LAST_TRY_WHY = {
   no_services: 'connected, but serves no blocks',
   height_unknown: 'connected, but never showed which chain it is on',
   height_wrong: 'is not on our chain',
-  disguised: "is not the Core it names",
+  disguised: "is disguised, not the Core it names",
   other_chain: 'follows another chain',
 };
 // "other_chain:BLAKE2b fork": the code, and the chain's name after it.
@@ -1021,7 +1021,7 @@ function lastTryText(st) {
   const l = st && st.lastTry;
   if (!l) return '';
   const where = l.country ? countryName(l.country) : l.region;
-  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${whyText(l.reason)}.`;
+  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${escapeHtml(whyText(l.reason))}.`;
 }
 // "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
 // per region under it, each a button to pick it (15.11.2026).

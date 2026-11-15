@@ -342,7 +342,7 @@ async function settleOne(trial, peers, chain, now, force) {
     // chain, or not the Core it names: rare, and worth seeing (15.11.2026).
     // One that just did not answer stays in the list of tries only.
     if (fork || fake) {
-      logAction({ action: 'rejected', address: trial.address, note: fork ? `Follows another chain (${fork})` : 'Not the Core it names' });
+      logAction({ action: 'rejected', address: trial.address, note: fork ? `Follows another chain (${fork})` : 'Disguised: not the Core it names' });
     }
     const { region, country } = spread.placeOf({ address: trial.address });
     writeLastTry({ at: now, reason: why.code, minutes, country: country || null, region: spread.REGION_NAMES[region] || null });

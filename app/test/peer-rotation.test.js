@@ -2040,3 +2040,16 @@ test('slot fill: the fork bits with no height yet are not a verdict', async () =
 
   assert.equal((await step(setPeers([coreOut(), early]), t0 + 10 * 1000)).reverted, 0, 'its first headers may still put it on our tip');
 });
+
+test('a run of "Not kept" rows does not push the adds out of the log', () => {
+  const { logAction, recentLog, LOG_ENTRIES } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  logAction({ action: 'promote', address: '203.0.113.50:8333' });
+  for (let i = 0; i < LOG_ENTRIES + 5; i++) logAction({ action: 'rejected', address: `198.51.100.${i}:8333`, note: 'Follows another chain (BIP110 fork)' });
+
+  const rows = db.instance.prepare('SELECT action FROM rotation_log').all();
+  assert.equal(rows.filter((r) => r.action === 'promote').length, 1, 'the add is still there');
+  assert.equal(rows.filter((r) => r.action === 'rejected').length, LOG_ENTRIES);
+  assert.equal(recentLog().length, LOG_ENTRIES, 'the page shows the newest as before');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+});

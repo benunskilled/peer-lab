@@ -37,8 +37,18 @@ function logAction(entry) {
   // one tick can share a millisecond, and after the clock steps back a new
   // action carries an older `at` than all the rest and would be the one
   // deleted.
+  //
+  // "Not kept" rows (a candidate on another chain or disguised) are kept
+  // apart: a run of them must not push out the adds and removals, which the
+  // list of tries counts from (review, 15.11.2026). The newest of each are
+  // kept, LOG_ENTRIES apiece; the page still shows the newest LOG_ENTRIES.
   db.instance
-    .prepare(`DELETE FROM rotation_log WHERE id NOT IN (SELECT id FROM rotation_log ORDER BY id DESC LIMIT ?)`)
+    .prepare(`DELETE FROM rotation_log WHERE action != 'rejected'
+              AND id NOT IN (SELECT id FROM rotation_log WHERE action != 'rejected' ORDER BY id DESC LIMIT ?)`)
+    .run(LOG_ENTRIES);
+  db.instance
+    .prepare(`DELETE FROM rotation_log WHERE action = 'rejected'
+              AND id NOT IN (SELECT id FROM rotation_log WHERE action = 'rejected' ORDER BY id DESC LIMIT ?)`)
     .run(LOG_ENTRIES);
 }
 
