@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Manual slot fill: one pass every ten minutes (every minute while a
+ * Manual slot fill: one pass every ten minutes (every 15 seconds while a
  * candidate is on trial), and the toggle that decides
  * whether any of it runs at all. (The directory keeps its old name,
  * peer-rotation, so every existing require keeps resolving; in the app it is
@@ -39,10 +39,12 @@ const { addressKey } = require('../address');
 const keyOfAddress = (address) => addressKey(address, config.bitcoin.network);
 
 const META_KEY = 'peer_rotation_enabled';
-// A pass every ten minutes (peer-profiler.js), every minute while a candidate
-// is on trial (watchTrial).
+// A pass every ten minutes (peer-profiler.js), every 15 seconds while a
+// candidate is on trial (watchTrial): a peer Core reached is in for good
+// within seconds, and the next candidate goes in as soon as one is out
+// (15.11.2026, it was a minute).
 const PASS_EVERY_MS = 10 * 60 * 1000;
-const TRIAL_CHECK_MS = 60 * 1000;
+const TRIAL_CHECK_MS = 15 * 1000;
 // How long the page mentions a candidate that went again.
 const LAST_TRY_SHOWN_MS = 30 * 60 * 1000;
 
@@ -118,7 +120,7 @@ function setEnabled(enabled) {
  * again.
  */
 async function settleOnSwitchOff() {
-  if (!fill.currentTrial()) return;
+  if (!fill.trials().length) return;
   try {
     const [peers, chain] = await Promise.all([rpc.getPeerInfo(), rpc.getBlockchainInfo()]);
     await fill.settle(peers, chain, Date.now(), { force: true });
@@ -128,16 +130,16 @@ async function settleOnSwitchOff() {
   }
 }
 
-// One pass at a time: the ten-minute timer and the one-minute trial check
+// One pass at a time: the ten-minute timer and the 15-second trial check
 // (watchTrial) both come here, and two passes at once could each put a
 // candidate on trial.
 let running = false;
 
-async function tick() {
+async function tick({ quick = false } = {}) {
   if (running) return { enabled: isEnabled(), retired: 0, started: 0, confirmed: 0, reverted: 0 };
   running = true;
   try {
-    return await pass();
+    return await pass({ quick });
   } finally {
     running = false;
   }
@@ -169,14 +171,14 @@ function wantsPass() {
 }
 
 /**
- * Every minute, from peer-profiler.js: only while a candidate is on trial, so
+ * Every 15 seconds, from peer-profiler.js: only while a candidate is on trial, so
  * a candidate Core cannot use is out at its own deadline, not at the next
  * ten-minute pass, and the next one goes in at once. Without a trial, and
  * switched off, it does nothing at all.
  */
 async function watchTrial() {
-  if (!isEnabled() || !fill.currentTrial()) return null;
-  return tick();
+  if (!isEnabled() || !fill.trials().length) return null;
+  return tick({ quick: true });
 }
 
 /**
@@ -187,18 +189,21 @@ async function watchTrial() {
  *   retire  frees the slot of a manual peer that has not been there for
  *           longer than its record buys it - never the candidate still on
  *           trial, which is the trial's to judge.
- *   start   puts the next candidate into a free slot, if nothing is on trial.
+ *   start   puts candidates into the free slots, up to fill.MAX_TRIALS on
+ *           trial at once.
  *
  * All read the same getpeerinfo, taken first. If Core does not answer,
  * nothing happens: every peer would look offline.
  */
-async function pass() {
+// `quick`: the 15-second check while trials run. It judges them; a new
+// candidate goes in only when one of them ended, not every 15 seconds.
+async function pass({ quick = false } = {}) {
   const idle = { enabled: false, retired: 0, started: 0, confirmed: 0, reverted: 0 };
   if (!isEnabled()) {
     clock.idle();
     // Switched off with a trial still open - Core did not answer at that
     // moment: it is settled here, the next time Core does.
-    if (fill.currentTrial()) await settleOnSwitchOff();
+    if (fill.trials().length) await settleOnSwitchOff();
     return idle;
   }
   let peers;
@@ -208,53 +213,50 @@ async function pass() {
   } catch (err) {
     logger.debug('slot fill: Core not answering, skipping this pass', { error: err.message });
     clock.coreDown();
-    writeStatus({ at: Date.now(), nextAt: nextCheckAt(Boolean(fill.currentTrial()), Date.now()), state: 'core' });
+    writeStatus({ at: Date.now(), nextAt: nextCheckAt(fill.trials().length > 0, Date.now()), state: 'core' });
     return { ...idle, enabled: true };
   }
-  // Core was down since the last pass, or the clock stepped: the trial
-  // starts over and nobody is retired this pass (clock.js).
+  // Core was down since the last pass, or the clock stepped: the trials
+  // start over and nobody is retired this pass (clock.js).
   const gap = clock.passed();
   if (gap) fill.restart(chain);
-  const trialBefore = fill.currentTrial();
   const settled = await fill.settle(peers, chain);
+  const counted = { confirmed: settled.confirmed, reverted: settled.reverted };
   // A candidate taken out: the next one goes in this pass, on a fresh
-  // getpeerinfo without the one just dropped. If Core does not answer now,
+  // getpeerinfo without the ones just dropped. If Core does not answer now,
   // the next pass does it.
-  if (settled === 'reverted') {
+  if (settled.gone.length) {
     try {
-      peers = fill.withoutSession(await rpc.getPeerInfo(), trialBefore.address);
+      peers = settled.gone.reduce((list, address) => fill.withoutSession(list, address), await rpc.getPeerInfo());
     } catch (err) {
       logger.debug('slot fill: Core not answering after a candidate went, next pass', { error: err.message });
       clock.coreDown();
       writeStatus({ at: Date.now(), nextAt: nextCheckAt(false, Date.now()), state: 'core' });
-      return { ...idle, enabled: true, reverted: 1 };
+      return { ...idle, enabled: true, ...counted };
     }
   }
   // Switched off while this pass waited for Core: the switch has been
   // answered already, so nothing more is removed or added from here on.
-  if (!isEnabled()) return { ...idle, enabled: false, confirmed: settled === 'confirmed' ? 1 : 0, reverted: settled === 'reverted' ? 1 : 0 };
-  const onTrial = fill.currentTrial();
+  if (!isEnabled()) return { ...idle, enabled: false, ...counted };
+  const onTrial = new Set(fill.trials().map((t) => t.address));
   const ranking = freshRanking();
-  const retired = gap ? 0 : await retireOfflineManualPeers(ranking, onTrial && onTrial.address, peers, isEnabled);
+  const retired = gap ? 0 : await retireOfflineManualPeers(ranking, onTrial, peers, isEnabled);
   // Switched off while the retiring waited for Core: no candidate goes in.
   if (!isEnabled()) {
-    return { ...idle, enabled: false, retired, confirmed: settled === 'confirmed' ? 1 : 0, reverted: settled === 'reverted' ? 1 : 0 };
+    return { ...idle, enabled: false, retired, ...counted };
   }
-  // One move per pass: nothing new while a candidate is on trial.
-  let started = onTrial
-    ? 0
-    : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
+  // Into the free slots, beside the candidates still on trial.
+  const ended = settled.confirmed + settled.reverted + settled.left;
+  let started = quick && !ended && !retired ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
   // Switched off while this pass was adding: the switch-off could not see the
-  // row yet, so the candidate is taken out here, rather than left in a slot
+  // rows yet, so the candidates are taken out here, rather than left in slots
   // no later pass would look at.
-  if (started && !isEnabled()) {
-    await fill.abandon(started);
-    started = 0;
+  if (started.length && !isEnabled()) {
+    for (const address of started) await fill.abandon(address);
+    started = [];
   }
   if (isEnabled()) reportPass(peers, chain);
-  return {
-    enabled: true, retired, started: started ? 1 : 0, confirmed: settled === 'confirmed' ? 1 : 0, reverted: settled === 'reverted' ? 1 : 0,
-  };
+  return { enabled: true, retired, started: started.length, ...counted };
 }
 
 // Switched on and not yet checked (switching on clears the status): the
@@ -290,7 +292,8 @@ function nextCheckAt(trial, now) {
 // candidate went into a free slot.
 function reportPass(peers, chain) {
   const now = Date.now();
-  const trial = fill.currentTrial();
+  const trials = fill.trials();
+  const trial = trials[0] || null;
   const slots = slotsOf(freshRanking(), now);
   const base = { at: now, nextAt: nextCheckAt(Boolean(trial), now), slots };
   // The candidate before, when it went again lately: the page's top row says
@@ -306,7 +309,11 @@ function reportPass(peers, chain) {
   // Every candidate tried since the slot came free, under the top row.
   const tries = slots.used < slots.max || trial ? triesSinceFree() : null;
   if (tries) base.tries = tries;
-  if (trial) return writeStatus({ ...base, state: 'trial', trial: fill.trialView(trial, peers, now) });
+  // All candidates on trial, oldest first; `trial` the oldest, as before.
+  if (trial) {
+    const views = trials.map((t) => fill.trialView(t, peers, now));
+    return writeStatus({ ...base, state: 'trial', trial: views[0], trials: views });
+  }
   if (chain.initialblockdownload) return writeStatus({ ...base, state: 'catching_up' });
   if (slots.used >= slots.max) return writeStatus({ ...base, state: 'full' });
   const look = fill.lastLook() || { why: 'none_fit' };
@@ -315,6 +322,7 @@ function reportPass(peers, chain) {
 
 module.exports = {
   PASS_EVERY_MS,
+  TRIAL_CHECK_MS,
   readStatus,
   waitsForFirstPass,
   scheduled,

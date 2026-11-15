@@ -459,7 +459,7 @@ async function main() {
   // bitcoin app itself (pollOnce restores them at once when it notices the
   // restart; this catches one it did not see), and adopt anything newly addnode'd outside this app
   // (e.g. a direct `bitcoin-cli addnode` call) since the last pass.
-  peerRotation.scheduled({ passAt: Date.now() + PEER_SYNC_INTERVAL_MS, trialAt: Date.now() + 60 * 1000 });
+  peerRotation.scheduled({ passAt: Date.now() + PEER_SYNC_INTERVAL_MS, trialAt: Date.now() + peerRotation.TRIAL_CHECK_MS });
   setInterval(() => {
     peerRotation.scheduled({ passAt: Date.now() + PEER_SYNC_INTERVAL_MS });
     adoptExternalManualPeers()
@@ -476,12 +476,13 @@ async function main() {
     peerRotation.tick().catch((err) => logger.warn('slot fill pass failed', { error: err.message }));
   }, PEER_SYNC_INTERVAL_MS);
 
-  // While a slot-fill candidate is on trial: look every minute, so it is judged
-  // at its own deadline. Does nothing without a trial.
+  // While a slot-fill candidate is on trial: look every 15 seconds, so it is
+  // judged at its own deadline and the next one goes in at once. Does nothing
+  // without a trial.
   setInterval(() => {
-    peerRotation.scheduled({ trialAt: Date.now() + 60 * 1000 });
+    peerRotation.scheduled({ trialAt: Date.now() + peerRotation.TRIAL_CHECK_MS });
     peerRotation.watchTrial().catch((err) => logger.warn('slot fill trial check failed', { error: err.message }));
-  }, 60 * 1000).unref?.();
+  }, peerRotation.TRIAL_CHECK_MS).unref?.();
 
   runMaintenance();
   setInterval(runMaintenance, MAINTENANCE_INTERVAL_MS);

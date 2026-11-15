@@ -156,7 +156,7 @@ async function adoptExternalManualPeers() {
     if (justRemoved[keyOf(addednode)]) continue;
     // The slot fill's candidate, between its addnode and its row: the slot
     // fill's to settle, not somebody else's addnode to adopt and padlock.
-    if (slotFillCandidate() === keyOf(addednode)) continue;
+    if (slotFillCandidates().has(keyOf(addednode))) continue;
     // Never past the limit. Core keeps its own list either way; what does not
     // fit is only left out of ours, and said so in the log.
     if (known.size >= config.maxManualPeers) {
@@ -514,12 +514,16 @@ function savePendingRemovals(map) {
     .run(PENDING_REMOVAL_KEY, JSON.stringify(map));
 }
 
-function slotFillCandidate() {
+// The slot fill's candidates on trial (peer-rotation/fill.js): a list, or
+// one object as versions with one trial at a time stored it.
+function slotFillCandidates() {
   try {
     const row = db.instance.prepare(`SELECT value FROM meta WHERE key = 'slot_fill_trial'`).get();
-    return row ? keyOf(JSON.parse(row.value).address) : null;
+    if (!row) return new Set();
+    const v = JSON.parse(row.value);
+    return new Set((Array.isArray(v) ? v : [v]).filter((t) => t && t.address).map((t) => keyOf(t.address)));
   } catch {
-    return null;
+    return new Set();
   }
 }
 

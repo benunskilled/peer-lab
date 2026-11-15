@@ -48,7 +48,8 @@ async function stillToRetire(peer) {
  * while Core does not answer (index.js), which is the case that would make
  * every peer look offline at once.
  *
- * `onTrial` is the slot fill's candidate, which its trial judges, not this.
+ * `onTrial` is the slot fill's candidates (an address or a Set of them),
+ * which their trials judge, not this.
  * `peers` is getpeerinfo from this pass: the ranking is the database's
  * picture, a few seconds old, and Core may have reconnected the peer since -
  * removing it then would cut a connection that works again.
@@ -68,7 +69,8 @@ async function retireOfflineManualPeers(ranking, onTrial = null, peers = [], sti
   // connection at least once. An address that never stood up is not a peer
   // you are keeping, it is an address that does not work. Without this, one
   // such address would sit on one of eight slots forever, protected.
-  for (const peer of ranking.filter((p) => p.trusted && !p.live && !(p.kept && p.everManual) && p.address !== onTrial)) {
+  const judged = onTrial instanceof Set ? onTrial : new Set(onTrial ? [onTrial] : []);
+  for (const peer of ranking.filter((p) => p.trusted && !p.live && !(p.kept && p.everManual) && !judged.has(p.address))) {
     if (connectedNow.has(keyOf(peer.address))) continue;
     const offlineMs = offlineForMs(peer, now, lostBetween);
     if (offlineMs == null) continue;

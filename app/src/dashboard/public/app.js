@@ -982,7 +982,7 @@ async function refreshRotation() {
 
   // Picks tapped since this was asked for are the page's, not this answer's.
   const picked = picksAtRequest === picksEpoch ? data.picked || [] : (lastSlotStatus && lastSlotStatus.picked) || [];
-  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, picked };
+  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, trialsWhere: data.trialsWhere || [], picked };
   renderSlotStatus();
   renderSlotBook();
   // The slow round speeds up while a trial runs.
@@ -1034,8 +1034,10 @@ function renderSlotBook() {
   const counts = { ...Object.fromEntries((s.picked || []).map((r) => [r, 0])), ...(b.regions || {}) };
   const buttons = Object.keys(BOOK_REGIONS).filter((r) => r in counts).map((r) => [r, counts[r]]);
   // A candidate on trial holds its slot before Core has connected to it: the
-  // Manual tile, which counts connected peers, is then one lower (15.11.2026).
-  const testing = s.status.state === 'trial' ? ' \u00b7 1 being tested' : '';
+  // Manual tile, which counts connected peers, is then that much lower
+  // (15.11.2026). Up to three at once.
+  const onTrial = s.status.state === 'trial' ? ((s.status.trials && s.status.trials.length) || 1) : 0;
+  const testing = onTrial ? ` \u00b7 ${onTrial} being tested` : '';
   const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
   const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
   document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
@@ -1059,7 +1061,7 @@ function renderSlotBook() {
     : empty ? `Nothing in ${names(picked)} can be added right now, back to the usual pick.`
     : `The next free slots go to ${names(picked)}. Tap again to undo.`;
 }
-function slotStatusText(st, now) {
+function slotStatusText(st, now, trial = st && st.trial) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
   const slots = st.slots || { used: 0, max: MAX_MANUAL_PEERS, offline: [] };
   const free = slots.max - slots.used;
@@ -1068,13 +1070,14 @@ function slotStatusText(st, now) {
     case 'catching_up':
       return { state: 'core', head: 'Waiting for Bitcoin Core', rest: st.state === 'core' ? 'to respond.' : 'to catch up with the chain.', short: 'on · waiting for Core' };
     case 'trial': {
-      const t = st.trial;
+      const t = trial;
       const where = t.country ? countryName(t.country) : t.region;
       const doing = { connecting: 'Core is connecting to it.', headers: 'Connected, waiting for its first block.', checking: 'Connected, checking it.' }[t.phase] || 'Core is testing it.';
       return {
         state: 'trial',
         head: `Testing a new peer${where ? ` in ${escapeHtml(where)}` : ''}.`,
-        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${lastTryText(st)}`,
+        // Why the peer before went: under the oldest candidate only.
+        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${!st.trial || t.address === st.trial.address ? lastTryText(st) : ''}`,
         short: 'on · testing a peer',
       };
     }
@@ -1113,8 +1116,13 @@ function renderSlotStatus() {
   const row = nowRow(Date.now());
   const tbody = document.querySelector('#rotation-log-table tbody');
   if (lastRotationLog && row !== shownNow) {
-    if (row && shownNow && tbody && tbody.firstElementChild) {
-      tbody.firstElementChild.outerHTML = row.trim();
+    // As many top rows as before (one per candidate on trial): only those are
+    // replaced; a change in how many there are draws the whole log again.
+    const rows = (html) => (html.match(/<tr[\s>]/g) || []).length;
+    const n = rows(row);
+    if (row && shownNow && n === rows(shownNow) && tbody && tbody.children.length >= n) {
+      for (let i = 0; i < n; i++) tbody.firstElementChild.remove();
+      tbody.insertAdjacentHTML('afterbegin', row.trim());
       shownNow = row;
     } else {
       renderRotationLog(lastRotationLog);
@@ -1217,8 +1225,14 @@ function nowRow(now) {
   if (!s || !s.enabled) return '';
   const t = slotStatusText(s.status, now);
   const tries = triesHtml(s.status);
+  // One row per candidate on trial, the oldest first; the list of tries
+  // under the first.
   if (s.status && s.status.state === 'trial' && s.status.trial) {
-    return rotationEntryRow({ action: 'trial', address: s.status.trial.address, at: s.status.trial.startedAt, where: s.trialWhere, note: t.rest }, tries);
+    const list = s.status.trials && s.status.trials.length ? s.status.trials : [s.status.trial];
+    return list.map((tr, i) => {
+      const where = (s.trialsWhere && s.trialsWhere[i]) || (i === 0 ? s.trialWhere : null);
+      return rotationEntryRow({ action: 'trial', address: tr.address, at: tr.startedAt, where, note: slotStatusText(s.status, now, tr).rest }, i === 0 ? tries : '');
+    }).join('');
   }
   const pill = '<span class="pill rotation-now">Now</span>';
   const head = t.head.replace(/\.$/, '');
