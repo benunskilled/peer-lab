@@ -147,6 +147,7 @@ function addressKey(address, network = 'mainnet') {
 }
 
 module.exports = {
+  DEFAULT_PORTS,
   addressKey,
   resolveHostPort,
   unreachableNetwork,

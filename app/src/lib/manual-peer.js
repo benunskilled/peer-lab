@@ -6,7 +6,7 @@ const config = require('./config');
 const peerSync = require('./peer-sync');
 const { isValidPort } = require('./validate');
 // Address parsing/formatting lives in one module - see address.js for why.
-const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork } = require('./address');
+const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork, DEFAULT_PORTS } = require('./address');
 const rpc = require('./rpc');
 const logger = require('./logger').make('manual-peer');
 const { logAction } = require('./peer-rotation/log');
@@ -143,7 +143,12 @@ async function manualAddPeer(rawInput, label, { kept = false } = {}) {
   } catch (err) {
     logger.warn('Slot Fill log entry for a manual add failed', { address: probed.address, error: err.message });
   }
-  return { ok: true, address: probed.address, ...evictionNote(result) };
+  return {
+    ok: true,
+    address: probed.address,
+    ...(probed.via ? { note: ADDED_VIA(probed.via) } : {}),
+    ...evictionNote(result),
+  };
 }
 
 /**
@@ -163,8 +168,18 @@ async function probePeer(rawInput) {
     return { ok: false, error: 'invalid host/IP' };
   }
   const { addr, port: explicitPort } = resolveHostPort(host);
-  const refused = await directRefusal(addr);
-  if (refused) return { ok: false, error: refused };
+  const route = await routeOf(addr);
+  if (route && route.refuse) return { ok: false, error: route.refuse };
+  // Reached through Tor or I2P: not tested from here, handed to Core as it is.
+  // Without a port, the network's default - there is no port to search for.
+  if (route && route.via) {
+    if (explicitPort != null && !isValidPort(explicitPort)) {
+      return { ok: false, error: `${explicitPort} is not a valid port (1-65535)` };
+    }
+    // I2P peers are on port 0 (SAM 3.1), the way Core lists them.
+    const port = explicitPort != null ? explicitPort : unreachableNetwork(addr) === 'I2P' ? 0 : DEFAULT_PORTS[config.bitcoin.network] || 8333;
+    return { ok: true, address: formatAddress(addr, port), via: route.via, untested: true, message: TEST_VIA(route.via) };
+  }
 
   // Already has an explicit :port - respect it and skip the port search.
   if (explicitPort != null) {
@@ -193,22 +208,33 @@ async function probePeer(rawInput) {
 }
 
 /**
- * Why this container must not dial the host itself, or null when it may.
+ * How a typed-in address is reached: null for a direct test from here, `via`
+ * for one Core reaches through Tor or I2P and is handed to it untested, or
+ * `refuse` with the reason.
  *
- * The test goes out from here, not through Core's proxy. A Tor or I2P name
- * cannot be reached that way at all, and asking for it would hand the name to
- * Docker's resolver and the one behind it. And on a node that sends IPv4 or
- * IPv6 through a proxy (Tor), a direct test would connect from the node's
- * real address - the one thing such a node keeps hidden. getnetworkinfo says
- * which, asked only when someone tests or adds a peer, and kept ten minutes.
- * A failed answer falls back on the last one; with none at all it does not
- * block, and the node runs as it did before.
+ * The test goes out from this container, not through Core's proxy. A Tor or
+ * I2P name cannot be reached that way at all, and asking for it would hand
+ * the name to Docker's resolver. On a node that sends IPv4 or IPv6 through a
+ * proxy (Tor), a direct test would connect from the node's real address - the
+ * one thing such a node keeps hidden. So in both cases Core gets the address
+ * and connects itself, the way it does for Slot Fill (15.11.2026; before, the
+ * address was refused, and a node on Tor alone could add no peer at all).
+ * getnetworkinfo says which, asked only when someone tests or adds a peer, and
+ * kept ten minutes. A failed answer falls back on the last one; with none, a
+ * clearnet address is tested as before and a Tor or I2P one refused.
  */
 const NETINFO_MS = 10 * 60 * 1000;
+const NET_NAME = { Tor: 'onion', I2P: 'i2p' };
+const TEST_VIA = (via) => `Your node reaches this peer through ${via}. To keep your node's address private, ` +
+  "Peer Lab doesn't test it from here. Add & Keep hands it straight to Core.";
+const ADDED_VIA = (via) => `Added. To keep your node's address private, Core connects through ${via} itself. ` +
+  "The peer shows under Manual once it's in.";
+const NOT_USED = (label) => `Your node doesn't use ${label}, so it can't reach this peer.`;
 let netInfo = null, netInfoAt = 0;
-async function directRefusal(addr) {
-  const hidden = unreachableNetwork(addr);
-  if (hidden) return `${hidden} peers cannot be tested or added here: Peer Lab reaches peers only directly`;
+async function routeOf(addr) {
+  const overlay = unreachableNetwork(addr);
+  // CJDNS: Core has no proxy for it, and this container no way to it.
+  if (overlay === 'CJDNS') return { refuse: 'CJDNS peers cannot be tested or added here: Peer Lab reaches peers only directly' };
   if (!netInfo || Date.now() - netInfoAt > NETINFO_MS) {
     try {
       netInfo = await rpc.getNetworkInfo();
@@ -217,26 +243,31 @@ async function directRefusal(addr) {
       logger.debug('getnetworkinfo failed before a probe', { error: err.message });
       // An older answer still holds: a node that sent IPv4 through Tor ten
       // minutes ago almost surely still does, and guessing wrong leaks it.
-      if (!netInfo) return null;
+      if (!netInfo) {
+        return overlay ? { refuse: `Bitcoin Core didn't answer, so Peer Lab can't tell whether your node uses ${overlay}. Try again in a moment.` } : null;
+      }
     }
   }
+  const networks = (netInfo && netInfo.networks) || [];
+  if (overlay) {
+    // -onlynet limits only Core's own picks: a manual peer still goes through
+    // the proxy (init.cpp, -onlynet).
+    const n = networks.find((x) => x.name === NET_NAME[overlay]);
+    return n && ((n.reachable && !n.limited) || n.proxy) ? { via: overlay } : { refuse: NOT_USED(overlay) };
+  }
   // A name could resolve to either; an IPv6 literal has a colon. A proxy on
-  // any network the address may use refuses (the leak). A network Core
-  // cannot use at all refuses an address that is surely on it, and a name
-  // only when neither IPv4 nor IPv6 is usable - a node without IPv6 still
-  // tests names, a node without clearnet (onlynet=onion) tests none.
+  // any network the address may use sends it to Core (a test from here would
+  // leak) - also under -onlynet=onion, which leaves manual peers alone and
+  // still sends them through the proxy. A network Core has neither a proxy
+  // for nor uses refuses an address that is surely on it, and a name only
+  // when neither IPv4 nor IPv6 is usable.
   const nets = /^[0-9.]+$/.test(addr) ? ['ipv4'] : addr.includes(':') ? ['ipv6'] : ['ipv4', 'ipv6'];
-  const info = nets.map((name) => (netInfo && netInfo.networks || []).find((x) => x.name === name)).filter(Boolean);
+  const info = nets.map((name) => networks.find((x) => x.name === name)).filter(Boolean);
   const label = (n) => (n.name === 'ipv4' ? 'IPv4' : 'IPv6');
+  // Umbrel's proxy is Tor (port 9050); any other is called what it is.
   const proxied = info.find((n) => n.proxy);
-  if (proxied) {
-    return `your node reaches ${label(proxied)} peers only through a proxy (such as Tor) - ` +
-      'a test from here would connect from its real address, so none is made';
-  }
-  if (info.length && info.every((n) => n.limited || !n.reachable)) {
-    return `your node does not use ${info.map(label).join(' or ')} - it could not connect to this peer, ` +
-      'and a test from here would go past its settings, so none is made';
-  }
+  if (proxied) return { via: /:9050$/.test(proxied.proxy) || /tor/i.test(proxied.proxy) ? 'Tor' : 'its proxy' };
+  if (info.length && info.every((n) => n.limited || !n.reachable)) return { refuse: NOT_USED(info.map(label).join(' or ')) };
   return null;
 }
 

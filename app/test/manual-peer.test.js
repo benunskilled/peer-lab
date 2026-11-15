@@ -19,6 +19,7 @@ const db = require('../src/lib/db');
 const rpc = require('../src/lib/rpc');
 const { manualAddPeer, probePeer, resolveHostPort, formatAddress, versionMessage, MAGIC, _resetNetInfo } = require('../src/lib/manual-peer');
 const config = require('../src/lib/config');
+const { DEFAULT_PORTS } = require('../src/lib/address');
 
 test.before(() => {
   db.open();
@@ -507,7 +508,8 @@ test('an address typed into the box arrives starred', async () => {
 
 // The test goes out from this container, not through Core's proxy. On a node
 // that sends IPv4 through Tor that would connect from its real address, and a
-// Tor name would go to Docker's resolver: neither is tried at all.
+// Tor name would go to Docker's resolver: neither is tried at all - both are
+// for Core to reach, untested.
 test('no direct test where the node uses a proxy, and none for Tor names', async () => {
   let connections = 0;
   const { server, port } = await withListeningPort((socket) => { connections += 1; socket.destroy(); });
@@ -515,13 +517,16 @@ test('no direct test where the node uses a proxy, and none for Tor names', async
     const net4 = (proxy) => async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] });
     mock.method(rpc, 'getNetworkInfo', net4('127.0.0.1:9050'));
     const proxied = await probePeer(`127.0.0.1:${port}`);
-    assert.equal(proxied.ok, false);
-    assert.match(proxied.error, /proxy/);
+    assert.equal(proxied.ok, true);
+    assert.equal(proxied.untested, true);
+    assert.equal(proxied.via, 'Tor');
+    assert.match(proxied.message, /through Tor\. To keep your node's address private/);
     assert.equal(connections, 0, 'not even a connection attempt');
 
+    // A node without Tor cannot reach a Tor name either.
     const onion = await probePeer('abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz23.onion:8333');
     assert.equal(onion.ok, false);
-    assert.match(onion.error, /^Tor peers cannot be tested/);
+    assert.equal(onion.error, "Your node doesn't use Tor, so it can't reach this peer.");
 
     mock.restoreAll();
     _resetNetInfo();
@@ -533,7 +538,7 @@ test('no direct test where the node uses a proxy, and none for Tor names', async
     mock.restoreAll();
     _resetNetInfo();
     mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: false, proxy: '' }] }));
-    assert.match((await probePeer(`[::1]:${port}`)).error, /does not use IPv6/);
+    assert.match((await probePeer(`[::1]:${port}`)).error, /doesn't use IPv6/);
     await probePeer(`localhost:${port}`);
     assert.ok(connections >= 2, 'a name is tested on a node without IPv6');
 
@@ -542,7 +547,7 @@ test('no direct test where the node uses a proxy, and none for Tor names', async
     _resetNetInfo();
     const before = connections;
     mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: true, reachable: false, proxy: '' }, { name: 'ipv6', limited: true, reachable: false, proxy: '' }] }));
-    assert.match((await probePeer(`localhost:${port}`)).error, /does not use IPv4 or IPv6/);
+    assert.match((await probePeer(`localhost:${port}`)).error, /doesn't use IPv4 or IPv6/);
     assert.equal(connections, before, 'not even a connection attempt');
   } finally {
     server.close();
@@ -556,18 +561,75 @@ test('an old proxy answer still refuses when Core does not answer again', async 
   const { server, port } = await withListeningPort((socket) => { connections += 1; socket.destroy(); });
   try {
     mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '127.0.0.1:9050' }] }));
-    assert.match((await probePeer(`127.0.0.1:${port}`)).error, /proxy/);
+    assert.equal((await probePeer(`127.0.0.1:${port}`)).via, 'Tor');
     mock.restoreAll();
     mock.method(rpc, 'getNetworkInfo', async () => { throw new Error('timeout'); });
     const later = Date.now() + 11 * 60 * 1000;
     t.mock.method(Date, 'now', () => later);
     const again = await probePeer(`127.0.0.1:${port}`);
     t.mock.restoreAll();
-    assert.equal(again.ok, false);
-    assert.match(again.error, /proxy/);
+    assert.equal(again.via, 'Tor', 'still handed to Core, never tested from here');
     assert.equal(connections, 0, 'not even a connection attempt');
   } finally {
     mock.restoreAll();
     server.close();
   }
+});
+
+// A node on Tor alone (15.11.2026): a Tor or I2P name, or IPv4 sent through
+// Tor, goes to Core untested - written, added, padlocked, and said so.
+test('through Tor, Add & Keep hands the address to Core without a test', async () => {
+  const ONION = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz23.onion';
+  const I2P = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz.b32.i2p';
+  const added = [];
+  try {
+    _resetNetInfo();
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+      { name: 'ipv6', limited: true, reachable: false, proxy: '' },
+      { name: 'onion', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+      { name: 'i2p', limited: false, reachable: true, proxy: '' },
+    ] }));
+    mock.method(rpc, 'getPeerInfo', async () => []);
+    mock.method(rpc, 'addNode', async (address, cmd) => { added.push(`${cmd} ${address}`); });
+    mock.method(rpc, 'disconnectNode', async () => {});
+
+    const port = DEFAULT_PORTS[config.bitcoin.network] || 8333;
+    const tor = await manualAddPeer(ONION, undefined, { kept: true });
+    assert.equal(tor.ok, true);
+    assert.equal(tor.address, `${ONION}:${port}`);
+    assert.equal(tor.note, "Added. To keep your node's address private, Core connects through Tor itself. The peer shows under Manual once it's in.");
+    assert.equal(db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(tor.address).kept, 1);
+
+    const i2p = await manualAddPeer(I2P, undefined, { kept: true });
+    assert.equal(i2p.address, `${I2P}:0`, "I2P on port 0, as Core lists it");
+    assert.match(i2p.note, /through I2P itself/);
+
+    const v4 = await manualAddPeer('203.0.113.7', undefined, { kept: true });
+    assert.equal(v4.address, `203.0.113.7:${port}`);
+    assert.match(v4.note, /through Tor itself/);
+    assert.deepEqual(added, [`add ${ONION}:${port}`, `add ${I2P}:0`, `add 203.0.113.7:${port}`]);
+
+    assert.equal((await probePeer('[2001:db8::1]:8333')).error, "Your node doesn't use IPv6, so it can't reach this peer.");
+
+    // Tor alone (-onlynet=onion): IPv4 is limited, but its proxy still takes a manual peer.
+    _resetNetInfo();
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: true, reachable: false, proxy: '10.21.21.11:9050' },
+      { name: 'onion', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+    ] }));
+    assert.equal((await probePeer('198.51.100.9')).via, 'Tor');
+  } finally {
+    mock.restoreAll();
+    _resetNetInfo();
+  }
+});
+
+test('with no answer from Core ever, a Tor name is refused, not guessed', async () => {
+  _resetNetInfo();
+  mock.method(rpc, 'getNetworkInfo', async () => { throw new Error('timeout'); });
+  const r = await probePeer('abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz23.onion');
+  mock.restoreAll();
+  assert.equal(r.ok, false);
+  assert.match(r.error, /can't tell whether your node uses Tor/);
 });

@@ -475,8 +475,9 @@ function actionsCell(p, { lock = '' } = {}) {
   //
   // A source-obscured peer's "address" is Docker's own relay gateway, not the
   // peer's real one (see queries/ranking-row.js). A local Umbrel app is not a peer worth
-  // acting on. And a Tor, I2P or CJDNS peer reaches us over a network this
-  // container cannot dial out on, so there is no address to call back.
+  // acting on. And a Tor or I2P peer that dialled in carries the address of
+  // Umbrel's proxy, a CJDNS one a network Core has no proxy for: there is no
+  // address to call back.
   //
   // The third used to print "Tor only" where the button goes, which was a
   // word about the peer standing in a place that is otherwise a reason, and
@@ -495,7 +496,11 @@ function actionsCell(p, { lock = '' } = {}) {
   // is not to be trusted with it.
   // The peers service's word where it has one, the name rules otherwise.
   const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : kindRuleIndex(p.client) === MISSPELT_RULE);
-  const primary = ((p.sourceObscured || p.localUmbrelPeer || p.privateNetwork || disguised || (neverFirstReason(p) && !p.first))
+  // A Tor or I2P peer this node dialled carries its own address, and Core
+  // reaches it again by itself (15.11.2026): it can be added. One that
+  // dialled in carries the proxy's address, and CJDNS no proxy at all.
+  const unreachable = p.privateNetwork && (p.proxiedPrivatePeer || p.privateNetwork === 'CJDNS');
+  const primary = ((p.sourceObscured || p.localUmbrelPeer || unreachable || disguised || (neverFirstReason(p) && !p.first))
       ? placeholder
       : `<button class="secondary action-slot" data-action="add-manual" data-address="${escapeHtml(p.address)}">Add as Manual</button>`);
 
@@ -1533,10 +1538,12 @@ document.getElementById('manual-test-button').addEventListener('click', async ()
     // Naming the port is the useful half of the answer for an inbound peer:
     // it is the port that peer's node actually listens on, which is never the
     // one its inbound connection to us came from.
-    manualAddResult(`reachable - a node answered at ${result.address}. Nothing was added.`, 'ok');
+    // Reached through Tor or I2P: not tested, and the answer says why.
+    if (result.untested) manualAddResult(result.message, 'ok');
+    else manualAddResult(`reachable - a node answered at ${result.address}. Nothing was added.`, 'ok');
   } catch (err) {
     // Refused before any test (a Tor name, a proxied network): "not reachable" would claim something nobody checked.
-    const untested = /cannot be tested|through a proxy|does not use/.test(err.message);
+    const untested = /cannot be tested|doesn't use|can't tell/.test(err.message);
     manualAddResult(`${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
   } finally {
     manualAddBusy(false);
@@ -1550,7 +1557,8 @@ document.getElementById('manual-add-form').addEventListener('submit', async (e) 
   try {
     const result = await api('/api/peers/manual-add', { method: 'POST', body: JSON.stringify({ host: input.value }) });
     justGone.delete(result.address);
-    manualAddResult(result.warning ? `added ${result.address} - ${result.warning}` : `added ${result.address}`, 'ok');
+    const said = result.note || `added ${result.address}`;
+    manualAddResult(result.warning ? `${said} - ${result.warning}` : said, 'ok');
     input.value = '';
     refreshPeers().catch(() => {});
     refreshRotation();
@@ -1722,7 +1730,9 @@ document.body.addEventListener('click', async (e) => {
   // Probing a host on 8333 then 9333 can take up to ~6s (3s timeout per
   // port) - show what's actually happening instead of leaving the UI
   // looking frozen/unresponsive during that wait.
-  if (action === 'add-manual') showToast(`Adding ${address} as manual peer - probing port 8333, then 9333…`, 'pending');
+  if (action === 'add-manual') {
+    showToast(/\.onion|\.i2p/.test(address) ? `Adding ${address} as manual peer…` : `Adding ${address} as manual peer - probing port 8333, then 9333…`, 'pending');
+  }
   if (action === 'untrust') showToast(`Removing ${address}…`, 'pending');
   if (action === 'disconnect') showToast(`Disconnecting ${address}…`, 'pending');
   if (action === 'delete-pool') showToast('Removing pool…', 'pending');
@@ -1734,9 +1744,11 @@ document.body.addEventListener('click', async (e) => {
       justGone.delete(address);
       justGone.delete(result.address);
       showToast(
-        result.warning
-          ? `Added and locked as manual peer: ${result.address} - ${result.warning}`
-          : `Added and locked as manual peer: ${result.address}. It now shows in the Manual Peers panel below.`,
+        result.note
+          ? `${result.note}${result.warning ? ` ${result.warning}` : ''}`
+          : result.warning
+            ? `Added and locked as manual peer: ${result.address} - ${result.warning}`
+            : `Added and locked as manual peer: ${result.address}. It now shows in the Manual Peers panel below.`,
         'success',
       );
     }
