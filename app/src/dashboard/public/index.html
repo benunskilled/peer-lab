@@ -123,11 +123,12 @@
           <tbody id="unplacedBody"></tbody>
         </table>
       </aside>
-      <!-- What the colours on the map mean. -->
-      <div class="map-legend">
-        <span><span class="swatch s-inbound"></span>Inbound</span>
-        <span><span class="swatch s-outbound"></span>Outbound</span>
-        <span><span class="swatch s-manual"></span>Manual</span>
+      <!-- What the colours on the map mean - and, tapped, which of the three
+           groups the map shows (15.11.2026). Only the map: the tables stay. -->
+      <div class="map-legend" id="mapLegend">
+        <button type="button" class="legend-pick" data-group="inbound" aria-pressed="true" title="Show or hide inbound peers on the map"><span class="swatch s-inbound"></span>Inbound</button>
+        <button type="button" class="legend-pick" data-group="outbound" aria-pressed="true" title="Show or hide outbound peers on the map"><span class="swatch s-outbound"></span>Outbound</button>
+        <button type="button" class="legend-pick" data-group="manual" aria-pressed="true" title="Show or hide manual peers on the map"><span class="swatch s-manual"></span>Manual</button>
         <span><span class="swatch s-home"></span>Your node</span>
       </div>
     </section>

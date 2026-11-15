@@ -82,7 +82,7 @@
     const delivered = deliveredNow;
     const by = new Map();
     for (const p of visiblePeers()) {
-      if (!p.cc) continue;
+      if (!p.cc || mapHidden.has(p.group)) continue;
       const key = placeKey(p, byRegion);
       let b = by.get(key);
       if (!b) {
@@ -115,6 +115,25 @@
   }
 
   let renderedMode = null;
+  // The legend's three groups, each a switch for the map alone (15.11.2026):
+  // a node with hundreds of inbound peers hid its few outbound ones under
+  // them. Kept on this device.
+  const MAP_HIDDEN_KEY = "peerlab.mapHidden";
+  const mapHidden = new Set((() => { try { return JSON.parse(store.get(MAP_HIDDEN_KEY)) || []; } catch { return []; } })());
+  function drawLegend() {
+    for (const b of document.querySelectorAll("#mapLegend .legend-pick")) b.setAttribute("aria-pressed", String(!mapHidden.has(b.dataset.group)));
+  }
+  drawLegend();
+  $("mapLegend").addEventListener("click", (e) => {
+    const b = e.target.closest(".legend-pick");
+    if (!b) return;
+    const g = b.dataset.group;
+    if (mapHidden.has(g)) mapHidden.delete(g); else mapHidden.add(g);
+    store.set(MAP_HIDDEN_KEY, JSON.stringify([...mapHidden]));
+    drawLegend();
+    renderMarkers();
+  });
+
   function renderMarkers() {
     if (!state.world || !state.data) return;
     renderedMode = regionMode();
