@@ -254,7 +254,7 @@ async function pass({ quick = false } = {}) {
   // answered already, so nothing more is removed or added from here on.
   if (!isEnabled()) return { ...idle, enabled: false, ...counted };
   // Added earlier and found out since: the slot is free again.
-  const unmasked = await fill.dropUnmasked(kinds);
+  const unmasked = await fill.dropUnmasked(kinds, peers, isEnabled);
   if (unmasked.length) {
     try {
       peers = unmasked.reduce((list, address) => fill.withoutSession(list, address), await rpc.getPeerInfo());

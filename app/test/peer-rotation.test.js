@@ -2074,7 +2074,7 @@ test('slot fill: a candidate the peer list calls Disguised is out at once', asyn
   assert.equal(row.note, 'Disguised: not the Core it names');
 });
 
-test('slot fill: the peer list on another chain counts as at a trial', async () => {
+test('slot fill: the peer list\'s fork mark alone does not throw out a candidate on our tip', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
   const asia = inBook('198.18.7.20', 'AS');
   const t0 = Date.now();
@@ -2084,8 +2084,7 @@ test('slot fill: the peer list on another chain counts as at a trial', async () 
 
   const settled = await fill.settle(peers, chain, t0 + 30 * 1000, { kinds: new Map([[asia, { kind: 'Knots', fork: 'BIP110 fork' }]]) });
 
-  assert.equal(settled.reverted, 1);
-  assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(asia).reason, 'other_chain:BIP110 fork');
+  assert.equal(settled.confirmed, 1, 'forks are judged on Core\'s header height, as before');
 });
 
 test('slot fill: a peer it added and the list later calls Disguised goes; locked and hand-added ones stay', async () => {
@@ -2100,14 +2099,18 @@ test('slot fill: a peer it added and the list later calls Disguised goes; locked
   insert.run(fine, 'slot fill: Asia', 0, Date.now());
   const kinds = new Map([[added, { kind: 'Disguised' }], [locked, { kind: 'Disguised' }], [byHand, { kind: 'Disguised' }], [fine, { kind: 'Core' }]]);
 
-  const gone = await fill.dropUnmasked(kinds);
+  const peers = [added, locked, byHand, fine].map((a) => manualSession(a));
+  assert.deepEqual(await fill.dropUnmasked(kinds, [], () => true), [], 'no session now, no verdict on it');
+  assert.deepEqual(await fill.dropUnmasked(kinds, peers, () => false), [], 'switched off meanwhile');
+
+  const gone = await fill.dropUnmasked(kinds, peers);
 
   assert.deepEqual(gone, [added]);
   assert.ok(!isManual(added));
   assert.ok(isManual(locked) && isManual(byHand) && isManual(fine));
   assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(added).reason, 'disguised');
   assert.equal(logRows().find((r) => r.address === added).action, 'rejected');
-  assert.deepEqual(await fill.dropUnmasked(new Map()), [], 'no word from the peer list, nothing done');
+  assert.deepEqual(await fill.dropUnmasked(new Map(), peers), [], 'no word from the peer list, nothing done');
   for (const a of [locked, byHand, fine]) db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(a);
 });
 

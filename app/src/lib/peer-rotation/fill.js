@@ -328,9 +328,10 @@ async function settleOne(trial, peers, chain, now, force, verdictOf = () => null
   }
   const session = manualSession(peers, trial.address);
   // Only while Core holds the candidate: the list's word is about a session.
-  const listed = verdictOf(session);
-  const fake = disguised(session, peers) || listSaysDisguised(listed);
-  const fork = fake ? null : (otherChain(session, chain) || (listed && listed.fork) || null);
+  // Its Disguised only: its fork mark comes without the wait for a first
+  // header height that otherChain() keeps (review, 15.11.2026).
+  const fake = disguised(session, peers) || listSaysDisguised(verdictOf(session));
+  const fork = fake ? null : otherChain(session, chain);
   if (!fake && !fork && works(session, chain, trial.tip)) {
     dropTrial(trial.address);
     // Why the one before went, until no candidate is left on trial.
@@ -373,32 +374,32 @@ async function settleOne(trial, peers, chain, now, force, verdictOf = () => null
 }
 
 /**
- * A peer Slot Fill added that the peer list calls Disguised, or on another
- * chain, after its trial: some of the list's rules need ten minutes of the
- * peer's behaviour, longer than a trial runs. Out again, held against for a
- * week, and a row in the log, as at a trial. Only Slot Fill's own adds that
- * nobody locked; a peer a person added or locked is theirs. Returns the
- * addresses taken out.
+ * A peer Slot Fill added that the peer list calls Disguised after its trial:
+ * some of the list's rules need ten minutes of the peer's behaviour, longer
+ * than a trial runs. Out again, held against for a week, and a row in the
+ * log, as at a trial. Only Slot Fill's own adds that nobody locked, and only
+ * while Core holds a manual session to it - the verdict is about that
+ * session. A peer a person added or locked is theirs. Returns the addresses
+ * taken out.
  */
 const ADDED_LABEL = 'slot fill:%';
-async function dropUnmasked(kinds, now = Date.now()) {
+async function dropUnmasked(kinds, peers, stillOn = () => true, now = Date.now()) {
   const verdicts = verdictsByKey(kinds);
   if (!verdicts.size) return [];
   const onTrial = new Set(trials().map((t) => keyOf(t.address)));
   const rows = db.instance.prepare('SELECT address FROM trusted_peer WHERE kept = 0 AND label LIKE ?').all(ADDED_LABEL);
+  const still = db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ? AND kept = 0 AND label LIKE ?');
   const out = [];
   for (const { address } of rows) {
-    const key = keyOf(address);
-    if (onTrial.has(key)) continue;
-    const m = verdicts.get(key);
-    const fake = listSaysDisguised(m);
-    const fork = !fake && m && m.fork ? m.fork : null;
-    if (!fake && !fork) continue;
+    if (onTrial.has(keyOf(address)) || !manualSession(peers, address)) continue;
+    if (!listSaysDisguised(verdicts.get(keyOf(address)))) continue;
+    // Each removal waits for Core: switched off, locked or removed by hand
+    // meanwhile, the rest is left alone (as retire.js does).
+    if (!stillOn() || !still.get(address, ADDED_LABEL)) break;
     await peerSync.removeTrustedPeer(address);
-    const why = whyNot(null, fake, fork);
-    markTried(address, false, now, { reason: why.code });
-    logAction({ action: 'rejected', address, note: fork ? `Follows another chain (${fork})` : 'Disguised: not the Core it names' });
-    logger.info('slot fill: added peer taken out again', { address, reason: why.text });
+    markTried(address, false, now, { reason: 'disguised' });
+    logAction({ action: 'rejected', address, note: 'Disguised: not the Core it names' });
+    logger.info('slot fill: added peer taken out again, the peer list calls it Disguised', { address });
     out.push(address);
   }
   return out;
