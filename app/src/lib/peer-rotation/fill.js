@@ -401,9 +401,10 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // region "tried" has nobody admissible in, as for the gaps above (review:
   // with Europe and Africa picked, Europe's thousands came first every time).
   //
-  // In a picked region the provider rule is half as strict, but only once no
-  // candidate there passes it whole (15.11.2026): an operator Core's own
-  // outbound peers use may come in, one the manual peers already have never.
+  // In the picked regions the provider rule is half as strict, but only once
+  // no candidate in any of them passes it whole (15.11.2026): an operator
+  // Core's own outbound peers use may come in, one the manual peers already
+  // have never. Decided over the picked regions together, not each alone.
   const pickKeys = (keys) => {
     const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
     const list = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];

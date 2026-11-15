@@ -7,7 +7,7 @@
  * things break that: Core not answering (restarting, say), and the clock
  * itself stepping. While Core is down it holds no connection to anyone, so a
  * candidate on trial cannot connect and every manual peer looks offline; after
- * a restart the candidate got "no connection" and a week's ban, and an
+ * a restart the candidate got "no connection" and a ban (a week then, a day now), and an
  * offline manual peer lost its slot for time Core was not even trying. A clock
  * stepping back left the trial waiting for hours; one stepping forward made
  * everybody overdue at once.

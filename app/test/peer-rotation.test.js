@@ -1811,16 +1811,17 @@ test('slot fill: a picked region lets in an operator Core uses, only when nobody
   at(seedLivePeer({ eligible: 144 }), 'NA', 'Amazon');
   const amazon = inBook('198.18.3.1', 'AF', { operator: 'Amazon', country: 'ZA' });
   inBook('198.18.3.2', 'AF', { operator: 'Hetzner', country: 'ZA' });
+  const asia = inBook('198.18.3.3', 'AS', { operator: 'Sakura' });
   const peers = setPeers([coreOut()]);
   setPickedRegions(['AF']);
   await step(peers, Date.now());
   assert.equal(fill.currentTrial().address, amazon, 'Amazon, which Core uses; never Hetzner, a manual peer\'s');
   await fill.abandon(fill.currentTrial().address);
-  // Without a pick the rule holds whole: no Amazon in Africa.
+  // Without a pick the rule holds whole: no Amazon in Africa, someone else.
   setPickedRegions([]);
   fill.markTried(amazon, false, Date.now() - 2 * 86400000, { reason: 'no_connection', startedAt: Date.now() - 2 * 86400000 });
   await step(peers, Date.now());
-  assert.notEqual(fill.currentTrial() && fill.currentTrial().address, amazon);
+  assert.equal(fill.currentTrial().address, asia);
 });
 
 test('slot fill: an address not reached is tried again after a day, a wrong one after a week', () => {
