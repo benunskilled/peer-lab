@@ -270,7 +270,7 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 :where(#map) .link { fill: none; stroke-width: 0.7; stroke-opacity: 0.16; stroke-linecap: round; pointer-events: none; }
 .l-manual { stroke: var(--manual); stroke-opacity: 0.5; stroke-width: 1; }
 .l-inbound { stroke: var(--inbound); stroke-opacity: 0.08; }
-.l-outbound { stroke: var(--outbound); stroke-opacity: 0.3; }
+.l-outbound { stroke: var(--outbound); stroke-opacity: 0.5; stroke-width: 1; } /* as clear as manual (15.11.2026): at 0.3 and thin they vanished beside it */
 .home-mark { pointer-events: none; }
 .home-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 1.2; }
 .fx-head { fill: #ffd29a; }
