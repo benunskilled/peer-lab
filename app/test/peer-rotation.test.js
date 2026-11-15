@@ -1700,3 +1700,31 @@ test('slot fill: after three restarts a Core that keeps going away no longer hol
   assert.ok(!isManual(asia));
   peerRotation.setEnabled(false);
 });
+
+// 15.11.2026: five candidates in Africa failed in half an hour after a peer
+// was removed by hand, and the page named only the last. The status carries
+// every one since the slot came free, and nothing once it is filled again.
+test('the status lists every candidate tried since a slot came free', () => {
+  const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const t0 = Date.now() - 30 * 60 * 1000;
+  const log = db.instance.prepare('INSERT INTO rotation_log (at, action, address) VALUES (?, ?, ?)');
+  const tried = db.instance.prepare('INSERT INTO slot_fill_tried (address, tried_at, ok, reason, started_at, network) VALUES (?, ?, ?, ?, ?, ?)');
+  log.run(t0 - 60 * 60 * 1000, 'promote', '203.0.113.1:8333');
+  tried.run('203.0.113.9:8333', t0 - 50 * 60 * 1000, 0, 'no_connection', t0 - 56 * 60 * 1000, 'clearnet'); // before: not shown
+  log.run(t0, 'unmanual', '203.0.113.2:8333');
+  tried.run('203.0.113.2:8333', t0, 0, 'removed', null, 'clearnet'); // the removal itself: not a try
+  tried.run('198.51.100.1:8333', t0 + 6 * 60000, 0, 'no_connection', t0 + 7000, 'clearnet');
+  tried.run('198.51.100.2:8333', t0 + 20 * 60000, 0, 'disguised', t0 + 18 * 60000, 'clearnet');
+
+  const got = triesSinceFree();
+  assert.equal(got.since, t0);
+  assert.deepEqual(got.tries.map((x) => [x.address, x.reason]), [['198.51.100.2:8333', 'disguised'], ['198.51.100.1:8333', 'no_connection']]);
+  assert.deepEqual(got.freed.map((f) => [f.action, f.address]), [['unmanual', '203.0.113.2:8333']]);
+
+  log.run(t0 + 25 * 60000, 'promote', '198.51.100.3:8333');
+  assert.equal(triesSinceFree(), null, 'filled again: no list');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});

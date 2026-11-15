@@ -1019,7 +1019,10 @@ function renderSlotBook() {
   const n = (x) => Number(x).toLocaleString('en-US');
   const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
   const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
-  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
+  // A candidate on trial holds its slot before Core has connected to it: the
+  // Manual tile, which counts connected peers, is then one lower (15.11.2026).
+  const testing = s.status.state === 'trial' ? ' \u00b7 1 being tested' : '';
+  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
     + (none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
   document.getElementById('slot-book-regions').textContent = regions.map(([r, c]) => `${BOOK_REGIONS[r] || r} ${n(c)}`).join(' \u00b7 ');
 }
@@ -1121,7 +1124,7 @@ function logPlace(entry) {
 // for the manual peers above; on a phone a card like a peer's (the last
 // cell, hidden in the table): place and action, address and when, the
 // provider under it as in the table, then why.
-function rotationEntryRow(entry) {
+function rotationEntryRow(entry, extra = '') {
   // An address can be long (Tor): cut with an ellipsis, the whole of it in a
   // tooltip only when it was cut (the mouseover handler below).
   const addr = `<span class="addr-txt">${escapeHtml(entry.address)}</span>`;
@@ -1138,8 +1141,8 @@ function rotationEntryRow(entry) {
       <td class="hint" title="${escapeHtml(new Date(entry.at).toLocaleString())}">${when}</td>
       <td>${pill}</td>
       ${address}
-      <td class="hint"${entry.replacedAddress ? ` title="In for ${escapeHtml(entry.replacedAddress)}"` : ''}>${escapeHtml(entry.note || '-')}</td>
-      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${logPlace(entry)}</span>${pill}</div><div class="lc-sub"><span class="lc-what">${addr}</span><span class="lc-when">${when}</span></div>${op}${why}</td>
+      <td class="hint"${entry.replacedAddress ? ` title="In for ${escapeHtml(entry.replacedAddress)}"` : ''}>${escapeHtml(entry.note || '-')}${extra}</td>
+      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${logPlace(entry)}</span>${pill}</div><div class="lc-sub"><span class="lc-what">${addr}</span><span class="lc-when">${when}</span></div>${op}${why}${extra}</td>
     </tr>`;
 }
 
@@ -1150,12 +1153,36 @@ function rotationEntryRow(entry) {
 // place and provider; any other state is its sentence, "All 8 slots in use."
 // head and rest are HTML already (slotStatusText escapes what it puts in).
 let shownNow = ''; // the top row as last drawn, '' for none
+// Under the top row while a slot is free: every candidate tried since it came
+// free, and what freed it (15.11.2026). Folded to one line; open stays open
+// across the redraws, which rewrite the row.
+let triesOpen = false;
+document.addEventListener('toggle', (e) => {
+  if (e.target.classList && e.target.classList.contains('slot-tries')) triesOpen = e.target.open;
+}, true);
+function triesHtml(st) {
+  const t = st && st.tries;
+  if (!t || !t.tries.length) return '';
+  const hm = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const place = (w) => (w ? [w.country ? countryName(w.country) : w.regionName, w.operator].filter(Boolean).join(' \u00b7 ') : 'unknown place');
+  const line = (at, where, what, title) =>
+    `<li><span class="st-when">${hm(at)}</span><span class="st-where"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(where)}</span><span class="st-what">${escapeHtml(what)}</span></li>`;
+  const tried = t.tries.map((x) => {
+    const min = Math.max(1, Math.round((x.endedAt - x.startedAt) / 60000));
+    return line(x.startedAt, place(x.where), `${LAST_TRY_WHY[x.reason] || 'was not kept'} (${min} min)`, x.address);
+  });
+  const freed = t.freed.slice().reverse().map((f) => line(f.at, place(f.where),
+    f.action === 'retire' ? 'offline too long, slot freed' : 'removed by hand, slot freed', f.address));
+  const n = t.tries.length;
+  return `<details class="slot-tries"${triesOpen ? ' open' : ''}><summary>${n} tried since ${hm(t.since)}</summary><ul>${tried.join('')}${freed.join('')}</ul></details>`;
+}
 function nowRow(now) {
   const s = lastSlotStatus;
   if (!s || !s.enabled) return '';
   const t = slotStatusText(s.status, now);
+  const tries = triesHtml(s.status);
   if (s.status && s.status.state === 'trial' && s.status.trial) {
-    return rotationEntryRow({ action: 'trial', address: s.status.trial.address, at: s.status.trial.startedAt, where: s.trialWhere, note: t.rest });
+    return rotationEntryRow({ action: 'trial', address: s.status.trial.address, at: s.status.trial.startedAt, where: s.trialWhere, note: t.rest }, tries);
   }
   const pill = '<span class="pill rotation-now">Now</span>';
   const head = t.head.replace(/\.$/, '');
@@ -1164,8 +1191,8 @@ function nowRow(now) {
       <td class="hint"></td>
       <td>${pill}</td>
       <td><b>${head}</b></td>
-      <td class="hint">${t.rest}</td>
-      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${t.rest}</div></td>
+      <td class="hint">${t.rest}${tries}</td>
+      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${t.rest}</div>${tries}</td>
     </tr>`;
 }
 
