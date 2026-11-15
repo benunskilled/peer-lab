@@ -350,8 +350,9 @@ async function settleRace(race, attempt = 0) {
   }
   // Switched off or restarted while Core was asked: written as abandoned
   // races are, with no misses (review G4: it was written with them).
+  // Not a block Core knows as recent: not written at all.
   if (race.generation !== generation) {
-    if (!race.written) writeRace(race, { misses: false });
+    if (!race.written && (known === true || known === null)) writeRace(race, { misses: false });
     return undefined;
   }
   if (known === 'old') {

@@ -85,6 +85,7 @@ class StratumPoolConnection extends EventEmitter {
 
   stop() {
     this.stopped = true;
+    this._connectedAt = null;
     clearTimeout(this._reconnectTimer);
     if (this.socket) this.socket.destroy();
   }
