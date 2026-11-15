@@ -24,8 +24,45 @@ const keyOf = (address) => addressKey(address, config.bitcoin.network);
  * simply stays queued in our own trusted_peer table and gets picked up
  * automatically once a slot frees up (another manual peer removed/dropped).
  */
+/**
+ * A manual peer Core holds in another spelling than ours - "1.2.3.4" from
+ * bitcoin.conf against our "1.2.3.4:8333", an IPv6 written out long - takes
+ * Core's: Core names the connection by its own addnode string, and in ours
+ * the live peer showed without its padlock beside an offline copy holding
+ * it (review G3, regtest 15.11.2026). Padlock, label and date go along; two
+ * rows for one peer become one, locked if either was.
+ */
+function takeCoreSpelling(addedNodes) {
+  const core = new Map();
+  for (const n of addedNodes) if (n && n.addednode) core.set(keyOf(n.addednode), n.addednode);
+  const rows = db.instance.prepare('SELECT address, label, kept, created_at FROM trusted_peer').all();
+  const byKey = new Map();
+  for (const r of rows) {
+    const k = keyOf(r.address);
+    if (!core.has(k)) continue;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(r);
+  }
+  const del = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
+  const put = db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, ?, ?, ?)');
+  for (const [k, list] of byKey) {
+    const spelling = core.get(k);
+    if (list.length === 1 && list[0].address === spelling) continue;
+    const label = (list.find((r) => r.address === spelling && r.label) || list.find((r) => r.label) || {}).label || null;
+    const kept = list.some((r) => r.kept) ? 1 : 0;
+    const createdAt = Math.min(...list.map((r) => r.created_at));
+    db.instance.transaction(() => {
+      for (const r of list) del.run(r.address);
+      put.run(spelling, label, kept, createdAt);
+    })();
+    // The ranking lists a manual peer by its peer row, as adoption makes one.
+    db.getOrCreatePeer(spelling);
+    logger.info('manual peer takes the spelling Core holds it under', { from: list.map((r) => r.address), to: spelling });
+  }
+}
+
 async function syncTrustedToAddnode(knownAddedNodes) {
-  const trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
+  let trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
   let addedNodes = [];
   try {
     // Callers that already hold this list can pass it in. adoptExternalManualPeers
@@ -40,6 +77,8 @@ async function syncTrustedToAddnode(knownAddedNodes) {
   // Compared by key: Core echoes an addnode in the spelling it was given, and
   // the same node written another way is still the same entry to Core.
   const existingAddrs = new Set(addedNodes.map((n) => keyOf(n.addednode)));
+  takeCoreSpelling(addedNodes);
+  trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't
   // starve them out just because they sort later than a newly-queued one.

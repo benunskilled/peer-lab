@@ -2142,3 +2142,14 @@ test('slot fill: a fresh add is checked once a minute, not every 15 seconds', as
     peerRotation.setEnabled(false);
   }
 });
+
+test('with Slot Fill on, the profiler runs a pass at start, once', () => {
+  peerRotation.setEnabled(true);
+  peerRotation.reportPassForTest([], { initialblockdownload: false }); // a status from before the restart
+  peerRotation._resetStartPassForTest();
+  assert.equal(peerRotation.waitsForFirstPass(), true, 'after an update, a free slot is filled now');
+  assert.equal(peerRotation.waitsForFirstPass(), false, 'once');
+  peerRotation.setEnabled(false);
+  peerRotation._resetStartPassForTest();
+  assert.equal(peerRotation.waitsForFirstPass(), false, 'off: none');
+});

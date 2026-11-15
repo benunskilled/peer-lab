@@ -143,3 +143,26 @@ test('a peer removed by hand in the other process is not adopted back', async ()
   mock.restoreAll();
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 0, 'the removed peer stays removed');
 });
+
+// Review G3, regtest 15.11.2026: Core held "127.0.0.1" (bitcoin.conf), we
+// held "127.0.0.1:18444". Core names the connection by its own string, so
+// the live peer showed without its padlock beside an offline locked copy.
+test('a manual peer takes the spelling Core holds it under; two rows for one peer become one', async () => {
+  const ins = db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, ?, ?, ?)');
+  ins.run('198.51.100.40:8333', 'mine', 1, 5);
+  ins.run('[2001:db8:0:0:0:0:0:1]:8333', null, 0, 7);
+  ins.run('[2001:db8::1]:8333', null, 1, 9);
+  const addedNodes = [{ addednode: '198.51.100.40' }, { addednode: '[2001:0db8::1]:8333' }];
+  const sent = [];
+  mock.method(rpc, 'addNode', async (a, c) => { sent.push(`${c} ${a}`); });
+
+  await require('../src/lib/peer-sync').syncTrustedToAddnode(addedNodes);
+
+  const all = db.instance.prepare('SELECT address, label, kept, created_at FROM trusted_peer ORDER BY address').all();
+  assert.deepEqual(all, [
+    { address: '198.51.100.40', label: 'mine', kept: 1, created_at: 5 },
+    { address: '[2001:0db8::1]:8333', label: null, kept: 1, created_at: 7 },
+  ]);
+  assert.deepEqual(sent, [], 'Core already holds both: nothing sent');
+  assert.ok(db.instance.prepare('SELECT 1 FROM peer WHERE address = ?').get('198.51.100.40'), 'a peer row, so the ranking lists it');
+});
