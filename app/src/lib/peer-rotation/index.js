@@ -28,7 +28,7 @@ const db = require('../db');
 const rpc = require('../rpc');
 const queries = require('../queries');
 const logger = require('../logger').make('peer-rotation');
-const { logAction, recentLog, triesSinceFree } = require('./log');
+const { logAction, recentLog, recentLogWithTries, triesSinceFree } = require('./log');
 const { retireOfflineManualPeers } = require('./retire');
 const fill = require('./fill');
 const { offlineGraceMs, offlineForMs } = require('./rules');
@@ -333,6 +333,7 @@ module.exports = {
   watchTrial,
   logAction,
   recentLog,
+  recentLogWithTries,
   retireOfflineManualPeers,
   offlineGraceMs,
   tick,

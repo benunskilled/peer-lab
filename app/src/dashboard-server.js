@@ -859,7 +859,7 @@ const routes = {
       trialWhere: status && status.trial ? whereOf(status.trial.address) : null,
       // Every candidate on trial (several at once since 15.11.2026), in order.
       trialsWhere: status && Array.isArray(status.trials) ? status.trials.map((t) => whereOf(t.address)) : [],
-      log: peerRotation.recentLog(),
+      log: peerRotation.recentLogWithTries(),
       // The regions picked for the next free slots (picks.js).
       picked: pickedRegions(),
     });

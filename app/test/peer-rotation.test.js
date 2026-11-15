@@ -1705,6 +1705,7 @@ test('slot fill: after three restarts a Core that keeps going away no longer hol
 // every one since the slot came free, and nothing once it is filled again.
 test('the status lists every candidate tried since a slot came free', () => {
   const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_on_at'").run();
   db.instance.prepare('DELETE FROM rotation_log').run();
   db.instance.prepare('DELETE FROM slot_fill_tried').run();
   const t0 = Date.now() - 30 * 60 * 1000;
@@ -1729,6 +1730,7 @@ test('the status lists every candidate tried since a slot came free', () => {
 });
 
 test('with two slots free and one filled since, the other one\'s tries still show, counted in full', () => {
+  db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_on_at'").run();
   const { triesSinceFree } = require('../src/lib/peer-rotation/log');
   db.instance.prepare('DELETE FROM rotation_log').run();
   db.instance.prepare('DELETE FROM slot_fill_tried').run();
@@ -1954,4 +1956,87 @@ test('watchTrial: no new candidate while the trials run on, the next one as soon
     config.maxManualPeers = before;
     peerRotation.setEnabled(false);
   }
+});
+
+// 15.11.2026: a Knots node on the BLAKE2b fork held a slot three minutes.
+test('slot fill: a candidate on another chain is out at once', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.5.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const fork = manualSession(asia, { synced: TIP - 50000, servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^28]'] });
+
+  const result = await step(setPeers([coreOut(), fork]), t0 + 30 * 1000);
+
+  assert.equal(result.reverted, 1, 'not three minutes later');
+  assert.ok(!isManual(asia));
+  assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(asia).reason, 'other_chain:BLAKE2b fork');
+  const row = logRows().find((r) => r.address === asia);
+  assert.equal(row && row.action, 'rejected', 'in the log, as worth seeing');
+  assert.equal(row.note, 'Follows another chain (BLAKE2b fork)');
+});
+
+test('slot fill: one that just did not answer stays out of the log', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.5.40', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  assert.equal((await step(setPeers([coreOut()]), t0 + 2 * MIN)).reverted, 1);
+  assert.ok(!logRows().some((r) => r.address === asia));
+});
+
+test('the newest Slot Fill add carries the candidates tried before it', () => {
+  const { recentLogWithTries } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_on_at'").run();
+  const t0 = Date.now() - 60 * MIN;
+  const log = db.instance.prepare('INSERT INTO rotation_log (at, action, address) VALUES (?, ?, ?)');
+  const tried = db.instance.prepare('INSERT INTO slot_fill_tried (address, tried_at, ok, reason, started_at, network) VALUES (?, ?, ?, ?, ?, ?)');
+  log.run(t0, 'promote', '203.0.113.1:8333');
+  tried.run('198.51.100.1:8333', t0 + 5 * MIN, 0, 'no_connection', t0 + 3 * MIN, 'clearnet');
+  tried.run('198.51.100.2:8333', t0 + 9 * MIN, 0, 'other_chain:BLAKE2b fork', t0 + 6 * MIN, 'clearnet');
+  log.run(t0 + 10 * MIN, 'promote', '203.0.113.2:8333');
+
+  const entries = recentLogWithTries();
+  const newest = entries.find((e) => e.action === 'promote');
+  assert.equal(newest.address, '203.0.113.2:8333');
+  assert.deepEqual(newest.tried.tries.map((x) => x.reason), ['other_chain:BLAKE2b fork', 'no_connection']);
+  assert.equal(entries.filter((e) => e.tried).length, 1, 'only the newest');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});
+
+test('slot fill: the list of tries starts at the last switching on', async () => {
+  const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  const now = Date.now();
+  fill.markTried('198.18.6.1:8333', false, now - 30 * MIN, { reason: 'no_connection', startedAt: now - 32 * MIN });
+  db.instance.prepare("INSERT INTO meta (key, value) VALUES ('slot_fill_on_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(`${now - 10 * MIN}-x`);
+  fill.markTried('198.18.6.2:8333', false, now - MIN, { reason: 'no_connection', startedAt: now - 3 * MIN });
+
+  const t = triesSinceFree();
+
+  assert.deepEqual(t.tries.map((x) => x.address), ['198.18.6.2:8333'], 'nothing from before the switch');
+  assert.equal(t.since, now - 10 * MIN);
+  db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_on_at'").run();
+});
+
+test('slot fill: the fork bit alone does not throw out a candidate on our tip', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.5.20', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const onTip = manualSession(asia, { synced: TIP, servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^27]'] });
+
+  assert.equal((await step(setPeers([coreOut(), onTip]), t0 + 30 * 1000)).confirmed, 1);
+});
+
+test('slot fill: the fork bits with no height yet are not a verdict', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.5.30', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const early = manualSession(asia, { synced: -1, servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^27]'] });
+
+  assert.equal((await step(setPeers([coreOut(), early]), t0 + 10 * 1000)).reverted, 0, 'its first headers may still put it on our tip');
 });
