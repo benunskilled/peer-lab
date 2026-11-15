@@ -37,6 +37,7 @@ const { addressKey, hostFromAddress, unreachableNetwork } = require('../address'
 const spread = require('./spread');
 const { pickedRegions } = require('./picks');
 const { bookEntries, usableNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
+const { otherChainOf } = require('../queries/ranking-row');
 
 const TRIAL_KEY = 'slot_fill_trial';
 // Candidates on trial at once. Each holds a slot while it runs, so never more
@@ -248,8 +249,22 @@ function disguised(session, peers) {
   return anySent && recv.verack > 0 && !(recv.wtxidrelay > 0) && Number(session.version) >= 70016;
 }
 
-function whyNot(session, fake = false) {
+// A candidate that says it follows another chain - the service bits the
+// peer list marks as a fork (ranking-row.js otherChainOf), and not on our tip
+// either: out at once, as a disguised one is (15.11.2026: a BLAKE2b-fork Knots
+// node held a slot three minutes for nothing).
+// Only with a height Core knows for it: before its first headers (-1, the
+// first seconds) a real node on our tip may carry the bits too.
+function otherChain(session, chain) {
+  if (!session || !(Number(session.synced_headers) >= 0)) return null;
+  const names = Array.isArray(session.servicesnames) ? session.servicesnames.join(',') : '';
+  return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks));
+}
+
+function whyNot(session, fake = false, fork = null) {
   if (fake) return { code: 'disguised', text: 'connected, but it is not the Core it names' };
+  // The chain's name rides along in the stored reason: other_chain:BLAKE2b fork.
+  if (fork) return { code: `other_chain:${fork}`, text: `connected, but it follows another chain (${fork})` };
   if (!session) return { code: 'no_connection', text: 'no connection seen' };
   if (!servesBlocks(session.services)) return { code: 'no_services', text: 'connected, but serves no blocks' };
   if (!(Number(session.synced_headers) >= 0)) return { code: 'height_unknown', text: 'connected, but Core had no header height for it' };
@@ -298,7 +313,8 @@ async function settleOne(trial, peers, chain, now, force) {
   }
   const session = manualSession(peers, trial.address);
   const fake = disguised(session, peers);
-  if (!fake && works(session, chain, trial.tip)) {
+  const fork = fake ? null : otherChain(session, chain);
+  if (!fake && !fork && works(session, chain, trial.tip)) {
     dropTrial(trial.address);
     // Why the one before went, until no candidate is left on trial.
     if (!trials().length) writeLastTry(null);
@@ -310,7 +326,7 @@ async function settleOne(trial, peers, chain, now, force) {
   // How long the verdict waits depends on what Core has to show for it so
   // far: no connection at all, a connection with no header height yet, or a
   // height that is not ours.
-  if (!force && !fake && now < decideAt(trial, session)) return 'waiting';
+  if (!force && !fake && !fork && now < decideAt(trial, session)) return 'waiting';
 
   // Out of the set first, then the trial is closed: a crash in between leaves
   // a trial whose candidate is gone, which the next pass reads as 'left'.
@@ -318,10 +334,16 @@ async function settleOne(trial, peers, chain, now, force) {
   // fill's own business, and the next one is tried anyway.
   await peerSync.removeTrustedPeer(trial.address);
   dropTrial(trial.address);
-  const why = whyNot(session, fake);
+  const why = whyNot(session, fake, fork);
   const minutes = Math.max(1, Math.round((now - trial.startedAt) / 60000));
   if (!force) {
     markTried(trial.address, false, now, { reason: why.code, startedAt: trial.startedAt });
+    // In the log too when the candidate was not what it said - another
+    // chain, or not the Core it names: rare, and worth seeing (15.11.2026).
+    // One that just did not answer stays in the list of tries only.
+    if (fork || fake) {
+      logAction({ action: 'rejected', address: trial.address, note: fork ? `Follows another chain (${fork})` : 'Disguised: not the Core it names' });
+    }
     const { region, country } = spread.placeOf({ address: trial.address });
     writeLastTry({ at: now, reason: why.code, minutes, country: country || null, region: spread.REGION_NAMES[region] || null });
   } else {

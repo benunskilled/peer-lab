@@ -948,7 +948,7 @@ let picksSending = false;
 // innerHTML - into a class attribute AND the text - without escaping. Nothing
 // a Bitcoin peer controls can reach it today, which is exactly the kind of
 // reasoning that stops being true after a refactor.
-const ROTATION_ACTIONS = new Set(['promote', 'retire', 'manual', 'unmanual', 'disconnect', 'trial']);
+const ROTATION_ACTIONS = new Set(['promote', 'retire', 'manual', 'unmanual', 'disconnect', 'trial', 'rejected']);
 function rotationActionClass(action) {
   return ROTATION_ACTIONS.has(action) ? `rotation-${action}` : 'offline';
 }
@@ -963,6 +963,8 @@ function rotationActionLabel(action) {
   if (action === 'manual') return 'Added by hand';
   if (action === 'unmanual') return 'Removed by hand';
   if (action === 'disconnect') return 'Disconnected by hand';
+  // A candidate that was not what it said: another chain, a disguised Core.
+  if (action === 'rejected') return 'Not kept';
   return action;
 }
 
@@ -1004,13 +1006,22 @@ const LAST_TRY_WHY = {
   no_services: 'connected, but serves no blocks',
   height_unknown: 'connected, but never showed which chain it is on',
   height_wrong: 'is not on our chain',
-  disguised: "is not the Core it names",
+  disguised: "is disguised, not the Core it names",
+  other_chain: 'follows another chain',
 };
+// "other_chain:BLAKE2b fork": the code, and the chain's name after it.
+function whyText(reason) {
+  const r = String(reason || '');
+  const cut = r.indexOf(':');
+  const code = cut < 0 ? r : r.slice(0, cut);
+  const detail = cut < 0 ? '' : r.slice(cut + 1);
+  return `${LAST_TRY_WHY[code] || 'was not kept'}${detail ? ` (${detail})` : ''}`;
+}
 function lastTryText(st) {
   const l = st && st.lastTry;
   if (!l) return '';
   const where = l.country ? countryName(l.country) : l.region;
-  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${LAST_TRY_WHY[l.reason] || 'was not kept'}.`;
+  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${escapeHtml(whyText(l.reason))}.`;
 }
 // "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
 // per region under it, each a button to pick it (15.11.2026).
@@ -1199,25 +1210,35 @@ let shownNow = ''; // the top row as last drawn, '' for none
 // across the redraws, which rewrite the row.
 let triesOpen = false;
 document.addEventListener('toggle', (e) => {
-  if (e.target.classList && e.target.classList.contains('slot-tries')) triesOpen = e.target.open;
+  if (e.target.classList && e.target.classList.contains('slot-tries') && !e.target.classList.contains('slot-tries-before')) triesOpen = e.target.open;
 }, true);
 function triesHtml(st) {
-  const t = st && st.tries;
-  if (!t || !t.tries.length) return '';
+  return triesList(st && st.tries, 'since');
+}
+// Under the newest "Added": the candidates tried before it (15.11.2026).
+let triesBeforeOpen = false;
+document.addEventListener('toggle', (e) => {
+  if (e.target.classList && e.target.classList.contains('slot-tries-before')) triesBeforeOpen = e.target.open;
+}, true);
+function triesList(t, kind) {
+  if (!t || !t.tries || !t.tries.length) return '';
   const hm = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const place = (w) => (w ? [w.country ? countryName(w.country) : w.regionName, w.operator].filter(Boolean).join(' \u00b7 ') : 'unknown place');
   const line = (at, where, what, title) =>
     `<li><span class="st-when">${hm(at)}</span><span class="st-where"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(where)}</span><span class="st-what">${escapeHtml(what)}</span></li>`;
   const tried = t.tries.map((x) => {
     const min = Math.max(1, Math.round((x.endedAt - x.startedAt) / 60000));
-    return line(x.startedAt, place(x.where), `${LAST_TRY_WHY[x.reason] || 'was not kept'} (${min} min)`, x.address);
+    return line(x.startedAt, place(x.where), `${whyText(x.reason)} (${min} min)`, x.address);
   });
-  const freed = t.freed.slice().reverse().map((f) => line(f.at, place(f.where),
+  const freed = (t.freed || []).slice().reverse().map((f) => line(f.at, place(f.where),
     f.action === 'retire' ? 'offline too long, slot freed' : 'removed by hand, slot freed', f.address));
   const n = t.total || t.tries.length;
   // Not today: the day too, or "since 13:20" reads as an hour ago.
   const day = new Date(t.since).toDateString() === new Date().toDateString() ? ''
     : `${new Date(t.since).toLocaleDateString([], { day: 'numeric', month: 'short' })} `;
+  if (kind === 'before') {
+    return `<details class="slot-tries slot-tries-before"${triesBeforeOpen ? ' open' : ''}><summary>${n} tried before</summary><ul>${tried.join('')}</ul></details>`;
+  }
   return `<details class="slot-tries"${triesOpen ? ' open' : ''}><summary>${n} tried since ${day}${hm(t.since)}</summary><ul>${tried.join('')}${freed.join('')}</ul></details>`;
 }
 function nowRow(now) {
@@ -1252,7 +1273,7 @@ function renderRotationLog(log) {
 
   const visible = showAllLog ? log : log.slice(0, ROTATION_LOG_LIMIT);
   shownNow = nowRow(Date.now());
-  tbody.innerHTML = (shownNow + visible.map((e) => rotationEntryRow(e)).join(''))
+  tbody.innerHTML = (shownNow + visible.map((e) => rotationEntryRow(e, e.tried ? triesList(e.tried, 'before') : '')).join(''))
     || `<tr><td colspan="4" class="hint">Nothing yet.</td></tr>`;
 
   const toggle = document.getElementById('rotation-log-toggle');

@@ -37,8 +37,18 @@ function logAction(entry) {
   // one tick can share a millisecond, and after the clock steps back a new
   // action carries an older `at` than all the rest and would be the one
   // deleted.
+  //
+  // "Not kept" rows (a candidate on another chain or disguised) are kept
+  // apart: a run of them must not push out the adds and removals, which the
+  // list of tries counts from (review, 15.11.2026). The newest of each are
+  // kept, LOG_ENTRIES apiece; the page still shows the newest LOG_ENTRIES.
   db.instance
-    .prepare(`DELETE FROM rotation_log WHERE id NOT IN (SELECT id FROM rotation_log ORDER BY id DESC LIMIT ?)`)
+    .prepare(`DELETE FROM rotation_log WHERE action != 'rejected'
+              AND id NOT IN (SELECT id FROM rotation_log WHERE action != 'rejected' ORDER BY id DESC LIMIT ?)`)
+    .run(LOG_ENTRIES);
+  db.instance
+    .prepare(`DELETE FROM rotation_log WHERE action = 'rejected'
+              AND id NOT IN (SELECT id FROM rotation_log WHERE action = 'rejected' ORDER BY id DESC LIMIT ?)`)
     .run(LOG_ENTRIES);
 }
 
@@ -69,7 +79,12 @@ function triesSinceFree(limit = TRIES_SHOWN) {
   const freed = db.instance
     .prepare(`SELECT at, action, address FROM rotation_log WHERE action IN ('unmanual', 'retire') AND at > ? ORDER BY at`)
     .all(filled);
-  const since = freed.length ? freed[0].at : filled;
+  // Not before Slot Fill was last switched on (15.11.2026: tries from
+  // before an off and on showed under the new ones).
+  const onRow = db.instance.prepare("SELECT value FROM meta WHERE key = 'slot_fill_on_at'").get();
+  const onAt = onRow ? parseInt(onRow.value, 10) || 0 : 0;
+  const since = Math.max(freed.length ? freed[0].at : filled, onAt);
+  const freedShown = freed.filter((f) => f.at >= onAt);
   const where = 'ok = 0 AND started_at IS NOT NULL AND started_at >= ?';
   const total = db.instance.prepare(`SELECT COUNT(*) AS n FROM slot_fill_tried WHERE ${where}`).get(since).n;
   if (!total) return null;
@@ -80,9 +95,41 @@ function triesSinceFree(limit = TRIES_SHOWN) {
   return {
     since,
     total,
-    freed: freed.map((f) => ({ at: f.at, action: f.action, address: f.address, where: whereOf(f.address) })),
+    freed: freedShown.map((f) => ({ at: f.at, action: f.action, address: f.address, where: whereOf(f.address) })),
     tries: tries.map((t) => ({ ...t, where: whereOf(t.address) })),
   };
 }
 
-module.exports = { logAction, recentLog, triesSinceFree, LOG_ENTRIES };
+// Before the last peer Slot Fill added: every candidate it tried for that
+// round and how each ended (15.11.2026: once the slots were full, the list
+// was gone, and with it why the others went). From the slot filled before it,
+// or the switching on if that came later; up to the add itself.
+function triesBeforeAdd(promoteAt, limit = TRIES_SHOWN) {
+  const before = db.instance
+    .prepare(`SELECT MAX(at) AS at FROM rotation_log WHERE action IN ('promote', 'manual') AND at < ?`)
+    .get(promoteAt).at || 0;
+  const onRow = db.instance.prepare("SELECT value FROM meta WHERE key = 'slot_fill_on_at'").get();
+  const onAt = onRow ? parseInt(onRow.value, 10) || 0 : 0;
+  const since = onAt < promoteAt ? Math.max(before, onAt) : before;
+  const where = 'ok = 0 AND started_at IS NOT NULL AND started_at >= ? AND started_at < ?';
+  const total = db.instance.prepare(`SELECT COUNT(*) AS n FROM slot_fill_tried WHERE ${where}`).get(since, promoteAt).n;
+  if (!total) return null;
+  const tries = db.instance
+    .prepare(`SELECT address, started_at AS startedAt, tried_at AS endedAt, reason FROM slot_fill_tried
+              WHERE ${where} ORDER BY started_at DESC LIMIT ?`)
+    .all(since, promoteAt, limit);
+  return { since, total, tries: tries.map((t) => ({ ...t, where: whereOf(t.address) })) };
+}
+
+// The log, with the tries before the newest Slot Fill add under that entry.
+function recentLogWithTries(limit = LOG_ENTRIES) {
+  const log = recentLog(limit);
+  const last = log.find((e) => e.action === 'promote');
+  if (last) {
+    const tried = triesBeforeAdd(last.at);
+    if (tried) last.tried = tried;
+  }
+  return log;
+}
+
+module.exports = { logAction, recentLog, recentLogWithTries, triesSinceFree, triesBeforeAdd, LOG_ENTRIES };
