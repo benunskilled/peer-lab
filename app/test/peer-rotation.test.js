@@ -1728,3 +1728,22 @@ test('the status lists every candidate tried since a slot came free', () => {
   db.instance.prepare('DELETE FROM rotation_log').run();
   db.instance.prepare('DELETE FROM slot_fill_tried').run();
 });
+
+test('with two slots free and one filled since, the other one\'s tries still show, counted in full', () => {
+  const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const t0 = Date.now() - 60 * 60 * 1000;
+  const log = db.instance.prepare('INSERT INTO rotation_log (at, action, address) VALUES (?, ?, ?)');
+  const tried = db.instance.prepare('INSERT INTO slot_fill_tried (address, tried_at, ok, reason, started_at, network) VALUES (?, ?, ?, ?, ?, ?)');
+  log.run(t0, 'retire', '203.0.113.2:8333');
+  log.run(t0 + 1000, 'retire', '203.0.113.3:8333');
+  log.run(t0 + 10 * 60000, 'promote', '198.51.100.1:8333');
+  for (let i = 0; i < 12; i++) tried.run(`198.51.100.${10 + i}:8333`, t0 + (12 + 3 * i) * 60000, 0, 'no_connection', t0 + (11 + 3 * i) * 60000, 'clearnet');
+  const got = triesSinceFree();
+  assert.equal(got.since, t0 + 10 * 60000, 'from the slot filled');
+  assert.equal(got.total, 12);
+  assert.equal(got.tries.length, 10, 'ten shown');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});

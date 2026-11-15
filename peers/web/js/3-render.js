@@ -400,7 +400,9 @@
     renderBlockCard();
     renderMarkers();
     renderUnplaced();
-    mapFollowsPeers(d.peers.some((p) => p.cc));
+    // No peers at all (a list not in yet, a fresh node) is not "nowhere to
+    // place them": the map stays as it is.
+    mapFollowsPeers(!d.peers.length || d.peers.some((p) => p.cc));
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     if (!dashboard().folding()) holdAnchor(anchor);

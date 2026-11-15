@@ -59,6 +59,9 @@ function recentLog(limit = LOG_ENTRIES) {
 // newest first (15.11.2026: five candidates in Africa failed in half an hour,
 // and the page showed only the last one). Null with no slot freed.
 const TRIES_SHOWN = 10;
+// Counted from the last slot filled, not the first freed: with two slots
+// free and one filled since, the other one's candidates are still shown
+// (review, 15.11.2026). Only called while a slot is free (index.js).
 function triesSinceFree(limit = TRIES_SHOWN) {
   const filled = db.instance
     .prepare(`SELECT MAX(at) AS at FROM rotation_log WHERE action IN ('promote', 'manual')`)
@@ -66,14 +69,17 @@ function triesSinceFree(limit = TRIES_SHOWN) {
   const freed = db.instance
     .prepare(`SELECT at, action, address FROM rotation_log WHERE action IN ('unmanual', 'retire') AND at > ? ORDER BY at`)
     .all(filled);
-  if (!freed.length) return null;
-  const since = freed[0].at;
+  const since = freed.length ? freed[0].at : filled;
+  const where = 'ok = 0 AND started_at IS NOT NULL AND started_at >= ?';
+  const total = db.instance.prepare(`SELECT COUNT(*) AS n FROM slot_fill_tried WHERE ${where}`).get(since).n;
+  if (!total) return null;
   const tries = db.instance
     .prepare(`SELECT address, started_at AS startedAt, tried_at AS endedAt, reason FROM slot_fill_tried
-              WHERE ok = 0 AND started_at IS NOT NULL AND started_at >= ? ORDER BY started_at DESC LIMIT ?`)
+              WHERE ${where} ORDER BY started_at DESC LIMIT ?`)
     .all(since, limit);
   return {
     since,
+    total,
     freed: freed.map((f) => ({ at: f.at, action: f.action, address: f.address, where: whereOf(f.address) })),
     tries: tries.map((t) => ({ ...t, where: whereOf(t.address) })),
   };

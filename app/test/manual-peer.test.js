@@ -633,3 +633,37 @@ test('with no answer from Core ever, a Tor name is refused, not guessed', async 
   assert.equal(r.ok, false);
   assert.match(r.error, /can't tell whether your node uses Tor/);
 });
+
+// Review 15.11.2026: an outbound Tor session carries the peer's own name and
+// must go, or Core sees the host as connected and never dials the addnode.
+// I2P is port 0 whatever was typed: Core dials I2P on no other.
+test('Add as Manual on an outbound Tor peer drops its relay session; I2P always goes in on port 0', async () => {
+  const ONION = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz23.onion';
+  const I2P = 'bcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyza.b32.i2p';
+  const disconnects = [], added = [];
+  try {
+    _resetNetInfo();
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'onion', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+      { name: 'i2p', limited: false, reachable: true, proxy: '' },
+    ] }));
+    mock.method(rpc, 'getPeerInfo', async () => [
+      { id: 7, addr: `${ONION}:8333`, connection_type: 'outbound-full-relay', network: 'onion', inbound: false },
+      { id: 8, addr: '127.0.0.1:52690', connection_type: 'inbound', network: 'onion', inbound: true },
+    ]);
+    mock.method(rpc, 'disconnectNode', async (target) => { disconnects.push(target); });
+    mock.method(rpc, 'addNode', async (address) => { added.push(address); });
+
+    const tor = await manualAddPeer(`${ONION}:8333`, undefined, { kept: true });
+    assert.equal(tor.ok, true);
+    assert.deepEqual(disconnects, [7], 'the outbound one, never the inbound proxy session');
+
+    assert.equal((await manualAddPeer(`${I2P}:0`, undefined, { kept: true })).address, `${I2P}:0`);
+    db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(`${I2P}:0`);
+    assert.equal((await manualAddPeer(`${I2P}:8333`, undefined, { kept: true })).address, `${I2P}:0`);
+    assert.deepEqual(added.slice(-2), [`${I2P}:0`, `${I2P}:0`]);
+  } finally {
+    mock.restoreAll();
+    _resetNetInfo();
+  }
+});

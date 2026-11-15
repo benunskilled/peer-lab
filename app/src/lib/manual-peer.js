@@ -173,11 +173,14 @@ async function probePeer(rawInput) {
   // Reached through Tor or I2P: not tested from here, handed to Core as it is.
   // Without a port, the network's default - there is no port to search for.
   if (route && route.via) {
-    if (explicitPort != null && !isValidPort(explicitPort)) {
+    // I2P peers are on port 0 and nothing else (SAM 3.1, Core's
+    // I2P_SAM31_PORT), the way Core lists them; any other port Core would
+    // never dial.
+    const i2p = unreachableNetwork(addr) === 'I2P';
+    if (!i2p && explicitPort != null && !isValidPort(explicitPort)) {
       return { ok: false, error: `${explicitPort} is not a valid port (1-65535)` };
     }
-    // I2P peers are on port 0 (SAM 3.1), the way Core lists them.
-    const port = explicitPort != null ? explicitPort : unreachableNetwork(addr) === 'I2P' ? 0 : DEFAULT_PORTS[config.bitcoin.network] || 8333;
+    const port = i2p ? 0 : explicitPort != null ? explicitPort : DEFAULT_PORTS[config.bitcoin.network] || 8333;
     return { ok: true, address: formatAddress(addr, port), via: route.via, untested: true, message: TEST_VIA(route.via) };
   }
 

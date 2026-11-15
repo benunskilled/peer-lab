@@ -499,7 +499,8 @@ function actionsCell(p, { lock = '' } = {}) {
   // A Tor or I2P peer this node dialled carries its own address, and Core
   // reaches it again by itself (15.11.2026): it can be added. One that
   // dialled in carries the proxy's address, and CJDNS no proxy at all.
-  const unreachable = p.privateNetwork && (p.proxiedPrivatePeer || p.privateNetwork === 'CJDNS');
+  const unreachable = p.privateNetwork
+    && !((p.privateNetwork === 'Tor' || p.privateNetwork === 'I2P') && p.direction === 'outbound' && !p.proxiedPrivatePeer);
   const primary = ((p.sourceObscured || p.localUmbrelPeer || unreachable || disguised || (neverFirstReason(p) && !p.first))
       ? placeholder
       : `<button class="secondary action-slot" data-action="add-manual" data-address="${escapeHtml(p.address)}">Add as Manual</button>`);
@@ -1173,8 +1174,11 @@ function triesHtml(st) {
   });
   const freed = t.freed.slice().reverse().map((f) => line(f.at, place(f.where),
     f.action === 'retire' ? 'offline too long, slot freed' : 'removed by hand, slot freed', f.address));
-  const n = t.tries.length;
-  return `<details class="slot-tries"${triesOpen ? ' open' : ''}><summary>${n} tried since ${hm(t.since)}</summary><ul>${tried.join('')}${freed.join('')}</ul></details>`;
+  const n = t.total || t.tries.length;
+  // Not today: the day too, or "since 13:20" reads as an hour ago.
+  const day = new Date(t.since).toDateString() === new Date().toDateString() ? ''
+    : `${new Date(t.since).toLocaleDateString([], { day: 'numeric', month: 'short' })} `;
+  return `<details class="slot-tries"${triesOpen ? ' open' : ''}><summary>${n} tried since ${day}${hm(t.since)}</summary><ul>${tried.join('')}${freed.join('')}</ul></details>`;
 }
 function nowRow(now) {
   const s = lastSlotStatus;
@@ -1758,7 +1762,7 @@ document.body.addEventListener('click', async (e) => {
   // port) - show what's actually happening instead of leaving the UI
   // looking frozen/unresponsive during that wait.
   if (action === 'add-manual') {
-    showToast(/\.onion|\.i2p/.test(address) ? `Adding ${address} as manual peer…` : `Adding ${address} as manual peer - probing port 8333, then 9333…`, 'pending');
+    showToast(`Adding ${address} as manual peer…`, 'pending');
   }
   if (action === 'untrust') showToast(`Removing ${address}…`, 'pending');
   if (action === 'disconnect') showToast(`Disconnecting ${address}…`, 'pending');
