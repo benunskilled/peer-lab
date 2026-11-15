@@ -228,7 +228,7 @@ const NET_NAME = { Tor: 'onion', I2P: 'i2p' };
 const TEST_VIA = (via) => `Your node reaches this peer through ${via}. To keep your node's address private, ` +
   "Peer Lab doesn't test it from here. Add & Keep hands it straight to Core.";
 const ADDED_VIA = (via) => `Added. To keep your node's address private, Core connects through ${via} itself. ` +
-  "The peer shows under Manual once it's in.";
+  'That can take a few minutes. It shows up under Manual as soon as Core has connected, no need to add it again.';
 const NOT_USED = (label) => `Your node doesn't use ${label}, so it can't reach this peer.`;
 let netInfo = null, netInfoAt = 0;
 async function routeOf(addr) {

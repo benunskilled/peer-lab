@@ -598,7 +598,7 @@ test('through Tor, Add & Keep hands the address to Core without a test', async (
     const tor = await manualAddPeer(ONION, undefined, { kept: true });
     assert.equal(tor.ok, true);
     assert.equal(tor.address, `${ONION}:${port}`);
-    assert.equal(tor.note, "Added. To keep your node's address private, Core connects through Tor itself. The peer shows under Manual once it's in.");
+    assert.equal(tor.note, "Added. To keep your node's address private, Core connects through Tor itself. That can take a few minutes. It shows up under Manual as soon as Core has connected, no need to add it again.");
     assert.equal(db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(tor.address).kept, 1);
 
     const i2p = await manualAddPeer(I2P, undefined, { kept: true });
