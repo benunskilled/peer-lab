@@ -14,7 +14,7 @@ function slotStatusText() {
   const fnStart = src.indexOf('function slotStatusText', start);
   assert.ok(start > 0 && fnStart > 0, 'app.js must still define minutes and slotStatusText');
   const end = src.indexOf('\n}', fnStart) + 2;
-  const prelude = "const MAX_MANUAL_PEERS = 8; const escapeHtml = (s) => String(s); const countryName = (cc) => ({ VE: 'Venezuela', PE: 'Peru' })[cc] || cc;";
+  const prelude = "const MAX_MANUAL_PEERS = 8; const escapeHtml = (s) => String(s).replace(/[&<>\\x22']/g, (c) => `&#${c.charCodeAt(0)};`); const countryName = (cc) => ({ VE: 'Venezuela', PE: 'Peru' })[cc] || cc;";
   return vm.runInNewContext(`${prelude}\n${src.slice(start, end)}\nslotStatusText;`);
 }
 
@@ -41,6 +41,9 @@ test('while testing, the top row also says why the peer before went', () => {
   const t = text(st, at);
   assert.match(t.head, /Testing a new peer in Peru/);
   assert.match(t.rest, /The peer before, in Venezuela, couldn't be reached\./);
+  // Plain text, escaped once where it goes into the page: escaped here too,
+  // the trial rows showed "couldn&#39;t" (15.11.2026).
+  assert.doesNotMatch(t.rest, /&#/);
   assert.doesNotMatch(text({ ...st, lastTry: undefined }, at).rest, /peer before/, 'nothing when nothing went');
 });
 

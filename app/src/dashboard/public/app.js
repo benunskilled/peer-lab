@@ -332,11 +332,14 @@ const LIST_COUNTS_MAX_AGE_MS = 45000;
 // The Manual tile counts connected peers, but a locked peer that is offline
 // still holds its slot: with one, the tile says how many slots are used, so
 // it never reads "7 of 8" above a list that has no slot free.
-function manualSlotsUsed() {
-  return (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address)).length;
+// `trials: false` for the tile: a candidate Slot Fill is testing comes and
+// goes every few seconds, and the tile jumped with each (15.11.2026). It
+// counts once added; the log says what is being tested.
+function manualSlotsUsed({ trials = true } = {}) {
+  return (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address) && (trials || p.status !== 'TESTING')).length;
 }
 function drawTiles({ inbound, outbound, manual }) {
-  const used = manualSlotsUsed();
+  const used = manualSlotsUsed({ trials: false });
   const stats = [
     ['Total', inbound + outbound + manual, ''],
     ['Inbound', inbound, 'inbound'],
@@ -1021,7 +1024,10 @@ function lastTryText(st) {
   const l = st && st.lastTry;
   if (!l) return '';
   const where = l.country ? countryName(l.country) : l.region;
-  return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${escapeHtml(whyText(l.reason))}.`;
+  // Plain text, as all of slotStatusText: escaped where it goes into the
+  // page (nowRow, rotationEntryRow), once - escaped here too, the trial rows
+  // showed "couldn&#39;t" (15.11.2026).
+  return ` The peer before${where ? `, in ${where},` : ''} ${whyText(l.reason)}.`;
 }
 // "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
 // per region under it, each a button to pick it (15.11.2026).
@@ -1256,14 +1262,15 @@ function nowRow(now) {
     }).join('');
   }
   const pill = '<span class="pill rotation-now">Now</span>';
-  const head = t.head.replace(/\.$/, '');
+  const head = escapeHtml(t.head.replace(/\.$/, ''));
+  const rest = escapeHtml(t.rest);
   return `
     <tr class="now-row">
       <td class="hint"></td>
       <td>${pill}</td>
       <td><b>${head}</b></td>
-      <td class="hint">${t.rest}${tries}</td>
-      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${t.rest}</div>${tries}</td>
+      <td class="hint">${rest}${tries}</td>
+      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${rest}</div>${tries}</td>
     </tr>`;
 }
 
