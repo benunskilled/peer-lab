@@ -165,4 +165,13 @@ test('a manual peer takes the spelling Core holds it under; two rows for one pee
   ]);
   assert.deepEqual(sent, [], 'Core already holds both: nothing sent');
   assert.ok(db.instance.prepare('SELECT 1 FROM peer WHERE address = ?').get('198.51.100.40'), 'a peer row, so the ranking lists it');
+  // A page drawn before the rename still sends the old spelling.
+  const peerSync = require('../src/lib/peer-sync');
+  assert.equal(peerSync.setKept('198.51.100.40:8333', false), true);
+  assert.equal(db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get('198.51.100.40').kept, 0);
+  // A peer removed by hand a moment ago is not written back.
+  db.instance.prepare("INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.41:8333', NULL, 1, 1)").run();
+  await peerSync.removeTrustedPeer('198.51.100.41:8333', { disconnect: false });
+  await peerSync.syncTrustedToAddnode([{ addednode: '198.51.100.41' }]);
+  assert.ok(!db.instance.prepare("SELECT 1 FROM trusted_peer WHERE address IN ('198.51.100.41', '198.51.100.41:8333')").get());
 });

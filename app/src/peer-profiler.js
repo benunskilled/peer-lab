@@ -307,7 +307,7 @@ async function pollOnce() {
     } catch (err) {
       coreRestarted({ ok: false });
       logger.warn('getpeerinfo failed', { error: err.message });
-      return;
+      return false;
     }
   }
   let uptime = null;
@@ -321,7 +321,7 @@ async function pollOnce() {
     if (shared) {
       coreRestarted({ ok: false });
       logger.warn('Bitcoin Core not answering', { error: err.message });
-      return;
+      return false;
     }
   }
   if (coreRestarted({ ok: true, uptime })) restoreAfterCoreRestart();
@@ -340,9 +340,10 @@ async function pollOnce() {
     // recoverable; a dead profiler that stops recording sessions is not
     // obvious from the outside.
     logger.error('failed to record peer snapshot', { error: err.stack || err.message });
-    return;
+    return true;
   }
   logger.debug('poll complete', { peers: peers.length });
+  return true;
 }
 
 /**
@@ -357,13 +358,15 @@ function startPolling(intervalMs) {
   let stopped = false;
   const tick = async () => {
     try {
-      await pollOnce();
+      // False while Core is down: the pass at start waits for Core, rather
+      // than being spent on a node still warming up (review, 15.11.2026).
+      const coreUp = await pollOnce();
       // Slot Fill just switched on: its first pass now, not at the next
       // ten-minute mark. One database read per poll otherwise.
       // A slot freed by hand on the page: filled now too (wantsPass).
       // Both read and write the database; an error there (SQLITE_BUSY past
       // the busy timeout) is one missed check, not the end of the loop.
-      if (peerRotation.waitsForFirstPass() || peerRotation.wantsPass()) {
+      if (coreUp && (peerRotation.waitsForFirstPass() || peerRotation.wantsPass())) {
         await peerRotation.tick().catch((err) => logger.warn('slot fill first pass failed', { error: err.message }));
       }
     } catch (err) {
