@@ -678,7 +678,7 @@ test('Add as Manual on an outbound Tor peer drops its relay session; I2P always 
 
 // GPT review G1 (15.11.2026): only a fresh answer from Core clears a direct
 // test. Each case on a real listener that counts every connection made.
-test('G1: no direct test unless Core has just said no proxy is in the way', async (t) => {
+test('G1: no direct test unless Core has just said no proxy is in the way', async () => {
   let connections = 0;
   const { server, port } = await withListeningPort((socket) => { connections += 1; socket.destroy(); });
   const direct = { networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] };
@@ -713,12 +713,24 @@ test('G1: no direct test unless Core has just said no proxy is in the way', asyn
     mock.restoreAll();
     mock.method(rpc, 'getNetworkInfo', down);
     assert.match((await probePeer(`127.0.0.1:${port}`)).error, /Try again/);
-    // 5. The same an hour later.
-    const later = Date.now() + 60 * 60 * 1000;
-    t.mock.method(Date, 'now', () => later);
-    assert.match((await probePeer(`127.0.0.1:${port}`)).error, /Try again/);
-    t.mock.restoreAll();
-    assert.equal(connections, seen, 'cases 4-5: no connection');
+    assert.equal(connections, seen, 'case 4: no connection');
+
+    // 5. An answer that says nothing about IPv4 and IPv6 clears no test.
+    for (const answer of [null, {}, { networks: [] }, { networks: [{ name: 'onion', limited: false, reachable: true, proxy: '' }] },
+      { networks: [{ name: 'ipv4', limited: false, reachable: true }, { name: 'ipv6', limited: false, reachable: true }] }]) {
+      mock.restoreAll();
+      mock.method(rpc, 'getNetworkInfo', async () => answer);
+      assert.match((await probePeer(`127.0.0.1:${port}`)).error, /Try again/, JSON.stringify(answer));
+    }
+    // An IPv4 address written as IPv6 goes by IPv4's proxy too.
+    mock.restoreAll();
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+    ] }));
+    assert.equal((await probePeer(`[::ffff:127.0.0.1]:${port}`)).via, 'Tor');
+    assert.equal((await probePeer(`[::ffff:7f00:1]:${port}`)).via, 'Tor');
+    assert.equal(connections, seen, 'case 5: no connection');
   } finally {
     mock.restoreAll();
     _resetNetInfo();

@@ -243,7 +243,10 @@ async function routeOf(addr) {
   // CJDNS: Core has no proxy for it, and this container no way to it.
   if (overlay === 'CJDNS') return { refuse: 'CJDNS peers cannot be tested or added here: Peer Lab reaches peers only directly' };
   try {
-    netInfo = await rpc.getNetworkInfo();
+    const answer = await rpc.getNetworkInfo();
+    // An answer without its list of networks says nothing (review G1).
+    if (!answer || !Array.isArray(answer.networks)) throw new Error('getnetworkinfo without networks');
+    netInfo = answer;
   } catch (err) {
     logger.debug('getnetworkinfo failed before a probe', { error: err.message });
     if (!netInfo) return { refuse: NO_ANSWER(overlay || 'a proxy') };
@@ -268,13 +271,18 @@ function routeFrom(answer, addr, overlay) {
   // still sends them through the proxy. A network Core has neither a proxy
   // for nor uses refuses an address that is surely on it, and a name only
   // when neither IPv4 nor IPv6 is usable.
-  const nets = /^[0-9.]+$/.test(addr) ? ['ipv4'] : addr.includes(':') ? ['ipv6'] : ['ipv4', 'ipv6'];
-  const info = nets.map((name) => networks.find((x) => x.name === name)).filter(Boolean);
+  // "[::ffff:1.2.3.4]" (or ::ffff:102:304) is IPv4 to Core and to this container's socket alike,
+  // so it goes by IPv4's proxy (review G1).
+  const v4 = /^[0-9.]+$/.test(addr) || /^\[?::ffff:([0-9.]+|[0-9a-f]{1,4}:[0-9a-f]{1,4})\]?$/i.test(addr);
+  const nets = v4 ? ['ipv4'] : addr.includes(':') ? ['ipv6'] : ['ipv4', 'ipv6'];
+  const info = nets.map((name) => networks.find((x) => x.name === name));
   const label = (n) => (n.name === 'ipv4' ? 'IPv4' : 'IPv6');
   // Umbrel's proxy is Tor (port 9050); any other is called what it is.
-  const proxied = info.find((n) => n.proxy);
+  const proxied = info.find((n) => n && n.proxy);
   if (proxied) return { via: /:9050$/.test(proxied.proxy) || /tor/i.test(proxied.proxy) ? 'Tor' : 'its proxy' };
-  if (info.length && info.every((n) => n.limited || !n.reachable)) return { refuse: NOT_USED(info.map(label).join(' or ')) };
+  // Direct only on Core's plain word: each network listed, with no proxy.
+  if (info.some((n) => !n || typeof n.proxy !== 'string')) return { refuse: NO_ANSWER('a proxy') };
+  if (info.every((n) => n.limited || !n.reachable)) return { refuse: NOT_USED(info.map(label).join(' or ')) };
   return null;
 }
 
