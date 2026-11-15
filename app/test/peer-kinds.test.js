@@ -172,6 +172,7 @@ test('the reason shown names the family the Go side named', () => {
     ['/electrumx:1.16/', 'indexer'],
     ['/EMPORION:0.3/', 'light client'],
     ['/SYMMARTYS:0.3/', 'light client'],
+    ['/wuji-headers:0.1/', 'light client'],
     ['/Bitflash:btc-light/', 'light client'],
     ['/21datalab-crawler:0.1/', 'crawler'],
     ['nebula/2.4.1-65580d4', 'crawler'],

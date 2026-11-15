@@ -163,8 +163,10 @@ var kindRules = []struct {
 	// Bitflash's wallet speaks Bitcoin P2P itself and loads only headers and
 	// compact filter hashes from peers that offer NODE_COMPACT_FILTERS
 	// (docs.bitflash.network/atomic-swaps), as "/Bitflash:btc-light/"
-	// (src/btclight.cpp in bitflash-network/bitflash).
-	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:`), false},
+	// (src/btclight.cpp in bitflash-network/bitflash). WUJI's indexer follows
+	// Bitcoin headers for an index on Ethereum, as "/wuji-headers:0.1/"
+	// (indexer/bitcoin-p2p.mjs in MM-sheng/wuji).
+	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - the dashboard has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -187,14 +189,16 @@ var kindRules = []struct {
 	// illuminodes/mantle, gosuda/bitcoin-rs, epochbtc/satd and
 	// yuvicc/bitcoinkernel-node. hashhog's ouroboros now says
 	// "/ouroboros:0.1.0/" (src/ouroboros/peer.py), and chjj/mako, a full node in
-	// C, "/mako:0.0.0/" (include/mako/net.h). Three more have no public source and stay
+	// C, "/mako:0.0.0/" (include/mako/net.h); BTC-Prometheus, a fork of Core,
+	// UA_NAME("Prometheus") in src/clientversion.cpp (CryptoIceMLH/
+	// bitcoin-prometheus, 15.11.2026). Two more have no public source and stay
 	// "Other", although they acted as full nodes on the node this was written for (peer-observer, 21. to
-	// 29.10.2026): /Prometheus:/ and /BTC-Nodes:/ were among its own outbound
+	// 29.10.2026): /BTC-Nodes:/ was among its own outbound
 	// peers, offering blocks (NETWORK) and relaying transactions for hours;
 	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
 	// names, "/BTC-Nodes:<date>/Sonar/" and ".../Probe/", are caught as a
 	// crawler first.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby):|/utreexod:|^StratisNode:`), true},
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus):|/utreexod:|^StratisNode:`), true},
 	// GrayersDad: see its line in about.go.
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots|^/GrayersDad:`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},

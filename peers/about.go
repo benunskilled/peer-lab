@@ -81,6 +81,12 @@ var aboutRules = []aboutRule{
 	// sends "/SYMMARTYS:0.3/"; EMPORION is the older name, still in
 	// emporion/bitcoin_headers.py at commit 922e4bc (17.10.2026).
 	{regexp.MustCompile(`(?i)^/EMPORION:`), "EMPORION, a Bitcoin header client for verifying OpenTimestamps proofs; later renamed SYMMARTYS", "EMPORION header client", ""},
+	// const ua = Buffer.from('/wuji-headers:0.1/') in indexer/bitcoin-p2p.mjs
+	// (MM-sheng/wuji, 15.11.2026).
+	{regexp.MustCompile(`^/wuji-headers:`), "WUJI's indexer: follows Bitcoin's block headers to build an index usable on Ethereum", "WUJI header client", ""},
+	// UA_NAME("Prometheus") in src/clientversion.cpp, version 30.4.1 in
+	// CMakeLists.txt (CryptoIceMLH/bitcoin-prometheus, 15.11.2026).
+	{regexp.MustCompile(`^/Prometheus:`), "BTC-Prometheus, a full node forked from Bitcoin Core", "BTC-Prometheus node", ""},
 	{regexp.MustCompile(`(?i)^/SYMMARTYS:`), "SYMMARTYS, formerly EMPORION: follows Bitcoin headers to verify OpenTimestamps proofs", "SYMMARTYS header client", ""},
 	{regexp.MustCompile(`^/bitcoin-peers:`), "bitcoin-peers, a Rust toolkit to connect to and survey Bitcoin peers", "bitcoin-peers crawler", ""},
 	{regexp.MustCompile(`^/logos-peer-list:`), "Logos peer list, a crawler that checks onion peers for the Logos wallet", "Logos peer list", ""},
