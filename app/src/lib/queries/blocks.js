@@ -160,11 +160,13 @@ function routeMedian(limit = ROUTE_MEDIAN_BLOCKS) {
   // newest block stayed out of the median until the next one came.
   const head = db.instance
     .prepare(`SELECT id, template_ms IS NOT NULL AS t, first_ping_ms IS NOT NULL AS p, recon AS r,
-                     (SELECT MAX(rowid) FROM stratum_observation) AS obs
+                     (SELECT MAX(rowid) FROM stratum_observation) AS obs,
+                     -- A block written late (older detected_at, higher id) changes this.
+                     (SELECT MAX(id) FROM relay_race) AS maxId
                 FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT 1`)
     .get();
   if (!head) return null;
-  const key = `${head.id}:${head.t}:${head.p}:${head.r}:${head.obs}:${limit}`;
+  const key = `${head.id}:${head.maxId}:${head.t}:${head.p}:${head.r}:${head.obs}:${limit}`;
   if (routeCache.key === key) return routeCache.value;
 
   const races = db.instance
