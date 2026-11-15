@@ -261,6 +261,20 @@ function otherChain(session, chain) {
   return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks));
 }
 
+// The peer list's word on a peer (peers-service.js peerKinds: kind, fork),
+// by address key: it judges a Core name by more than the one rule above -
+// services the named version never had, a protocol number it never sent, and
+// after ten minutes connected how the peer behaves (peers/disguise.go). On
+// 15.11.2026 a peer the list called Disguised had passed its trial and sat in
+// a manual slot. Empty when the peers service is down: then only Core's own
+// signs count, as before.
+function verdictsByKey(kinds) {
+  const out = new Map();
+  if (kinds) for (const [addr, m] of kinds) out.set(keyOf(addr), m);
+  return out;
+}
+const listSaysDisguised = (m) => Boolean(m) && m.kind === 'Disguised';
+
 function whyNot(session, fake = false, fork = null) {
   if (fake) return { code: 'disguised', text: 'connected, but it is not the Core it names' };
   // The chain's name rides along in the stored reason: other_chain:BLAKE2b fork.
@@ -277,17 +291,18 @@ function whyNot(session, fake = false, fork = null) {
  * settles now either way - the slot fill is being switched off. Returns how
  * many ended which way, and the addresses taken out (`gone`).
  */
-async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
+async function settle(peers, chain, now = Date.now(), { force = false, kinds = null } = {}) {
   const out = { confirmed: 0, reverted: 0, left: 0, waiting: 0, gone: [] };
+  const verdicts = verdictsByKey(kinds);
   for (const trial of trials()) {
-    const r = await settleOne(trial, peers, chain, now, force);
+    const r = await settleOne(trial, peers, chain, now, force, (session) => (session ? verdicts.get(keyOf(trial.address)) : null));
     out[r] += 1;
     if (r === 'reverted') out.gone.push(trial.address);
   }
   return out;
 }
 
-async function settleOne(trial, peers, chain, now, force) {
+async function settleOne(trial, peers, chain, now, force, verdictOf = () => null) {
   const row = db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(trial.address);
   if (!row && now - trial.startedAt < ADDING_MS) return 'waiting';
   // Given the padlock by hand while on trial: a person's decision, and it
@@ -312,8 +327,10 @@ async function settleOne(trial, peers, chain, now, force) {
     return 'left';
   }
   const session = manualSession(peers, trial.address);
-  const fake = disguised(session, peers);
-  const fork = fake ? null : otherChain(session, chain);
+  // Only while Core holds the candidate: the list's word is about a session.
+  const listed = verdictOf(session);
+  const fake = disguised(session, peers) || listSaysDisguised(listed);
+  const fork = fake ? null : (otherChain(session, chain) || (listed && listed.fork) || null);
   if (!fake && !fork && works(session, chain, trial.tip)) {
     dropTrial(trial.address);
     // Why the one before went, until no candidate is left on trial.
@@ -353,6 +370,47 @@ async function settleOne(trial, peers, chain, now, force) {
     address: trial.address, what: trial.what, reason: force ? 'switched off' : `${why.text} in ${minutes} min`,
   });
   return 'reverted';
+}
+
+/**
+ * A peer Slot Fill added that the peer list calls Disguised, or on another
+ * chain, after its trial: some of the list's rules need ten minutes of the
+ * peer's behaviour, longer than a trial runs. Out again, held against for a
+ * week, and a row in the log, as at a trial. Only Slot Fill's own adds that
+ * nobody locked; a peer a person added or locked is theirs. Returns the
+ * addresses taken out.
+ */
+const ADDED_LABEL = 'slot fill:%';
+async function dropUnmasked(kinds, now = Date.now()) {
+  const verdicts = verdictsByKey(kinds);
+  if (!verdicts.size) return [];
+  const onTrial = new Set(trials().map((t) => keyOf(t.address)));
+  const rows = db.instance.prepare('SELECT address FROM trusted_peer WHERE kept = 0 AND label LIKE ?').all(ADDED_LABEL);
+  const out = [];
+  for (const { address } of rows) {
+    const key = keyOf(address);
+    if (onTrial.has(key)) continue;
+    const m = verdicts.get(key);
+    const fake = listSaysDisguised(m);
+    const fork = !fake && m && m.fork ? m.fork : null;
+    if (!fake && !fork) continue;
+    await peerSync.removeTrustedPeer(address);
+    const why = whyNot(null, fake, fork);
+    markTried(address, false, now, { reason: why.code });
+    logAction({ action: 'rejected', address, note: fork ? `Follows another chain (${fork})` : 'Disguised: not the Core it names' });
+    logger.info('slot fill: added peer taken out again', { address, reason: why.text });
+    out.push(address);
+  }
+  return out;
+}
+
+// Added by Slot Fill this recently: the peer list's verdict is asked every
+// minute, not every ten (index.js watchTrial), as its behaviour rules need
+// ten minutes of the peer.
+const WATCH_ADDED_MS = 30 * 60 * 1000;
+function recentlyAdded(now = Date.now()) {
+  const row = db.instance.prepare("SELECT MAX(tried_at) AS at FROM slot_fill_tried WHERE ok = 1 AND reason = 'ok'").get();
+  return Boolean(row && row.at && now - row.at < WATCH_ADDED_MS);
 }
 
 // What the last look for a candidate found, for the line on the page that
@@ -597,4 +655,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, MAX_TRIALS, NO_CONNECT_MS, settle, trials, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks, recentlyFailedForTest: recentlyFailed };
+module.exports = { MAX_RESTARTS, WATCH_ADDED_MS, dropUnmasked, recentlyAdded, MAX_TRIALS, NO_CONNECT_MS, settle, trials, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks, recentlyFailedForTest: recentlyFailed };

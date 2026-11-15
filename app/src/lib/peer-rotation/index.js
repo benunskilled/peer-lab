@@ -34,6 +34,7 @@ const fill = require('./fill');
 const { offlineGraceMs, offlineForMs } = require('./rules');
 const clock = require('./clock');
 const peerSync = require('../peer-sync');
+const peersService = require('../peers-service');
 const { addressKey } = require('../address');
 
 const keyOfAddress = (address) => addressKey(address, config.bitcoin.network);
@@ -108,6 +109,10 @@ function setEnabled(enabled) {
   put.run(META_KEY, enabled ? '1' : '0');
   // Unique per switching on, even two in the same millisecond.
   if (enabled) put.run(ON_AT_KEY, `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  // Switched off, its log goes with it (15.11.2026): switched on again it
+  // starts empty, as the list of tries does. What it held against candidates
+  // (slot_fill_tried) stays, or the same bad ones would come straight back.
+  if (!enabled) db.instance.prepare('DELETE FROM rotation_log').run();
   // What a pass saw before the switch is not what Slot Fill is doing now.
   db.instance.prepare('DELETE FROM meta WHERE key = ?').run(STATUS_KEY);
   db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_last_try'").run();
@@ -176,8 +181,16 @@ function wantsPass() {
  * ten-minute pass, and the next one goes in at once. Without a trial, and
  * switched off, it does nothing at all.
  */
-async function watchTrial() {
-  if (!isEnabled() || !fill.trials().length) return null;
+// A peer Slot Fill added in the last half hour gets the peer list's verdict
+// once a minute (fill.dropUnmasked): its behaviour rules need ten minutes,
+// and at the ten-minute pass a Disguised peer could sit in its slot twenty.
+const ADDED_CHECK_MS = 60 * 1000;
+let addedCheckAt = 0;
+async function watchTrial(now = Date.now()) {
+  if (!isEnabled()) return null;
+  if (fill.trials().length) return tick({ quick: true });
+  if (!fill.recentlyAdded(now) || now - addedCheckAt < ADDED_CHECK_MS) return null;
+  addedCheckAt = now;
   return tick({ quick: true });
 }
 
@@ -220,7 +233,9 @@ async function pass({ quick = false } = {}) {
   // start over and nobody is retired this pass (clock.js).
   const gap = clock.passed();
   if (gap) fill.restart(chain);
-  const settled = await fill.settle(peers, chain);
+  // The peer list's word on each peer, as last fetched (at most a minute old).
+  const kinds = peersService.peerKinds();
+  const settled = await fill.settle(peers, chain, Date.now(), { kinds });
   const counted = { confirmed: settled.confirmed, reverted: settled.reverted };
   // A candidate taken out: the next one goes in this pass, on a fresh
   // getpeerinfo without the ones just dropped. If Core does not answer now,
@@ -238,6 +253,17 @@ async function pass({ quick = false } = {}) {
   // Switched off while this pass waited for Core: the switch has been
   // answered already, so nothing more is removed or added from here on.
   if (!isEnabled()) return { ...idle, enabled: false, ...counted };
+  // Added earlier and found out since: the slot is free again.
+  const unmasked = await fill.dropUnmasked(kinds);
+  if (unmasked.length) {
+    try {
+      peers = unmasked.reduce((list, address) => fill.withoutSession(list, address), await rpc.getPeerInfo());
+    } catch (err) {
+      logger.debug('slot fill: Core not answering after a peer went, next pass', { error: err.message });
+      clock.coreDown();
+      return { ...idle, enabled: true, ...counted };
+    }
+  }
   const onTrial = new Set(fill.trials().map((t) => t.address));
   const ranking = freshRanking();
   const retired = gap ? 0 : await retireOfflineManualPeers(ranking, onTrial, peers, isEnabled);
@@ -246,7 +272,7 @@ async function pass({ quick = false } = {}) {
     return { ...idle, enabled: false, retired, ...counted };
   }
   // Into the free slots, beside the candidates still on trial.
-  const ended = settled.confirmed + settled.reverted + settled.left;
+  const ended = settled.confirmed + settled.reverted + settled.left + unmasked.length;
   let started = quick && !ended && !retired ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
   // Switched off while this pass was adding: the switch-off could not see the
   // rows yet, so the candidates are taken out here, rather than left in slots

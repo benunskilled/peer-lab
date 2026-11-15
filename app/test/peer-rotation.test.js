@@ -2053,3 +2053,89 @@ test('a run of "Not kept" rows does not push the adds out of the log', () => {
   assert.equal(recentLog().length, LOG_ENTRIES, 'the page shows the newest as before');
   db.instance.prepare('DELETE FROM rotation_log').run();
 });
+
+// 15.11.2026: a peer the peer list called Disguised had passed its trial and
+// sat in a manual slot - the trial checked one of the list's rules only.
+test('slot fill: a candidate the peer list calls Disguised is out at once', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.7.10', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const peers = setPeers([coreOut(), manualSession(asia)]);
+  const chain = await rpc.getBlockchainInfo();
+
+  const settled = await fill.settle(peers, chain, t0 + 30 * 1000, { kinds: new Map([[asia, { kind: 'Disguised' }]]) });
+
+  assert.equal(settled.reverted, 1, 'not kept, though Core holds a working connection');
+  assert.ok(!isManual(asia));
+  assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(asia).reason, 'disguised');
+  const row = logRows().find((r) => r.address === asia);
+  assert.equal(row && row.action, 'rejected');
+  assert.equal(row.note, 'Disguised: not the Core it names');
+});
+
+test('slot fill: the peer list on another chain counts as at a trial', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.7.20', 'AS');
+  const t0 = Date.now();
+  await step(setPeers([coreOut()]), t0);
+  const peers = setPeers([coreOut(), manualSession(asia)]);
+  const chain = await rpc.getBlockchainInfo();
+
+  const settled = await fill.settle(peers, chain, t0 + 30 * 1000, { kinds: new Map([[asia, { kind: 'Knots', fork: 'BIP110 fork' }]]) });
+
+  assert.equal(settled.reverted, 1);
+  assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(asia).reason, 'other_chain:BIP110 fork');
+});
+
+test('slot fill: a peer it added and the list later calls Disguised goes; locked and hand-added ones stay', async () => {
+  const insert = db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, ?, ?, ?)');
+  const added = '198.18.7.30:8333';
+  const locked = '198.18.7.31:8333';
+  const byHand = '198.18.7.32:8333';
+  const fine = '198.18.7.33:8333';
+  insert.run(added, 'slot fill: Asia', 0, Date.now());
+  insert.run(locked, 'slot fill: Asia', 1, Date.now());
+  insert.run(byHand, null, 0, Date.now());
+  insert.run(fine, 'slot fill: Asia', 0, Date.now());
+  const kinds = new Map([[added, { kind: 'Disguised' }], [locked, { kind: 'Disguised' }], [byHand, { kind: 'Disguised' }], [fine, { kind: 'Core' }]]);
+
+  const gone = await fill.dropUnmasked(kinds);
+
+  assert.deepEqual(gone, [added]);
+  assert.ok(!isManual(added));
+  assert.ok(isManual(locked) && isManual(byHand) && isManual(fine));
+  assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(added).reason, 'disguised');
+  assert.equal(logRows().find((r) => r.address === added).action, 'rejected');
+  assert.deepEqual(await fill.dropUnmasked(new Map()), [], 'no word from the peer list, nothing done');
+  for (const a of [locked, byHand, fine]) db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(a);
+});
+
+test('slot fill: switched off, its log goes; what it holds against stays', () => {
+  const { logAction } = require('../src/lib/peer-rotation/log');
+  logAction({ action: 'promote', address: '203.0.113.60:8333' });
+  fill.markTried('198.18.7.40:8333', false, Date.now(), { reason: 'disguised' });
+  peerRotation.setEnabled(true);
+  assert.ok(logRows().length > 0, 'switching on keeps it');
+
+  peerRotation.setEnabled(false);
+
+  assert.equal(logRows().length, 0);
+  assert.ok(db.instance.prepare('SELECT 1 FROM slot_fill_tried WHERE address = ?').get('198.18.7.40:8333'));
+});
+
+test('slot fill: a fresh add is checked once a minute, not every 15 seconds', async () => {
+  peerRotation.setEnabled(true);
+  try {
+    const now = Date.now();
+    fill.markTried('198.18.7.50:8333', true, now - 5 * MIN, { reason: 'ok' });
+    assert.ok(fill.recentlyAdded(now));
+    assert.ok(!fill.recentlyAdded(now + fill.WATCH_ADDED_MS));
+    setPeers([coreOut()]);
+    assert.notEqual(await peerRotation.watchTrial(now + 10 * MIN), null, 'the first check runs');
+    assert.equal(await peerRotation.watchTrial(now + 10 * MIN + 15 * 1000), null, '15 s later it waits');
+    assert.notEqual(await peerRotation.watchTrial(now + 11 * MIN), null, 'a minute later it runs again');
+  } finally {
+    peerRotation.setEnabled(false);
+  }
+});
