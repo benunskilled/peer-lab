@@ -176,9 +176,10 @@ function readBody(req) {
         return;
       }
       if (size > 1_000_000) {
-        // Not cut off here: the answer has to go out first (413, below), and
-        // the connection is closed once it has. Cutting it here left the
-        // caller with a dropped connection and no word why (15.11.2026).
+        // Not cut off here: cutting it left the caller with a dropped
+        // connection and no word why (15.11.2026). The answer (413, below)
+        // goes out, the rest is read and dropped, and the connection stays
+        // usable.
         tooLarge = true;
         chunks.length = 0;
         reject(new Error('body too large'));
