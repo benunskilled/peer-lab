@@ -16,7 +16,7 @@ function raceIdsForRange(range) {
   if (range === 'all') return null;
   const n = Number(range);
   if (Number.isFinite(n) && n > 0) {
-    return db.instance.prepare(`SELECT id FROM stratum_race ORDER BY id DESC LIMIT ?`).all(n).map((r) => r.id);
+    return db.instance.prepare(`SELECT id FROM stratum_race ORDER BY created_at DESC, id DESC LIMIT ?`).all(n).map((r) => r.id);
   }
   return null; // unrecognized value - fail open to all-time rather than showing nothing
 }
@@ -79,7 +79,7 @@ function computeRanking(range, pools) {
   // badge) and how far behind each pool was in it (the "Last block" column,
   // beside the average over the range - 04.11.2026, in place of median and
   // P90, which nobody read).
-  const lastRace = db.instance.prepare(`SELECT id FROM stratum_race ORDER BY id DESC LIMIT 1`).get();
+  const lastRace = db.instance.prepare(`SELECT id FROM stratum_race ORDER BY created_at DESC, id DESC LIMIT 1`).get();
   const lastRows = lastRace
     ? db.instance.prepare(`SELECT pool_id AS poolId, latency_ms AS latencyMs, rank FROM stratum_observation WHERE race_id = ?`).all(lastRace.id)
     : [];

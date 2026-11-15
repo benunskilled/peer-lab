@@ -30,7 +30,7 @@ function firstPeersOf(raceId) {
 // write path itself (relay-profiler.js writes these rows independently).
 function latestBlock() {
   const race = db.instance
-    .prepare(`SELECT ${RACE_COLUMNS} FROM relay_race ORDER BY id DESC LIMIT 1`)
+    .prepare(`SELECT ${RACE_COLUMNS} FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT 1`)
     .get();
   if (!race) return null;
 
@@ -161,7 +161,7 @@ function routeMedian(limit = ROUTE_MEDIAN_BLOCKS) {
   const head = db.instance
     .prepare(`SELECT id, template_ms IS NOT NULL AS t, first_ping_ms IS NOT NULL AS p, recon AS r,
                      (SELECT MAX(rowid) FROM stratum_observation) AS obs
-                FROM relay_race ORDER BY id DESC LIMIT 1`)
+                FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT 1`)
     .get();
   if (!head) return null;
   const key = `${head.id}:${head.t}:${head.p}:${head.r}:${head.obs}:${limit}`;
@@ -172,7 +172,7 @@ function routeMedian(limit = ROUTE_MEDIAN_BLOCKS) {
       `SELECT block_hash AS blockHash, detected_at AS detectedAt,
               template_ms AS templateMs, template_tx AS templateTx, first_ping_ms AS firstPingMs,
               first_hb AS firstHb, recon
-         FROM relay_race ORDER BY id DESC LIMIT ?`,
+         FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT ?`,
     )
     .all(limit);
 
@@ -299,7 +299,7 @@ function attributionHealth() {
       `SELECT first_count AS firstCount, nearest_delta_ms AS deltaMs
          FROM relay_race
         WHERE first_count IS NOT NULL
-        ORDER BY id DESC LIMIT ?`,
+        ORDER BY detected_at DESC, id DESC LIMIT ?`,
     )
     .all(ATTRIBUTION_SAMPLE);
 
@@ -342,7 +342,7 @@ function reconstructionLast(n = ROUTE_MEDIAN_BLOCKS) {
               SUM(recon = 'asked') AS asked,
               SUM(recon = 'full') AS full,
               AVG(CASE WHEN recon = 'asked' THEN recon_missing_bytes END) AS askedAvgBytes
-         FROM (SELECT recon, recon_missing_bytes FROM relay_race ORDER BY id DESC LIMIT ?)
+         FROM (SELECT recon, recon_missing_bytes FROM relay_race ORDER BY detected_at DESC, id DESC LIMIT ?)
         -- An unclear block is left out like an unmeasured one: it is in
         -- neither share, so the shares still add up to the blocks counted.
         WHERE recon IN ('mempool', 'asked', 'full')`,

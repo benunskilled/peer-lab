@@ -1014,3 +1014,14 @@ test('every table "Reset peer data" empties is counted in the peer-data group', 
     assert.ok(db.PEER_DATA_TABLES.includes(table), `${table} is emptied but not counted`);
   }
 });
+
+// Review G5 (15.11.2026): of two blocks moments apart the second can be
+// written first; "the latest" is the one that came last, not the last row.
+test('the latest block is the one that came last, whatever order it was written in', () => {
+  const ins = db.instance.prepare('INSERT INTO relay_race (block_hash, block_height, detected_at) VALUES (?, ?, ?)');
+  const far = Date.now() + 10 * 365 * 24 * 3600 * 1000;
+  ins.run('ab'.repeat(32), 990003, far + 1000);
+  ins.run('cd'.repeat(32), 990002, far);
+  assert.equal(queries.latestBlock().blockHeight, 990003);
+  db.instance.prepare('DELETE FROM relay_race WHERE block_height IN (990002, 990003)').run();
+});
