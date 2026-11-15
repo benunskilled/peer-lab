@@ -64,12 +64,12 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)/Elastum:`), "Names Elastum, a former exchange; talks to nodes through bitcoinj", "Names Elastum (bitcoinj)", ""},
 	// 26-27.10.2026: one address, five sessions in 40 minutes under protocol
 	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
-	// the version message; three took 7 to 16 MB of blocks each. Not found
-	// anywhere, so the text says only what it names itself.
-	// The form btc-rpc-proxy sends when it fetches a block the node lacks
-	// from a peer: "BTC RPC Proxy v<version>" (src/fetch_blocks.rs L49 in
-	// Kixunil/btc-rpc-proxy, Martin Habovštiak; 15.11.2026). Another form
-	// only names itself.
+	// the version message; three took 7 to 16 MB of blocks each.
+	// That is btc-rpc-proxy fetching a block the node lacks from a peer: it
+	// sends "BTC RPC Proxy v<version>" (src/fetch_blocks.rs L50 in
+	// Start9Labs/btc-rpc-proxy, 0.5 to 0.8.x, the fork StartOS runs; L49 in
+	// Martin Habovštiak's Kixunil/btc-rpc-proxy up to 0.4.1; 15.11.2026).
+	// Any other form was found nowhere and only names itself.
 	{regexp.MustCompile(`^BTC RPC Proxy v[0-9]`), "BTC RPC Proxy, which guards Bitcoin Core's RPC and fetches blocks the node lacks from peers", "BTC RPC Proxy", ""},
 	{regexp.MustCompile(`^BTC RPC Proxy `), "Names itself an RPC proxy for Bitcoin; no public source", "Names an RPC proxy", ""},
 	// Bisq's userAgent option defaults to "Bisq" (common/.../config/Config.java
@@ -310,11 +310,12 @@ var aboutRules = []aboutRule{
 	// hands over one of its own transactions and leaves, introducing itself
 	// with this fixed name and no services so nobody can tell which node sent
 	// it (net_processing.cpp, IsPrivateBroadcastConn; PR #29415). The name is
-	// that of pynode, Jeff Garzik's Python node from 2013, which sends it too
-	// (MY_SUBVERSION in node.py, jgarzik/pynode): two sources, one string.
+	// bitcoin-submittx's (laanwj, 2015), a tool that hands over a transaction
+	// and leaves, which took it from Jeff Garzik's pynode (2012): both send it
+	// too (MY_SUBVERSION in each). Three sources, one string (15.11.2026).
 	// The one seen on the node this was written for came from a Tor exit, v2,
 	// offering nothing.
-	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Bitcoin Core handing over a transaction privately, then leaving - or pynode, Jeff Garzik's Python node from 2013, whose name Core borrows for this", "Core broadcast or pynode", ""},
+	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Bitcoin Core handing over a transaction privately, then leaving; the name is that of bitcoin-submittx and pynode, which send it too", "Core broadcast or pynode", ""},
 	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
 	// rune 1:0 in chains of transactions; on the node this was written for it
 	// pushed unannounced 66-byte transactions, the size of such a sweep. The
@@ -481,8 +482,8 @@ var aboutRules = []aboutRule{
 	// jochemin/crawly; src/protocol.rs in danielabrozzoni/new-p2p-crawler;
 	// src/handshake/handshake.ts in OriginalEveres/bitcoin-node-scanner;
 	// bitcoin_probe.py in dutenrapha/bitcoin-topology-discovery; crawl_btcd.go
-	// in p2pobservatory/bitcoin-crawler ("/crawler:0.1/", a name others may
-	// use too, hence "Probably"); src/main/kotlin/crawler.kt in
+	// in p2pobservatory/bitcoin-crawler L35 ("/crawler:0.1/", checked
+	// 15.11.2026; a name others may use too, hence "Probably"); src/main/kotlin/crawler.kt in
 	// bitcoinj/httpseed; netmine.cfg in jameslitton/coinscope (University of
 	// Maryland); setting.properties in Crepepepe/JBS (Chung-Ang University;
 	// Judgegao/Bitcoin-Node-Scanner reuses it); Main.java in vs-uulm/CoinView
