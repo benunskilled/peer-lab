@@ -222,36 +222,40 @@ async function probePeer(rawInput) {
  * one thing such a node keeps hidden. So in both cases Core gets the address
  * and connects itself, the way it does for Slot Fill (15.11.2026; before, the
  * address was refused, and a node on Tor alone could add no peer at all).
- * getnetworkinfo says which, asked only when someone tests or adds a peer, and
- * kept ten minutes. A failed answer falls back on the last one; with none, a
- * clearnet address is tested as before and a Tor or I2P one refused.
+ * getnetworkinfo says which, asked anew each time someone tests or adds a
+ * peer. Only a fresh answer clears a direct test (review, 15.11.2026): a kept
+ * one may be from before Core was restarted with a proxy, and with Core not
+ * answering and nothing known, a direct test was made anyway - the one thing
+ * that must not happen on a node that hides behind Tor. If Core does not
+ * answer, the last answer may still send the address to Core or refuse it,
+ * never test it from here: the reader is asked to try again.
  */
-const NETINFO_MS = 10 * 60 * 1000;
 const NET_NAME = { Tor: 'onion', I2P: 'i2p' };
 const TEST_VIA = (via) => `Your node reaches this peer through ${via}. To keep your node's address private, ` +
   "Peer Lab doesn't test it from here. Add & Keep hands it straight to Core.";
 const ADDED_VIA = (via) => `Added. To keep your node's address private, Core connects through ${via} itself. ` +
   'That can take a few minutes. It shows up under Manual as soon as Core has connected, no need to add it again.';
 const NOT_USED = (label) => `Your node doesn't use ${label}, so it can't reach this peer.`;
-let netInfo = null, netInfoAt = 0;
+const NO_ANSWER = (what) => `Bitcoin Core didn't answer, so Peer Lab can't tell whether your node uses ${what}. Try again in a moment.`;
+let netInfo = null;
 async function routeOf(addr) {
   const overlay = unreachableNetwork(addr);
   // CJDNS: Core has no proxy for it, and this container no way to it.
   if (overlay === 'CJDNS') return { refuse: 'CJDNS peers cannot be tested or added here: Peer Lab reaches peers only directly' };
-  if (!netInfo || Date.now() - netInfoAt > NETINFO_MS) {
-    try {
-      netInfo = await rpc.getNetworkInfo();
-      netInfoAt = Date.now();
-    } catch (err) {
-      logger.debug('getnetworkinfo failed before a probe', { error: err.message });
-      // An older answer still holds: a node that sent IPv4 through Tor ten
-      // minutes ago almost surely still does, and guessing wrong leaks it.
-      if (!netInfo) {
-        return overlay ? { refuse: `Bitcoin Core didn't answer, so Peer Lab can't tell whether your node uses ${overlay}. Try again in a moment.` } : null;
-      }
-    }
+  try {
+    netInfo = await rpc.getNetworkInfo();
+  } catch (err) {
+    logger.debug('getnetworkinfo failed before a probe', { error: err.message });
+    if (!netInfo) return { refuse: NO_ANSWER(overlay || 'a proxy') };
+    // An older answer may still say "through Tor" or "not used"; never "direct".
+    const kept = routeFrom(netInfo, addr, overlay);
+    return kept ? kept : { refuse: NO_ANSWER('a proxy') };
   }
-  const networks = (netInfo && netInfo.networks) || [];
+  return routeFrom(netInfo, addr, overlay);
+}
+
+function routeFrom(answer, addr, overlay) {
+  const networks = (answer && answer.networks) || [];
   if (overlay) {
     // -onlynet limits only Core's own picks: a manual peer still goes through
     // the proxy (init.cpp, -onlynet).
@@ -316,7 +320,7 @@ function evictionNote(result) {
 
 module.exports = {
   // For the tests: forget the cached getnetworkinfo.
-  _resetNetInfo: () => { netInfo = null; netInfoAt = 0; },
+  _resetNetInfo: () => { netInfo = null; },
   manualAddPeer,
   probePeer,
   hostFromAddress,
