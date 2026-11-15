@@ -1787,3 +1787,18 @@ test('slot fill: a region with twenty inbound peers counts one more, and no more
   const ranked = spread.rankForGap([{ address: eu }, { address: oc }], [], { EU: 1, OC: 2 }, { EU: 163, OC: 12 });
   assert.equal(ranked[0].address, oc);
 });
+
+// Review 15.11.2026: Europe and Africa picked, Africa only in "new" - Africa,
+// the gap, goes first; Europe's "tried" addresses do not shut it out.
+test('slot fill: among picked regions the spread holds, a "new"-only one included', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  inBook('198.18.2.1', 'EU');
+  inBook('198.18.2.2', 'EU');
+  const africa = inNew('198.18.2.9', 'AF');
+  setPickedRegions(['EU', 'AF']);
+  await step(setPeers([coreOut()]), Date.now());
+  assert.equal(fill.currentTrial().address, africa);
+  assert.equal(fill.currentTrial().note, 'Africa picked by you');
+  setPickedRegions([]);
+});

@@ -83,7 +83,10 @@ function countriesByRegion(peers) {
 // one more for a region at least INBOUND_BONUS_AT peers came to on their own
 // (15.11.2026: Europe had one outbound and 163 inbound, Oceania two outbound
 // and 12 inbound, and the slot went to Europe). Never more than one: inbound
-// peers are others' choice (config.inboundBonusAt).
+// peers are others' choice (config.inboundBonusAt). It also decides which
+// region is missing: one with no outbound but twenty inbound is reached, and
+// waits behind one with neither. Not for eviction (leastMissed), which keeps
+// the outbound paths the node really holds.
 function totalCounts(trusted, coreRegions, inboundRegions = {}) {
   const counts = { ...coreRegions };
   for (const [r, n] of Object.entries(regionCounts(trusted))) counts[r] = (counts[r] || 0) + n;

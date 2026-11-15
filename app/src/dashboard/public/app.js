@@ -937,6 +937,11 @@ const recheckGone = () => setTimeout(() => refreshPeers().catch(() => {}), GONE_
 // counter across the await discards any response that was already in flight
 // when the state changed.
 let rotationToggleEpoch = 0;
+// The same for the picked regions: a poll asked before a tap must not put
+// back the picks from before it (review, 15.11.2026). picksSending holds the
+// buttons while a tap is on its way.
+let picksEpoch = 0;
+let picksSending = false;
 
 // Only ever the actions this app writes, and only as a class name from a fixed
 // list. This was the single place in the file where a value went into
@@ -968,13 +973,16 @@ let rotationSeq = 0;
 async function refreshRotation() {
   const seq = ++rotationSeq;
   const epochAtRequest = rotationToggleEpoch;
+  const picksAtRequest = picksEpoch;
   const data = await api('/api/rotation');
   if (seq !== rotationSeq || rotationToggleEpoch !== epochAtRequest) return;
   const toggle = document.getElementById('rotation-toggle');
   if (toggle) toggle.checked = Boolean(data.enabled);
   foldSums();
 
-  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, picked: data.picked || [] };
+  // Picks tapped since this was asked for are the page's, not this answer's.
+  const picked = picksAtRequest === picksEpoch ? data.picked || [] : (lastSlotStatus && lastSlotStatus.picked) || [];
+  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, picked };
   renderSlotStatus();
   renderSlotBook();
   // The slow round speeds up while a trial runs.
@@ -1005,7 +1013,7 @@ function lastTryText(st) {
   return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${LAST_TRY_WHY[l.reason] || 'was not kept'}.`;
 }
 // "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
-// per region under it. Text only, so an open list stays open on a redraw.
+// per region under it, each a button to pick it (15.11.2026).
 const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
   const box = document.getElementById('slot-book');
@@ -1020,6 +1028,11 @@ function renderSlotBook() {
   const n = (x) => Number(x).toLocaleString('en-US');
   const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
   const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
+  // The buttons in a fixed order, so none moves under a finger when a count
+  // changes; a picked region the book no longer lists (Tor gone) still has
+  // its button, to be unpicked.
+  const counts = { ...Object.fromEntries((s.picked || []).map((r) => [r, 0])), ...(b.regions || {}) };
+  const buttons = Object.keys(BOOK_REGIONS).filter((r) => r in counts).map((r) => [r, counts[r]]);
   // A candidate on trial holds its slot before Core has connected to it: the
   // Manual tile, which counts connected peers, is then one lower (15.11.2026).
   const testing = s.status.state === 'trial' ? ' \u00b7 1 being tested' : '';
@@ -1029,14 +1042,21 @@ function renderSlotBook() {
     + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
   // Each region a switch (15.11.2026): picked, the next free slots go there.
   // One with nothing to pick from cannot be picked, but stays to be unpicked.
-  document.getElementById('slot-book-regions').innerHTML = regions.map(([r, c]) => {
+  const html = buttons.map(([r, c]) => {
     const on = picked.includes(r);
-    return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${!c && !on ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
+    return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${(!c && !on) || picksSending ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
   }).join('');
-  const empty = s.status.picks && s.status.picks.empty && picked.length;
+  // Drawn again only when something changed: a redraw every poll took the
+  // keyboard focus off the button.
+  const box2 = document.getElementById('slot-book-regions');
+  if (box2.dataset.drawn !== html) { box2.innerHTML = html; box2.dataset.drawn = html; }
+  // The last look's word, only if it was about these very picks.
+  const pk = s.status.picks;
+  const same = pk && pk.regions.length === picked.length && pk.regions.every((r) => picked.includes(r));
+  const empty = same && pk.empty && picked.length;
   document.getElementById('slot-pick-note').textContent = !picked.length
     ? 'Tap a region to give it the next free slots.'
-    : empty ? `No address left in ${names(picked)}, back to the usual pick.`
+    : empty ? `Nothing in ${names(picked)} can be added right now, back to the usual pick.`
     : `The next free slots go to ${names(picked)}. Tap again to undo.`;
 }
 function slotStatusText(st, now) {
@@ -1577,14 +1597,20 @@ document.getElementById('slot-book-regions').addEventListener('click', async (e)
   const btn = e.target.closest('button.region-pick');
   if (!btn || btn.disabled || !lastSlotStatus) return;
   const r = btn.dataset.region;
+  if (picksSending) return;
   const now = new Set(lastSlotStatus.picked || []);
   if (now.has(r)) now.delete(r); else now.add(r);
-  for (const b of document.querySelectorAll('#slot-book-regions button')) b.disabled = true;
+  picksSending = true;
+  picksEpoch += 1;
+  renderSlotBook();
   try {
     const result = await api('/api/rotation/regions', { method: 'POST', body: JSON.stringify({ regions: [...now] }) });
     lastSlotStatus.picked = result.picked;
   } catch (err) {
     showToast(`Could not change the regions: ${err.message}`, 'error');
+  } finally {
+    picksSending = false;
+    picksEpoch += 1;
   }
   renderSlotBook();
 });

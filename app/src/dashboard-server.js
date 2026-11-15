@@ -863,8 +863,8 @@ const routes = {
     });
   },
 
-  // Tapped in the card's list of regions: the whole set, every time, so two
-  // taps that cross on the way cannot leave a region the page no longer shows.
+  // Tapped in the card's list of regions: the whole set, every time; the page
+  // sends one tap at a time and keeps polls from undoing it (app.js picksEpoch).
   'POST /api/rotation/regions': async (req, res, url) => {
     const { regions } = await readBody(req);
     if (!Array.isArray(regions)) return sendJson(res, 400, { error: 'regions must be a list' });

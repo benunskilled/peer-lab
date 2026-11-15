@@ -392,7 +392,11 @@ async function start(ranking, peers, chain, now = Date.now()) {
   const usual = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
   // Picked regions (picks.js): theirs only, "tried" first, then "new" - and
   // the usual pick once none of them has a candidate the spread lets in.
-  const mine = picked.size ? [...tried.filter(inPicked), ...ranked.filter((c) => c.fromNew && inPicked(c))] : [];
+  // In ranked order, so the spread among them holds; "new" only for a picked
+  // region "tried" has nobody admissible in, as for the gaps above (review:
+  // with Europe and Africa picked, Europe's thousands came first every time).
+  const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, coreKeys)).map((c) => spread.placeOf(c).region));
+  const mine = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
   const pickedLeft = mine.some((c) => spread.admit(c, trusted, max, coreKeys));
   lastPicks = picked.size ? { regions: [...picked], empty: !pickedLeft } : null;
   const ordered = pickedLeft ? mine : usual;
