@@ -1802,3 +1802,38 @@ test('slot fill: among picked regions the spread holds, a "new"-only one include
   assert.equal(fill.currentTrial().note, 'Africa picked by you');
   setPickedRegions([]);
 });
+
+// 15.11.2026: in a picked region, an operator Core's own outbound peers use
+// may come in once nobody else there can; one a manual peer has, never.
+test('slot fill: a picked region lets in an operator Core uses, only when nobody else there fits, never one a manual peer has', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU', 'Hetzner');
+  at(seedLivePeer({ eligible: 144 }), 'NA', 'Amazon');
+  const amazon = inBook('198.18.3.1', 'AF', { operator: 'Amazon', country: 'ZA' });
+  inBook('198.18.3.2', 'AF', { operator: 'Hetzner', country: 'ZA' });
+  const peers = setPeers([coreOut()]);
+  setPickedRegions(['AF']);
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, amazon, 'Amazon, which Core uses; never Hetzner, a manual peer\'s');
+  await fill.abandon(fill.currentTrial().address);
+  // Without a pick the rule holds whole: no Amazon in Africa.
+  setPickedRegions([]);
+  fill.markTried(amazon, false, Date.now() - 2 * 86400000, { reason: 'no_connection', startedAt: Date.now() - 2 * 86400000 });
+  await step(peers, Date.now());
+  assert.notEqual(fill.currentTrial() && fill.currentTrial().address, amazon);
+});
+
+test('slot fill: an address not reached is tried again after a day, a wrong one after a week', () => {
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  fill.markTried('203.0.113.50:8333', false, now - 2 * day, { reason: 'no_connection', startedAt: now - 2 * day });
+  fill.markTried('203.0.113.51:8333', false, now - 2 * day, { reason: 'disguised', startedAt: now - 2 * day });
+  fill.markTried('203.0.113.52:8333', false, now - 3600000, { reason: 'no_connection', startedAt: now - 3600000 });
+  const { recentlyFailedForTest } = fill;
+  const failed = recentlyFailedForTest(now);
+  assert.equal(failed.has('203.0.113.50:8333'), false, 'not reached two days ago: tried again');
+  assert.equal(failed.has('203.0.113.51:8333'), true, 'not the Core it names: a week');
+  assert.equal(failed.has('203.0.113.52:8333'), true, 'not reached an hour ago: not yet');
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});

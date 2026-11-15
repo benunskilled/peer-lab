@@ -61,7 +61,11 @@ const TRIAL_MS = 3 * 60 * 1000;
 // that is no verdict, so it gets this long.
 const HEADERS_OPEN_MS = 30 * 60 * 1000;
 // An address-book address Core could not connect to is left alone this long.
+// One that could not be reached at all only a day (15.11.2026): a home node
+// may just have been off for the night. One that answered and was wrong - not
+// the Core it names, another chain, no blocks - does not change overnight.
 const FAILED_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
+const UNREACHED_RETRY_MS = 24 * 60 * 60 * 1000;
 const TRIED_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 // Adds refused before Core was even asked (already connected, say) per pass.
 const ATTEMPTS_PER_PASS = 3;
@@ -104,8 +108,9 @@ function markTried(address, ok, now, { reason = null, startedAt = null } = {}) {
 function recentlyFailed(now) {
   db.instance.prepare('DELETE FROM slot_fill_tried WHERE tried_at < ?').run(now - TRIED_KEEP_MS);
   return new Set(db.instance
-    .prepare('SELECT address FROM slot_fill_tried WHERE ok = 0 AND tried_at >= ?')
-    .all(now - FAILED_RETRY_MS)
+    .prepare(`SELECT address FROM slot_fill_tried WHERE ok = 0
+              AND tried_at >= CASE WHEN reason = 'no_connection' THEN ? ELSE ? END`)
+    .all(now - UNREACHED_RETRY_MS, now - FAILED_RETRY_MS)
     // By key: a peer removed by hand is held against under the spelling it
     // was stored with (no port, another IPv6 form), not the address book's.
     .map((r) => keyOf(r.address)));
@@ -395,17 +400,31 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // In ranked order, so the spread among them holds; "new" only for a picked
   // region "tried" has nobody admissible in, as for the gaps above (review:
   // with Europe and Africa picked, Europe's thousands came first every time).
-  const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, coreKeys)).map((c) => spread.placeOf(c).region));
-  const mine = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
-  const pickedLeft = mine.some((c) => spread.admit(c, trusted, max, coreKeys));
+  //
+  // In a picked region the provider rule is half as strict, but only once no
+  // candidate there passes it whole (15.11.2026): an operator Core's own
+  // outbound peers use may come in, one the manual peers already have never.
+  const pickKeys = (keys) => {
+    const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
+    const list = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
+    return { list, left: list.some((c) => spread.admit(c, trusted, max, keys)) };
+  };
+  let mine = pickKeys(coreKeys);
+  let relaxed = false;
+  if (picked.size && !mine.left) {
+    mine = pickKeys(new Set());
+    relaxed = mine.left;
+  }
+  const pickedLeft = mine.left;
+  const keysNow = relaxed ? new Set() : coreKeys;
   lastPicks = picked.size ? { regions: [...picked], empty: !pickedLeft } : null;
-  const ordered = pickedLeft ? mine : usual;
+  const ordered = pickedLeft ? mine.list : usual;
 
-  const fitting = ordered.filter((c) => spread.admit(c, trusted, max, coreKeys)).length;
+  const fitting = ordered.filter((c) => spread.admit(c, trusted, max, pickedLeft ? keysNow : coreKeys)).length;
   if (!fitting) return looked('none_fit', { ...counts0, fitting });
   let attempts = 0;
   for (const c of ordered) {
-    if (!spread.admit(c, trusted, max, coreKeys)) continue;
+    if (!spread.admit(c, trusted, max, pickedLeft ? keysNow : coreKeys)) continue;
     const what = spread.describe(c);
     const { region } = spread.placeOf(c);
     // Where it is shows under its address in the log; the note says why.
@@ -482,4 +501,4 @@ async function abandon(address, now = Date.now()) {
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks };
+module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks, recentlyFailedForTest: recentlyFailed };
