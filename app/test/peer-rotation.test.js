@@ -44,9 +44,9 @@ function inNew(host, region, ago = 3600) {
   if (region) at(address, region);
   return address;
 }
-function inBook(host, region, { port = 8333, network: net = 'ipv4', operator, country } = {}) {
+function inBook(host, region, { port = 8333, network: net = 'ipv4', operator, country, ago = null } = {}) {
   const address = `${host}:${port}`;
-  BOOK[`${Object.keys(BOOK).length}`] = { address: host, port, network: net, services: 1033, time: 0 };
+  BOOK[`${Object.keys(BOOK).length}`] = { address: host, port, network: net, services: 1033, time: ago == null ? 0 : Math.floor(Date.now() / 1000) - ago };
   if (region) at(address, region, operator, country);
   return address;
 }
@@ -514,11 +514,10 @@ const logRows = () => db.instance.prepare('SELECT * FROM rotation_log ORDER BY i
 // around it.
 async function step(peers, now) {
   const chain = await rpc.getBlockchainInfo();
-  const before = fill.currentTrial();
   const settled = await fill.settle(peers, chain, now);
-  if (settled === 'reverted') peers = fill.withoutSession(peers, before.address);
-  const started = settled === 'waiting' ? 0 : await fill.start(ranking(), peers, chain, now);
-  return { started: started ? 1 : 0, confirmed: settled === 'confirmed' ? 1 : 0, reverted: settled === 'reverted' ? 1 : 0 };
+  for (const address of settled.gone) peers = fill.withoutSession(peers, address);
+  const started = await fill.start(ranking(), peers, chain, now);
+  return { started: started.length, confirmed: settled.confirmed, reverted: settled.reverted };
 }
 
 test('slot fill: a free slot goes to an address-book peer from a missing region, and Core is asked, not probed', async () => {
@@ -713,10 +712,10 @@ test('slot fill: while Core has not connected yet, nothing else moves', async ()
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
 
-  const result = await step(setPeers([coreOut()]), t0 + 4 * MIN);
+  const result = await step(setPeers([coreOut()]), t0 + MIN);
 
   assert.deepEqual(result, { started: 0, confirmed: 0, reverted: 0 });
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 2, 'one candidate at a time');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 2, 'no more candidates than free slots');
 });
 
 test('slot fill: a candidate Core cannot connect to goes again, and is not tried again for a week', async () => {
@@ -1079,7 +1078,7 @@ test('slot fill: a trial whose candidate never got its row is cleared, and Core 
   db.instance.prepare("INSERT INTO meta (key, value) VALUES ('slot_fill_trial', ?)").run(JSON.stringify({ address: asia, startedAt: t0 }));
   const calls = [];
   rpc.addNode.mock.mockImplementation(async (addr, cmd) => { calls.push(`${cmd} ${addr}`); });
-  assert.equal(await fill.settle([], { headers: TIP }, Date.now()), 'left');
+  assert.equal((await fill.settle([], { headers: TIP }, Date.now())).left, 1);
   assert.equal(fill.currentTrial(), null);
   assert.deepEqual(calls, [`remove ${asia}`]);
 });
@@ -1095,7 +1094,7 @@ test('REGRESSION: a cleared trial whose remove Core did not take is removed agai
     calls.push(`${cmd} ${addr}`);
     if (calls.length === 1) throw new Error('timeout');
   });
-  assert.equal(await fill.settle([], { headers: TIP }, Date.now()), 'left');
+  assert.equal((await fill.settle([], { headers: TIP }, Date.now())).left, 1);
   assert.equal(fill.currentTrial(), null);
   mock.method(rpc, 'getAddedNodeInfo', async () => [{ addednode: asia }]);
   await peerSync.adoptExternalManualPeers();
@@ -1181,7 +1180,7 @@ test('switched off while Core did not answer, the trial is settled on a later pa
 
 // --- Deadlines by network, and the next candidate at once ---------------------
 
-test('slot fill: no connection to a clearnet candidate by 5 minutes - out, and the next goes in that pass', async () => {
+test('slot fill: no connection to a clearnet candidate by 2 minutes - out, and the next goes in that pass', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
   const asia = inBook('198.18.0.10', 'AS');
   const oceania = inBook('198.18.0.12', 'OC');
@@ -1190,8 +1189,8 @@ test('slot fill: no connection to a clearnet candidate by 5 minutes - out, and t
   const first = fill.currentTrial().address;
   const second = first === asia ? oceania : asia;
 
-  assert.equal((await step(setPeers([coreOut()]), t0 + 4 * MIN)).reverted, 0, 'still waiting at 4 minutes');
-  const result = await step(setPeers([coreOut()]), t0 + 5 * MIN);
+  assert.equal((await step(setPeers([coreOut()]), t0 + MIN)).reverted, 0, 'still waiting at 1 minute');
+  const result = await step(setPeers([coreOut()]), t0 + 2 * MIN);
 
   assert.equal(result.reverted, 1);
   assert.equal(result.started, 1, 'no ten-minute pause behind a candidate that did not answer');
@@ -1199,19 +1198,19 @@ test('slot fill: no connection to a clearnet candidate by 5 minutes - out, and t
   assert.ok(!isManual(first));
 });
 
-test('slot fill: a Tor candidate gets 10 minutes to connect', async () => {
+test('slot fill: a Tor candidate gets 5 minutes to connect', async () => {
   at(seedLivePeer({ address: `${'t'.repeat(56)}.onion:8333`, eligible: 144, first: 50, trusted: true }), null);
   const tor = inBook(`${'u'.repeat(56)}.onion`, null, { network: 'onion' });
   rpc.getNetworkInfo.mock.mockImplementation(async () => ({ networks: [{ name: 'onion', reachable: true, proxy: '' }] }));
   const t0 = Date.now();
   await step(setPeers([coreOut('onion')]), t0);
 
-  assert.equal((await step(setPeers([coreOut('onion')]), t0 + 9 * MIN)).reverted, 0);
-  assert.equal((await step(setPeers([coreOut('onion')]), t0 + 10 * MIN)).reverted, 1);
+  assert.equal((await step(setPeers([coreOut('onion')]), t0 + 4 * MIN)).reverted, 0);
+  assert.equal((await step(setPeers([coreOut('onion')]), t0 + 5 * MIN)).reverted, 1);
   assert.ok(!isManual(tor));
 });
 
-test('slot fill: an I2P candidate gets 15 minutes to connect', async () => {
+test('slot fill: an I2P candidate gets 8 minutes to connect', async () => {
   at(seedLivePeer({ address: `${'t'.repeat(52)}.b32.i2p:0`, eligible: 144, first: 50, trusted: true }), null);
   const i2p = inBook(`${'v'.repeat(52)}.b32.i2p`, null, { network: 'i2p', port: 0 });
   rpc.getNetworkInfo.mock.mockImplementation(async () => ({ networks: [{ name: 'i2p', reachable: true, proxy: '' }] }));
@@ -1219,8 +1218,8 @@ test('slot fill: an I2P candidate gets 15 minutes to connect', async () => {
   await step(setPeers([coreOut('i2p')]), t0);
   assert.equal(fill.currentTrial().address, i2p);
 
-  assert.equal((await step(setPeers([coreOut('i2p')]), t0 + 14 * MIN)).reverted, 0);
-  assert.equal((await step(setPeers([coreOut('i2p')]), t0 + 15 * MIN)).reverted, 1);
+  assert.equal((await step(setPeers([coreOut('i2p')]), t0 + 7 * MIN)).reverted, 0);
+  assert.equal((await step(setPeers([coreOut('i2p')]), t0 + 8 * MIN)).reverted, 1);
 });
 
 test('slot fill: connected but with no header height yet - no verdict for 30 minutes, and it keeps the slot once the height comes', async () => {
@@ -1278,7 +1277,7 @@ test('slot fill: a connection time from a clock far ahead does not hold the slot
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
   const ahead = manualSession(asia, { synced: TIP - 50, conntime: Math.floor((t0 + 600 * MIN) / 1000) });
-  // At most the five minutes a clearnet connection had, then three.
+  // At most the two minutes a clearnet connection had, then three.
   assert.equal((await step(setPeers([coreOut(), ahead]), t0 + 8 * MIN)).reverted, 1);
 });
 
@@ -1292,12 +1291,12 @@ test('slot fill: a peer on our tip is kept at the first check after it connected
   assert.equal((await step(setPeers([coreOut(), fresh]), t0 + MIN)).confirmed, 1);
 });
 
-// Moves the open trial back in time, as if it had been running that long.
+// Moves the open trials back in time, as if they had been running that long.
 function ageTrial(ms) {
   const row = db.instance.prepare(`SELECT value FROM meta WHERE key = 'slot_fill_trial'`).get();
-  const trial = JSON.parse(row.value);
-  trial.startedAt -= ms;
-  db.instance.prepare(`UPDATE meta SET value = ? WHERE key = 'slot_fill_trial'`).run(JSON.stringify(trial));
+  const list = [].concat(JSON.parse(row.value));
+  for (const t of list) t.startedAt -= ms;
+  db.instance.prepare(`UPDATE meta SET value = ? WHERE key = 'slot_fill_trial'`).run(JSON.stringify(list));
 }
 
 test('slot fill: a candidate that is not the Core it names is out at once, even on our tip', async () => {
@@ -1856,4 +1855,103 @@ test('slot fill: right after a removal by hand, the freed slot is filled in the 
   await fill.abandon(fill.currentTrial().address);
   peerRotation.setEnabled(false);
   assert.ok(asia && peers);
+});
+
+// 15.11.2026: one candidate at a time, eight free slots took over an hour.
+// Up to three at once now, each from another region and provider.
+test('slot fill: several candidates at once, each in another region, never more than MAX_TRIALS', async () => {
+  const before = config.maxManualPeers;
+  config.maxManualPeers = 8;
+  try {
+    at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+    const asia = [inBook('198.18.1.10', 'AS'), inBook('198.18.1.11', 'AS')];
+    const oceania = inBook('198.18.1.12', 'OC');
+    const na = inBook('198.18.1.13', 'NA');
+    inBook('198.18.1.14', 'SA');
+
+    const result = await step(setPeers([coreOut()]), Date.now());
+
+    assert.equal(result.started, fill.MAX_TRIALS);
+    const onTrial = fill.trials().map((t) => t.address);
+    assert.equal(onTrial.length, fill.MAX_TRIALS);
+    assert.equal(onTrial.filter((a) => asia.includes(a)).length <= 1, true, 'not two from one region while others are missing');
+    for (const a of onTrial) assert.ok(isManual(a));
+    assert.ok(ranking().filter((p) => p.status === 'TESTING').length === fill.MAX_TRIALS, 'each shows as on trial');
+    void oceania; void na;
+
+    // Nothing more while three are on trial, though slots are free.
+    assert.equal((await step(setPeers([coreOut()]), Date.now() + 30 * 1000)).started, 0);
+  } finally {
+    config.maxManualPeers = before;
+  }
+});
+
+test('slot fill: one candidate kept, one out - the next goes in beside the one still on trial', async () => {
+  const before = config.maxManualPeers;
+  config.maxManualPeers = 8;
+  try {
+    at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+    inBook('198.18.2.10', 'AS');
+    inBook('198.18.2.11', 'OC');
+    inBook('198.18.2.12', 'NA');
+    inBook('198.18.2.13', 'SA');
+    const t0 = Date.now();
+    await step(setPeers([coreOut()]), t0);
+    const [a, b, c] = fill.trials().map((t) => t.address);
+    // a connected and is on our tip, c too late: b still waits on its own clock.
+    db.instance.prepare("UPDATE meta SET value = ? WHERE key = 'slot_fill_trial'").run(JSON.stringify(
+      fill.trials().map((t) => (t.address === b ? { ...t, startedAt: t0 + MIN } : t))));
+    const result = await step(setPeers([coreOut(), manualSession(a)]), t0 + 2 * MIN);
+
+    assert.equal(result.confirmed, 1);
+    assert.equal(result.reverted, 1, 'c had its two minutes');
+    assert.equal(result.started, 1, 'its slot goes to the next at once');
+    const now = fill.trials().map((t) => t.address);
+    assert.ok(now.includes(b) && !now.includes(a) && !now.includes(c));
+    assert.equal(now.length, 2);
+  } finally {
+    config.maxManualPeers = before;
+  }
+});
+
+test('slot fill: an address Core heard of lately goes before one not heard of for weeks', async () => {
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  inBook('198.18.3.10', 'AS', { operator: 'Old', ago: 30 * 24 * 3600 });
+  inBook('198.18.3.11', 'AS', { operator: 'Older', ago: 10 * 24 * 3600 });
+  const fresh = inBook('198.18.3.12', 'AS', { operator: 'Fresh', ago: 3600 });
+  inBook('198.18.3.13', 'AS', { operator: 'Oldest', ago: 60 * 24 * 3600 });
+
+  await step(setPeers([coreOut()]), Date.now());
+
+  assert.equal(fill.currentTrial().address, fresh);
+});
+
+// Review 15.11.2026: the 15-second check judges the trials; a new candidate
+// goes in only when one of them ended, not at every check.
+test('watchTrial: no new candidate while the trials run on, the next one as soon as one ended', async () => {
+  const before = config.maxManualPeers;
+  config.maxManualPeers = 8;
+  try {
+    peerRotation.setEnabled(true);
+    at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+    inBook('198.18.4.10', 'AS');
+    setPeers([coreOut()]);
+    await peerRotation.tick();
+    assert.equal(fill.trials().length, 1);
+    inBook('198.18.4.11', 'OC');
+    inBook('198.18.4.12', 'NA');
+    require('../src/lib/peer-rotation/addrbook').resetForTests();
+
+    const quiet = await peerRotation.watchTrial();
+    assert.equal(quiet.started, 0, 'nothing ended, nothing new');
+    assert.equal(fill.trials().length, 1);
+
+    ageTrial(3 * MIN);
+    const next = await peerRotation.watchTrial();
+    assert.equal(next.reverted, 1);
+    assert.ok(next.started >= 1, 'the freed room is used at once');
+  } finally {
+    config.maxManualPeers = before;
+    peerRotation.setEnabled(false);
+  }
 });

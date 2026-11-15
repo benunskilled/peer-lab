@@ -9,8 +9,9 @@
  * its grace (retire.js) or a person removes one, and then a peer from a region
  * the set is missing gets it first (spread.js).
  *
- * One candidate at a time. It goes in with addnode, and the slot fill waits
- * for Core: within its time (NO_CONNECT_MS, TRIAL_MS, HEADERS_OPEN_MS) Core must hold a manual connection to it, to a
+ * Up to MAX_TRIALS candidates at a time, each from another region and
+ * provider (15.11.2026: one at a time, eight free slots took over an hour).
+ * Each goes in with addnode, and the slot fill waits for Core: within its time (NO_CONNECT_MS, TRIAL_MS, HEADERS_OPEN_MS) Core must hold a manual connection to it, to a
  * node that says it serves blocks and segwit and has announced our chain's
  * tip. Then it stays. If not, it is taken out again and the next one tried.
  * That is a check that Core reached a node on this chain, not that the node
@@ -38,17 +39,22 @@ const { pickedRegions } = require('./picks');
 const { bookEntries, usableNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
 
 const TRIAL_KEY = 'slot_fill_trial';
+// Candidates on trial at once. Each holds a slot while it runs, so never more
+// than there are free slots; three keeps a burst of addnodes small.
+const MAX_TRIALS = 3;
 // Passes run every ten minutes; while a trial is open a check runs every
-// minute (peer-profiler.js), so these are the real waits.
+// 15 seconds (peer-profiler.js), so these are the real waits.
 //
-// No connection at all by then: the candidate is out. Core dials an added
-// node within about a minute, and a clearnet address that does not answer is
-// settled in about 65 s (5 s to connect, 60 s for the handshake). Tor adds a
-// circuit (Winnow's census, 7-9 November 2026: 11.7 s median, 51 s the
-// longest success); I2P goes through SAM, whose budget is minutes, but the
-// slot fill only starts an I2P candidate once Core holds an I2P connection,
-// so the session is up.
-const NO_CONNECT_MS = { clearnet: 5 * 60 * 1000, Tor: 10 * 60 * 1000, I2P: 15 * 60 * 1000 };
+// No connection at all by then: the candidate is out. Core's added-node
+// thread takes a new addnode at its next round, at most a minute away, and
+// shows a clearnet peer in getpeerinfo as soon as the TCP connection stands
+// (5 s to connect); a peer that answers is there well inside two minutes. It was five, and on
+// 15.11.2026 four South American candidates in a row took twenty minutes to
+// fail. Tor adds a circuit (Winnow's census, 7-9 November 2026: 11.7 s
+// median, 51 s the longest success); I2P goes through SAM, whose budget is
+// minutes, but the slot fill only starts an I2P candidate once Core holds an
+// I2P connection, so the session is up.
+const NO_CONNECT_MS = { clearnet: 2 * 60 * 1000, Tor: 5 * 60 * 1000, I2P: 8 * 60 * 1000 };
 // Connected, but not on our tip (or serving no blocks), counted from the
 // connection: long enough for the peer to answer the headers Core asks every
 // new peer for, which a peer on our chain does within seconds. It was a
@@ -75,23 +81,39 @@ const ADDING_MS = 60 * 1000;
 
 const keyOf = (address) => addressKey(address, config.bitcoin.network);
 
-function writeTrial(trial) {
-  if (trial == null) {
+// The candidates on trial, oldest first, as one JSON list in meta. A single
+// object is what versions with one trial at a time left behind.
+function trials() {
+  try {
+    const row = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(TRIAL_KEY);
+    if (!row) return [];
+    const v = JSON.parse(row.value);
+    return (Array.isArray(v) ? v : [v]).filter((t) => t && t.address);
+  } catch {
+    return [];
+  }
+}
+
+function writeTrials(list) {
+  if (!list.length) {
     db.instance.prepare('DELETE FROM meta WHERE key = ?').run(TRIAL_KEY);
     return;
   }
   db.instance
     .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-    .run(TRIAL_KEY, JSON.stringify(trial));
+    .run(TRIAL_KEY, JSON.stringify(list));
 }
 
+// Read and written in one transaction: the dashboard (switching off) and the
+// profiler (a pass) change the list from two processes.
+const changeTrials = (fn) => db.instance.transaction(() => writeTrials(fn(trials())))();
+const addTrial = (trial) => changeTrials((list) => [...list.filter((t) => t.address !== trial.address), trial]);
+const dropTrial = (address) => changeTrials((list) => list.filter((t) => t.address !== address));
+const replaceTrial = (trial) => changeTrials((list) => list.map((t) => (t.address === trial.address ? trial : t)));
+
+// The oldest candidate on trial, or null.
 function currentTrial() {
-  try {
-    const row = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(TRIAL_KEY);
-    return row ? JSON.parse(row.value) : null;
-  } catch {
-    return null;
-  }
+  return trials()[0] || null;
 }
 
 // The last trial of an address: how it ended and how long it ran, kept so a
@@ -114,6 +136,21 @@ function recentlyFailed(now) {
     // By key: a peer removed by hand is held against under the spelling it
     // was stored with (no port, another IPv6 form), not the address book's.
     .map((r) => keyOf(r.address)));
+}
+
+// Fresh addresses first (15.11.2026): Core's address book keeps when it last
+// heard of or connected to each one, and an address not heard of for a week
+// is often a node that is gone - the candidates that took minutes to fail.
+// Three bands, a day and a week; within a band the order is random, so the
+// same few addresses are not tried by every node.
+const DAY_S = 24 * 60 * 60;
+function freshFirst(list, now) {
+  const nowS = Math.floor(now / 1000);
+  const band = (c) => {
+    const age = nowS - Number(c.time || 0);
+    return age <= DAY_S ? 0 : age <= 7 * DAY_S ? 1 : 2;
+  };
+  return shuffle(list).map((c, i) => ({ c, b: band(c), i })).sort((x, y) => x.b - y.b || x.i - y.i).map((x) => x.c);
 }
 
 function shuffle(list) {
@@ -220,20 +257,30 @@ function whyNot(session, fake = false) {
 }
 
 /**
- * Settle the candidate on trial: keep it if Core holds a working connection
- * to it, wait while the trial runs, take it out once it is over. `force`
- * settles now either way - the slot fill is being switched off.
+ * Settle the candidates on trial: keep each Core holds a working connection
+ * to, wait while its trial runs, take it out once that is over. `force`
+ * settles now either way - the slot fill is being switched off. Returns how
+ * many ended which way, and the addresses taken out (`gone`).
  */
 async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
-  const trial = currentTrial();
-  if (!trial) return 'none';
+  const out = { confirmed: 0, reverted: 0, left: 0, waiting: 0, gone: [] };
+  for (const trial of trials()) {
+    const r = await settleOne(trial, peers, chain, now, force);
+    out[r] += 1;
+    if (r === 'reverted') out.gone.push(trial.address);
+  }
+  return out;
+}
+
+async function settleOne(trial, peers, chain, now, force) {
   const row = db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(trial.address);
   if (!row && now - trial.startedAt < ADDING_MS) return 'waiting';
   // Given the padlock by hand while on trial: a person's decision, and it
   // stands.
   if (row && row.kept) {
-    writeTrial(null);
-    writeLastTry(null);
+    dropTrial(trial.address);
+    // Why the one before went, until no candidate is left on trial.
+    if (!trials().length) writeLastTry(null);
     return 'left';
   }
   // Taken out by hand - or the app stopped, or the add failed, after Core was
@@ -244,7 +291,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // the trial is what keeps the sync off it until then.
   if (!row) {
     await peerSync.removeTrustedPeer(trial.address, { disconnect: false });
-    writeTrial(null);
+    dropTrial(trial.address);
     // Ended by a person: the one before is no longer the peer before.
     writeLastTry(null);
     return 'left';
@@ -252,8 +299,9 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   const session = manualSession(peers, trial.address);
   const fake = disguised(session, peers);
   if (!fake && works(session, chain, trial.tip)) {
-    writeTrial(null);
-    writeLastTry(null);
+    dropTrial(trial.address);
+    // Why the one before went, until no candidate is left on trial.
+    if (!trials().length) writeLastTry(null);
     markTried(trial.address, true, now, { reason: 'ok', startedAt: trial.startedAt });
     logAction({ action: 'promote', address: trial.address, note: trial.note });
     logger.info('slot fill: Core connected, the candidate keeps the slot', { address: trial.address });
@@ -269,7 +317,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
   // Not in the dashboard's log: a candidate Core could not use is the slot
   // fill's own business, and the next one is tried anyway.
   await peerSync.removeTrustedPeer(trial.address);
-  writeTrial(null);
+  dropTrial(trial.address);
   const why = whyNot(session, fake);
   const minutes = Math.max(1, Math.round((now - trial.startedAt) / 60000));
   if (!force) {
@@ -289,7 +337,7 @@ async function settle(peers, chain, now = Date.now(), { force = false } = {}) {
 // says what Slot Fill is doing (index.js, status): why nothing went in, and
 // how many addresses were left after each step. Read right after start().
 let lastLook = null;
-const looked = (why, counts = {}) => { lastLook = { why, ...counts }; return 0; };
+const looked = (why, counts = {}, result = []) => { lastLook = { why, ...counts }; return result; };
 
 // How many addresses Slot Fill could pick from at its last look, and how many
 // per region, for the line on the page ("4,812 addresses to pick from"):
@@ -316,32 +364,40 @@ function noteBook(candidates, nets, now) {
 }
 
 /**
- * Put the next candidate on trial, if a slot is free. `peers` is getpeerinfo
- * from this pass. Returns the candidate's address, or 0.
+ * Put candidates on trial in the free slots: as many as are free, up to
+ * MAX_TRIALS on trial at once. `peers` is getpeerinfo from this pass. Returns
+ * the addresses put on trial, an empty list for none.
  */
 async function start(ranking, peers, chain, now = Date.now()) {
+  const started = [];
+  // As many on trial as may be: nothing to ask Core, and the page keeps what
+  // the last look found (15 s checks while trials run, review 15.11.2026).
+  if (trials().length >= MAX_TRIALS) return started;
   lastLook = null;
   lastBook = null;
   lastPicks = null;
   // A node still catching up has no tip to test a candidate against.
-  if (chain.initialblockdownload) return looked('catching_up');
+  if (chain.initialblockdownload) return looked('catching_up', {}, started);
+  // Copied: each candidate put on trial below counts as one of them for the
+  // next pick, so the next goes to another region and provider.
   const trusted = ranking.filter((p) => p.trusted);
   const max = config.maxManualPeers;
   // With every slot in use the book is still counted, for the page: how
   // much there would be to pick from (noteBook). Nothing is tried.
   const full = trusted.length >= max;
+  const room = () => Math.min(MAX_TRIALS - trials().length, max - trusted.length);
 
   let networkInfo;
   try {
     networkInfo = await rpc.getNetworkInfo();
   } catch (err) {
     logger.debug('slot fill: getnetworkinfo failed', { error: err.message });
-    return looked('core');
+    return looked('core', {}, started);
   }
   const nets = usableNetworks(networkInfo, peers);
-  if (!nets.size) return looked('no_network');
+  if (!nets.size) return looked('no_network', {}, started);
   const banned = await bannedMatcher();
-  if (!banned) return looked('core');
+  if (!banned) return looked('core', {}, started);
 
   // Core's own address too: an address book can hold the node itself.
   const inUse = new Set([
@@ -352,80 +408,93 @@ async function start(ranking, peers, chain, now = Date.now()) {
   const failed = recentlyFailed(now);
   const all = await bookEntries(now);
   const reachable = all.filter((c) => nets.has(c.network));
-  const book = reachable
-    .filter((c) => !inUse.has(hostFromAddress(c.address)) && !banned(c.address) && !failed.has(keyOf(c.address)));
+  const book = freshFirst(reachable
+    .filter((c) => !inUse.has(hostFromAddress(c.address)) && !banned(c.address) && !failed.has(keyOf(c.address))), now);
   const counts0 = { known: all.length, reachable: reachable.length, untried: book.length };
   if (all.length) noteBook(book, nets, now);
-  if (full) return looked('full');
-  if (!all.length) return looked('no_book', counts0);
+  if (full) return looked('full', {}, started);
+  if (!all.length) return looked('no_book', counts0, started);
+  if (room() <= 0) return started;
 
   // Counted over all outbound connections, Core's own too (spread.js).
   const coreRegions = spread.coreRegionsOf(ranking);
   const coreKeys = spread.coreOperatorsOf(ranking);
   const inbound = spread.inboundRegionsOf(ranking);
-  // With the one more for a region many peers came to on their own: that
-  // decides which region is missing and which goes first. The note in the log
-  // says the outbound count alone, what the reader can count in the tables.
-  const counts = spread.totalCounts(trusted, coreRegions, inbound);
-  const outbound = spread.totalCounts(trusted, coreRegions);
-  const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
-  const ranked = spread.rankForGap(shuffle(book), trusted, coreRegions, inbound);
   const picked = new Set(pickedRegions());
   const inPicked = (c) => picked.has(spread.placeOf(c).region);
-  const inGap = (c) => gaps.has(spread.placeOf(c).region);
   // Where clearnet works, one Tor and one I2P connection are enough, Core's
   // own counted (10.11.2026): an I2P or Tor peer may sit anywhere, and those
   // networks are small, so a further one says less than a continent. A node
   // on Tor alone takes all it can get there.
   const clearnet = nets.has('ipv4') || nets.has('ipv6');
-  // A picked Tor or I2P is the reader's word against that rule.
-  const capped = (c) => {
-    const { region } = spread.placeOf(c);
-    return clearnet && (region === 'TOR' || region === 'I2P') && (outbound[region] || 0) >= 1 && !picked.has(region);
-  };
-  for (let i = ranked.length - 1; i >= 0; i--) if (capped(ranked[i])) ranked.splice(i, 1);
-  const tried = ranked.filter((c) => !c.fromNew);
-  // A missing region "tried" has nobody from may look in "new" (addrbook.js).
-  // Nobody the provider rule would let in, that is: a region whose only
-  // tried candidates are with providers already in use is still missing.
-  const triedGaps = new Set(tried.filter((c) => inGap(c) && spread.admit(c, trusted, max, coreKeys)).map((c) => spread.placeOf(c).region));
-  const stand = ranked.filter((c) => c.fromNew && inGap(c) && !triedGaps.has(spread.placeOf(c).region));
-  // The missing regions first, from "tried", then from "new" where "tried"
-  // has none; once none of them can be filled - a node that reaches only
-  // Tor, say - anyone the spread lets in from "tried", so that no slot stays
-  // empty for want of a perfect candidate.
-  const usual = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
-  // Picked regions (picks.js): theirs only, "tried" first, then "new" - and
-  // the usual pick once none of them has a candidate the spread lets in.
-  // In ranked order, so the spread among them holds; "new" only for a picked
-  // region "tried" has nobody admissible in, as for the gaps above (review:
-  // with Europe and Africa picked, Europe's thousands came first every time).
-  //
-  // In the picked regions the provider rule is half as strict, but only once
-  // no candidate in any of them passes it whole (15.11.2026): an operator
-  // Core's own outbound peers use may come in, one the manual peers already
-  // have never. Decided over the picked regions together, not each alone.
-  const pickKeys = (keys) => {
-    const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
-    const list = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
-    return { list, left: list.some((c) => spread.admit(c, trusted, max, keys)) };
-  };
-  let mine = pickKeys(coreKeys);
-  let relaxed = false;
-  if (picked.size && !mine.left) {
-    mine = pickKeys(new Set());
-    relaxed = mine.left;
-  }
-  const pickedLeft = mine.left;
-  const keysNow = relaxed ? new Set() : coreKeys;
-  lastPicks = picked.size ? { regions: [...picked], empty: !pickedLeft } : null;
-  const ordered = pickedLeft ? mine.list : usual;
 
-  const fitting = ordered.filter((c) => spread.admit(c, trusted, max, pickedLeft ? keysNow : coreKeys)).length;
-  if (!fitting) return looked('none_fit', { ...counts0, fitting });
+  // The order for the next pick, over the manual set as it stands with the
+  // candidates already put on trial in this call.
+  const order = () => {
+    // With the one more for a region many peers came to on their own: that
+    // decides which region is missing and which goes first. The note in the
+    // log says the outbound count alone, what the reader can count in the
+    // tables.
+    const counts = spread.totalCounts(trusted, coreRegions, inbound);
+    const outbound = spread.totalCounts(trusted, coreRegions);
+    const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
+    const inGap = (c) => gaps.has(spread.placeOf(c).region);
+    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, inbound);
+    // A picked Tor or I2P is the reader's word against that rule.
+    const capped = (c) => {
+      const { region } = spread.placeOf(c);
+      return clearnet && (region === 'TOR' || region === 'I2P') && (outbound[region] || 0) >= 1 && !picked.has(region);
+    };
+    for (let i = ranked.length - 1; i >= 0; i--) if (capped(ranked[i])) ranked.splice(i, 1);
+    const tried = ranked.filter((c) => !c.fromNew);
+    // A missing region "tried" has nobody from may look in "new" (addrbook.js).
+    // Nobody the provider rule would let in, that is: a region whose only
+    // tried candidates are with providers already in use is still missing.
+    const triedGaps = new Set(tried.filter((c) => inGap(c) && spread.admit(c, trusted, max, coreKeys)).map((c) => spread.placeOf(c).region));
+    const stand = ranked.filter((c) => c.fromNew && inGap(c) && !triedGaps.has(spread.placeOf(c).region));
+    // The missing regions first, from "tried", then from "new" where "tried"
+    // has none; once none of them can be filled - a node that reaches only
+    // Tor, say - anyone the spread lets in from "tried", so that no slot stays
+    // empty for want of a perfect candidate.
+    const usual = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
+    // Picked regions (picks.js): theirs only, "tried" first, then "new" - and
+    // the usual pick once none of them has a candidate the spread lets in.
+    // In ranked order, so the spread among them holds; "new" only for a picked
+    // region "tried" has nobody admissible in, as for the gaps above (review:
+    // with Europe and Africa picked, Europe's thousands came first every time).
+    //
+    // In the picked regions the provider rule is half as strict, but only once
+    // no candidate in any of them passes it whole (15.11.2026): an operator
+    // Core's own outbound peers use may come in, one the manual peers already
+    // have never. Decided over the picked regions together, not each alone.
+    const pickKeys = (keys) => {
+      const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
+      const list = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
+      return { list, left: list.some((c) => spread.admit(c, trusted, max, keys)) };
+    };
+    let mine = pickKeys(coreKeys);
+    let relaxed = false;
+    if (picked.size && !mine.left) {
+      mine = pickKeys(new Set());
+      relaxed = mine.left;
+    }
+    const pickedLeft = mine.left;
+    const keys = pickedLeft && relaxed ? new Set() : coreKeys;
+    return { ordered: pickedLeft ? mine.list : usual, pickedLeft, keys, outbound };
+  };
+
   let attempts = 0;
-  for (const c of ordered) {
-    if (!spread.admit(c, trusted, max, pickedLeft ? keysNow : coreKeys)) continue;
+  let fitting = 0;
+  while (room() > 0) {
+    const { ordered, pickedLeft, keys, outbound } = order();
+    // The picks as the first look of this call found them, for the page.
+    if (!started.length) lastPicks = picked.size ? { regions: [...picked], empty: !pickedLeft } : null;
+    const fits = ordered.filter((c) => spread.admit(c, trusted, max, keys));
+    if (!started.length) fitting = fits.length;
+    if (!fits.length) return started.length ? started : looked('none_fit', { ...counts0, fitting }, started);
+    const c = fits[0];
+    // Tried once in this call, whatever came of it.
+    inUse.add(hostFromAddress(c.address));
     const what = spread.describe(c);
     const { region } = spread.placeOf(c);
     // Where it is shows under its address in the log; the note says why.
@@ -434,7 +503,7 @@ async function start(ranking, peers, chain, now = Date.now()) {
       : region ? `${spread.REGION_NAMES[region]} had ${outbound[region] ? `only ${outbound[region]}` : 'none'}` : 'free slot';
     // Written before the add: if the app stops between the two, the next pass
     // finds the trial and either its candidate (and judges it) or nothing.
-    writeTrial({
+    addTrial({
       address: c.address,
       startedAt: now,
       tip: Number(chain.headers ?? chain.blocks),
@@ -445,19 +514,21 @@ async function start(ranking, peers, chain, now = Date.now()) {
     const result = await peerSync.addTrustedPeer(c.address, `slot fill: ${what}`, { neverDisconnect: true });
     if (result.ok) {
       logger.info('slot fill: candidate on trial', { address: c.address });
-      return c.address;
+      started.push(c.address);
+      trusted.push({ address: c.address, trusted: true });
+      continue;
     }
-    writeTrial(null);
+    dropTrial(c.address);
     logger.info('slot fill: candidate not added', { address: c.address, error: result.error });
     // The set filled up under us (a peer added by hand meanwhile): nothing
     // wrong with the candidate, and nothing more to do this pass. Nor is a
     // refusal held against it: it may be Core not answering, and a week's
     // cooldown for that would cost good addresses.
-    if (result.count >= max) return looked('full');
+    if (result.count >= max) return started.length ? started : looked('full', {}, started);
     attempts += 1;
-    if (attempts >= ATTEMPTS_PER_PASS) return looked('refused', { ...counts0, fitting });
+    if (attempts >= ATTEMPTS_PER_PASS) return started.length ? started : looked('refused', { ...counts0, fitting }, started);
   }
-  return looked('refused', { ...counts0, fitting });
+  return started;
 }
 
 // How the candidate on trial stands, for the page: what Core has to show for
@@ -482,24 +553,26 @@ function trialView(trial, peers, now = Date.now()) {
 // candidate on trial, holding the slot, for good.
 const MAX_RESTARTS = 3;
 function restart(chain, now = Date.now()) {
-  const trial = currentTrial();
-  if (!trial) return false;
-  const restarts = (trial.restarts || 0) + 1;
-  if (restarts > MAX_RESTARTS) {
-    logger.info('slot fill: trial not started over again, judged as it stands', { address: trial.address });
-    return false;
+  let any = false;
+  for (const trial of trials()) {
+    const restarts = (trial.restarts || 0) + 1;
+    if (restarts > MAX_RESTARTS) {
+      logger.info('slot fill: trial not started over again, judged as it stands', { address: trial.address });
+      continue;
+    }
+    replaceTrial({ ...trial, startedAt: now, tip: Number(chain.headers ?? chain.blocks), restarts });
+    logger.info('slot fill: trial starts over after a gap', { address: trial.address, restarts });
+    any = true;
   }
-  writeTrial({ ...trial, startedAt: now, tip: Number(chain.headers ?? chain.blocks), restarts });
-  logger.info('slot fill: trial starts over after a gap', { address: trial.address, restarts });
-  return true;
+  return any;
 }
 
 // Take a candidate out at once, trial or not: the slot fill was switched off
 // while this pass was adding it.
 async function abandon(address, now = Date.now()) {
   await peerSync.removeTrustedPeer(address);
-  writeTrial(null);
+  dropTrial(address);
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });
 }
 
-module.exports = { MAX_RESTARTS, settle, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks, recentlyFailedForTest: recentlyFailed };
+module.exports = { MAX_RESTARTS, MAX_TRIALS, NO_CONNECT_MS, settle, trials, start, restart, abandon, markTried, currentTrial, works, withoutSession, trialView, lastTry, lastLook: () => lastLook, lastBook: () => lastBook, lastPicks: () => lastPicks, recentlyFailedForTest: recentlyFailed };

@@ -42,12 +42,16 @@ function newManualGraceStartedAt() {
   return row ? row.at : 0;
 }
 
-function slotFillTrialAddress() {
+// The slot fill's candidates on trial: a list, or one object as versions
+// with one trial at a time stored it.
+function slotFillTrialAddresses() {
   try {
     const row = db.instance.prepare(`SELECT value FROM meta WHERE key = 'slot_fill_trial'`).get();
-    return row ? JSON.parse(row.value).address || null : null;
+    if (!row) return new Set();
+    const v = JSON.parse(row.value);
+    return new Set((Array.isArray(v) ? v : [v]).map((t) => t && t.address).filter(Boolean));
   } catch {
-    return null;
+    return new Set();
   }
 }
 
@@ -66,12 +70,12 @@ function peerRanking() {
   const liveTip = liveTipStmt.get()?.tip || 0;
   const rows = peerRankingStmt.all().map(mapRankingRow(now, graceFrom, liveTip));
 
-  // The manual peer the slot fill has on trial (peer-rotation/fill.js): in its
-  // slot, but only for good once Core has connected to it.
-  const onTrial = slotFillTrialAddress();
-  if (onTrial) {
+  // The manual peers the slot fill has on trial (peer-rotation/fill.js): in
+  // their slots, but only for good once Core has connected to them.
+  const onTrial = slotFillTrialAddresses();
+  if (onTrial.size) {
     for (const r of rows) {
-      if (r.trusted && r.address === onTrial) {
+      if (r.trusted && onTrial.has(r.address)) {
         r.onTrial = true;
         r.status = 'TESTING';
       }

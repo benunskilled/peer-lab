@@ -68,10 +68,10 @@ async function bookEntries(now = Date.now()) {
   const usable = (e) => servesBlocks(e.services) && NETWORKS.includes(e.network);
   const entries = Object.values(raw.tried)
     .filter(usable)
-    .map((e) => ({ address: formatAddress(e.address, e.port), network: e.network }));
+    .map((e) => ({ address: formatAddress(e.address, e.port), network: e.network, time: Number(e.time) || 0 }));
   const fresh = Math.floor(now / 1000) - NEW_FRESH_S;
   for (const e of Object.values(raw.new && typeof raw.new === 'object' ? raw.new : {})) {
-    if (usable(e) && Number(e.time) >= fresh) entries.push({ address: formatAddress(e.address, e.port), network: e.network, fromNew: true });
+    if (usable(e) && Number(e.time) >= fresh) entries.push({ address: formatAddress(e.address, e.port), network: e.network, time: Number(e.time) || 0, fromNew: true });
   }
   // An empty answer is most likely Core not being up yet: ask again next
   // tick rather than living on nothing for six hours.

@@ -857,6 +857,8 @@ const routes = {
       // its top until the trial is decided (13.11.2026). Not stored: kept,
       // it becomes the pass's own "Added" entry; let go, it was a try.
       trialWhere: status && status.trial ? whereOf(status.trial.address) : null,
+      // Every candidate on trial (several at once since 15.11.2026), in order.
+      trialsWhere: status && Array.isArray(status.trials) ? status.trials.map((t) => whereOf(t.address)) : [],
       log: peerRotation.recentLog(),
       // The regions picked for the next free slots (picks.js).
       picked: pickedRegions(),

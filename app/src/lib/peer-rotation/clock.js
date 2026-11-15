@@ -29,7 +29,7 @@ const LAST_KEY = 'slot_fill_last_pass';
 const DOWN_KEY = 'slot_fill_core_down'; // the first pass Core did not answer
 const DOWN_LAST_KEY = 'slot_fill_core_down_last'; // and the latest
 const GAPS_KEY = 'slot_fill_gaps';
-// Passes run every ten minutes, every minute while a trial is open; two
+// Passes run every ten minutes, every 15 seconds while a trial is open; two
 // passes' worth is more than any normal step.
 const MAX_STEP_MS = 20 * 60 * 1000;
 // Core gone at least this long is an outage; less is a busy moment.
