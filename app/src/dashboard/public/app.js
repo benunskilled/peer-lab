@@ -475,8 +475,9 @@ function actionsCell(p, { lock = '' } = {}) {
   //
   // A source-obscured peer's "address" is Docker's own relay gateway, not the
   // peer's real one (see queries/ranking-row.js). A local Umbrel app is not a peer worth
-  // acting on. And a Tor, I2P or CJDNS peer reaches us over a network this
-  // container cannot dial out on, so there is no address to call back.
+  // acting on. And a Tor or I2P peer that dialled in carries the address of
+  // Umbrel's proxy, a CJDNS one a network Core has no proxy for: there is no
+  // address to call back.
   //
   // The third used to print "Tor only" where the button goes, which was a
   // word about the peer standing in a place that is otherwise a reason, and
@@ -495,7 +496,12 @@ function actionsCell(p, { lock = '' } = {}) {
   // is not to be trusted with it.
   // The peers service's word where it has one, the name rules otherwise.
   const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : kindRuleIndex(p.client) === MISSPELT_RULE);
-  const primary = ((p.sourceObscured || p.localUmbrelPeer || p.privateNetwork || disguised || (neverFirstReason(p) && !p.first))
+  // A Tor or I2P peer this node dialled carries its own address, and Core
+  // reaches it again by itself (15.11.2026): it can be added. One that
+  // dialled in carries the proxy's address, and CJDNS no proxy at all.
+  const unreachable = p.privateNetwork
+    && !((p.privateNetwork === 'Tor' || p.privateNetwork === 'I2P') && p.direction === 'outbound' && !p.proxiedPrivatePeer);
+  const primary = ((p.sourceObscured || p.localUmbrelPeer || unreachable || disguised || (neverFirstReason(p) && !p.first))
       ? placeholder
       : `<button class="secondary action-slot" data-action="add-manual" data-address="${escapeHtml(p.address)}">Add as Manual</button>`);
 
@@ -931,6 +937,11 @@ const recheckGone = () => setTimeout(() => refreshPeers().catch(() => {}), GONE_
 // counter across the await discards any response that was already in flight
 // when the state changed.
 let rotationToggleEpoch = 0;
+// The same for the picked regions: a poll asked before a tap must not put
+// back the picks from before it (review, 15.11.2026). picksSending holds the
+// buttons while a tap is on its way.
+let picksEpoch = 0;
+let picksSending = false;
 
 // Only ever the actions this app writes, and only as a class name from a fixed
 // list. This was the single place in the file where a value went into
@@ -962,13 +973,16 @@ let rotationSeq = 0;
 async function refreshRotation() {
   const seq = ++rotationSeq;
   const epochAtRequest = rotationToggleEpoch;
+  const picksAtRequest = picksEpoch;
   const data = await api('/api/rotation');
   if (seq !== rotationSeq || rotationToggleEpoch !== epochAtRequest) return;
   const toggle = document.getElementById('rotation-toggle');
   if (toggle) toggle.checked = Boolean(data.enabled);
   foldSums();
 
-  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null };
+  // Picks tapped since this was asked for are the page's, not this answer's.
+  const picked = picksAtRequest === picksEpoch ? data.picked || [] : (lastSlotStatus && lastSlotStatus.picked) || [];
+  lastSlotStatus = { enabled: Boolean(data.enabled), status: data.status || null, trialWhere: data.trialWhere || null, picked };
   renderSlotStatus();
   renderSlotBook();
   // The slow round speeds up while a trial runs.
@@ -999,7 +1013,7 @@ function lastTryText(st) {
   return ` The peer before${where ? `, in ${escapeHtml(where)},` : ''} ${LAST_TRY_WHY[l.reason] || 'was not kept'}.`;
 }
 // "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
-// per region under it. Text only, so an open list stays open on a redraw.
+// per region under it, each a button to pick it (15.11.2026).
 const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
   const box = document.getElementById('slot-book');
@@ -1014,9 +1028,36 @@ function renderSlotBook() {
   const n = (x) => Number(x).toLocaleString('en-US');
   const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
   const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
-  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
-    + (none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
-  document.getElementById('slot-book-regions').textContent = regions.map(([r, c]) => `${BOOK_REGIONS[r] || r} ${n(c)}`).join(' \u00b7 ');
+  // The buttons in a fixed order, so none moves under a finger when a count
+  // changes; a picked region the book no longer lists (Tor gone) still has
+  // its button, to be unpicked.
+  const counts = { ...Object.fromEntries((s.picked || []).map((r) => [r, 0])), ...(b.regions || {}) };
+  const buttons = Object.keys(BOOK_REGIONS).filter((r) => r in counts).map((r) => [r, counts[r]]);
+  // A candidate on trial holds its slot before Core has connected to it: the
+  // Manual tile, which counts connected peers, is then one lower (15.11.2026).
+  const testing = s.status.state === 'trial' ? ' \u00b7 1 being tested' : '';
+  const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
+  const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
+  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
+    + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
+  // Each region a switch (15.11.2026): picked, the next free slots go there.
+  // One with nothing to pick from cannot be picked, but stays to be unpicked.
+  const html = buttons.map(([r, c]) => {
+    const on = picked.includes(r);
+    return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${(!c && !on) || picksSending ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
+  }).join('');
+  // Drawn again only when something changed: a redraw every poll took the
+  // keyboard focus off the button.
+  const box2 = document.getElementById('slot-book-regions');
+  if (box2.dataset.drawn !== html) { box2.innerHTML = html; box2.dataset.drawn = html; }
+  // The last look's word, only if it was about these very picks.
+  const pk = s.status.picks;
+  const same = pk && pk.regions.length === picked.length && pk.regions.every((r) => picked.includes(r));
+  const empty = same && pk.empty && picked.length;
+  document.getElementById('slot-pick-note').textContent = !picked.length
+    ? 'Tap a region to give it the next free slots.'
+    : empty ? `Nothing in ${names(picked)} can be added right now, back to the usual pick.`
+    : `The next free slots go to ${names(picked)}. Tap again to undo.`;
 }
 function slotStatusText(st, now) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
@@ -1116,7 +1157,7 @@ function logPlace(entry) {
 // for the manual peers above; on a phone a card like a peer's (the last
 // cell, hidden in the table): place and action, address and when, the
 // provider under it as in the table, then why.
-function rotationEntryRow(entry) {
+function rotationEntryRow(entry, extra = '') {
   // An address can be long (Tor): cut with an ellipsis, the whole of it in a
   // tooltip only when it was cut (the mouseover handler below).
   const addr = `<span class="addr-txt">${escapeHtml(entry.address)}</span>`;
@@ -1133,8 +1174,8 @@ function rotationEntryRow(entry) {
       <td class="hint" title="${escapeHtml(new Date(entry.at).toLocaleString())}">${when}</td>
       <td>${pill}</td>
       ${address}
-      <td class="hint"${entry.replacedAddress ? ` title="In for ${escapeHtml(entry.replacedAddress)}"` : ''}>${escapeHtml(entry.note || '-')}</td>
-      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${logPlace(entry)}</span>${pill}</div><div class="lc-sub"><span class="lc-what">${addr}</span><span class="lc-when">${when}</span></div>${op}${why}</td>
+      <td class="hint"${entry.replacedAddress ? ` title="In for ${escapeHtml(entry.replacedAddress)}"` : ''}>${escapeHtml(entry.note || '-')}${extra}</td>
+      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${logPlace(entry)}</span>${pill}</div><div class="lc-sub"><span class="lc-what">${addr}</span><span class="lc-when">${when}</span></div>${op}${why}${extra}</td>
     </tr>`;
 }
 
@@ -1145,12 +1186,39 @@ function rotationEntryRow(entry) {
 // place and provider; any other state is its sentence, "All 8 slots in use."
 // head and rest are HTML already (slotStatusText escapes what it puts in).
 let shownNow = ''; // the top row as last drawn, '' for none
+// Under the top row while a slot is free: every candidate tried since it came
+// free, and what freed it (15.11.2026). Folded to one line; open stays open
+// across the redraws, which rewrite the row.
+let triesOpen = false;
+document.addEventListener('toggle', (e) => {
+  if (e.target.classList && e.target.classList.contains('slot-tries')) triesOpen = e.target.open;
+}, true);
+function triesHtml(st) {
+  const t = st && st.tries;
+  if (!t || !t.tries.length) return '';
+  const hm = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const place = (w) => (w ? [w.country ? countryName(w.country) : w.regionName, w.operator].filter(Boolean).join(' \u00b7 ') : 'unknown place');
+  const line = (at, where, what, title) =>
+    `<li><span class="st-when">${hm(at)}</span><span class="st-where"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(where)}</span><span class="st-what">${escapeHtml(what)}</span></li>`;
+  const tried = t.tries.map((x) => {
+    const min = Math.max(1, Math.round((x.endedAt - x.startedAt) / 60000));
+    return line(x.startedAt, place(x.where), `${LAST_TRY_WHY[x.reason] || 'was not kept'} (${min} min)`, x.address);
+  });
+  const freed = t.freed.slice().reverse().map((f) => line(f.at, place(f.where),
+    f.action === 'retire' ? 'offline too long, slot freed' : 'removed by hand, slot freed', f.address));
+  const n = t.total || t.tries.length;
+  // Not today: the day too, or "since 13:20" reads as an hour ago.
+  const day = new Date(t.since).toDateString() === new Date().toDateString() ? ''
+    : `${new Date(t.since).toLocaleDateString([], { day: 'numeric', month: 'short' })} `;
+  return `<details class="slot-tries"${triesOpen ? ' open' : ''}><summary>${n} tried since ${day}${hm(t.since)}</summary><ul>${tried.join('')}${freed.join('')}</ul></details>`;
+}
 function nowRow(now) {
   const s = lastSlotStatus;
   if (!s || !s.enabled) return '';
   const t = slotStatusText(s.status, now);
+  const tries = triesHtml(s.status);
   if (s.status && s.status.state === 'trial' && s.status.trial) {
-    return rotationEntryRow({ action: 'trial', address: s.status.trial.address, at: s.status.trial.startedAt, where: s.trialWhere, note: t.rest });
+    return rotationEntryRow({ action: 'trial', address: s.status.trial.address, at: s.status.trial.startedAt, where: s.trialWhere, note: t.rest }, tries);
   }
   const pill = '<span class="pill rotation-now">Now</span>';
   const head = t.head.replace(/\.$/, '');
@@ -1159,8 +1227,8 @@ function nowRow(now) {
       <td class="hint"></td>
       <td>${pill}</td>
       <td><b>${head}</b></td>
-      <td class="hint">${t.rest}</td>
-      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${t.rest}</div></td>
+      <td class="hint">${t.rest}${tries}</td>
+      <td class="log-card" data-label=""><div class="lc-top"><span class="lc-place">${head}</span>${pill}</div><div class="lc-why">${t.rest}</div>${tries}</td>
     </tr>`;
 }
 
@@ -1524,6 +1592,29 @@ function manualAddResult(text, kind) {
   resultEl.className = kind === 'error' ? 'hint result-error' : 'hint result-ok';
 }
 
+// A tap on a region: the whole set goes to the node, which keeps it.
+document.getElementById('slot-book-regions').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button.region-pick');
+  if (!btn || btn.disabled || !lastSlotStatus) return;
+  const r = btn.dataset.region;
+  if (picksSending) return;
+  const now = new Set(lastSlotStatus.picked || []);
+  if (now.has(r)) now.delete(r); else now.add(r);
+  picksSending = true;
+  picksEpoch += 1;
+  renderSlotBook();
+  try {
+    const result = await api('/api/rotation/regions', { method: 'POST', body: JSON.stringify({ regions: [...now] }) });
+    lastSlotStatus.picked = result.picked;
+  } catch (err) {
+    showToast(`Could not change the regions: ${err.message}`, 'error');
+  } finally {
+    picksSending = false;
+    picksEpoch += 1;
+  }
+  renderSlotBook();
+});
+
 document.getElementById('manual-test-button').addEventListener('click', async () => {
   const input = document.getElementById('manual-add-input');
   if (!input.value.trim()) return;
@@ -1533,10 +1624,12 @@ document.getElementById('manual-test-button').addEventListener('click', async ()
     // Naming the port is the useful half of the answer for an inbound peer:
     // it is the port that peer's node actually listens on, which is never the
     // one its inbound connection to us came from.
-    manualAddResult(`reachable - a node answered at ${result.address}. Nothing was added.`, 'ok');
+    // Reached through Tor or I2P: not tested, and the answer says why.
+    if (result.untested) manualAddResult(result.message, 'ok');
+    else manualAddResult(`reachable - a node answered at ${result.address}. Nothing was added.`, 'ok');
   } catch (err) {
     // Refused before any test (a Tor name, a proxied network): "not reachable" would claim something nobody checked.
-    const untested = /cannot be tested|through a proxy|does not use/.test(err.message);
+    const untested = /cannot be tested|doesn't use|can't tell/.test(err.message);
     manualAddResult(`${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
   } finally {
     manualAddBusy(false);
@@ -1550,7 +1643,8 @@ document.getElementById('manual-add-form').addEventListener('submit', async (e) 
   try {
     const result = await api('/api/peers/manual-add', { method: 'POST', body: JSON.stringify({ host: input.value }) });
     justGone.delete(result.address);
-    manualAddResult(result.warning ? `added ${result.address} - ${result.warning}` : `added ${result.address}`, 'ok');
+    const said = result.note || `added ${result.address}`;
+    manualAddResult(result.warning ? `${said} - ${result.warning}` : said, 'ok');
     input.value = '';
     refreshPeers().catch(() => {});
     refreshRotation();
@@ -1722,7 +1816,9 @@ document.body.addEventListener('click', async (e) => {
   // Probing a host on 8333 then 9333 can take up to ~6s (3s timeout per
   // port) - show what's actually happening instead of leaving the UI
   // looking frozen/unresponsive during that wait.
-  if (action === 'add-manual') showToast(`Adding ${address} as manual peer - probing port 8333, then 9333…`, 'pending');
+  if (action === 'add-manual') {
+    showToast(`Adding ${address} as manual peer…`, 'pending');
+  }
   if (action === 'untrust') showToast(`Removing ${address}…`, 'pending');
   if (action === 'disconnect') showToast(`Disconnecting ${address}…`, 'pending');
   if (action === 'delete-pool') showToast('Removing pool…', 'pending');
@@ -1734,9 +1830,11 @@ document.body.addEventListener('click', async (e) => {
       justGone.delete(address);
       justGone.delete(result.address);
       showToast(
-        result.warning
-          ? `Added and locked as manual peer: ${result.address} - ${result.warning}`
-          : `Added and locked as manual peer: ${result.address}. It now shows in the Manual Peers panel below.`,
+        result.note
+          ? `${result.note}${result.warning ? ` ${result.warning}` : ''}`
+          : result.warning
+            ? `Added and locked as manual peer: ${result.address} - ${result.warning}`
+            : `Added and locked as manual peer: ${result.address}. It now shows in the Manual Peers panel below.`,
         'success',
       );
     }

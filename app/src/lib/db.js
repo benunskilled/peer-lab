@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS trusted_peer (
 );
 
 -- Address-book candidates the slot fill has put to Core, and whether Core
--- connected to them. One that did not is left alone for a week; the rows are
+-- connected to them. One that did not is left alone for a day if Core could
+-- not reach it, a week otherwise; the rows are
 -- dropped after a month. The candidate on trial right now is in meta
 -- (slot_fill_trial), as one JSON value. Per address, the last trial: why it
 -- ended (ok, no_connection, no_services, height_unknown, height_wrong,

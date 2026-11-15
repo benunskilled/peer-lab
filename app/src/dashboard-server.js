@@ -33,6 +33,7 @@ const hashblock = require('./lib/hashblock-subscriber');
 const { validatePool } = require('./lib/validate');
 const { manualAddPeer, probePeer, hostFromAddress } = require('./lib/manual-peer');
 const peerRotation = require('./lib/peer-rotation');
+const { pickedRegions, setPickedRegions } = require('./lib/peer-rotation/picks');
 const { whereOf } = require('./lib/queries/ranking-row');
 const stratumRace = require('./lib/stratum-race-toggle');
 const logger = require('./lib/logger').make('dashboard');
@@ -857,7 +858,17 @@ const routes = {
       // it becomes the pass's own "Added" entry; let go, it was a try.
       trialWhere: status && status.trial ? whereOf(status.trial.address) : null,
       log: peerRotation.recentLog(),
+      // The regions picked for the next free slots (picks.js).
+      picked: pickedRegions(),
     });
+  },
+
+  // Tapped in the card's list of regions: the whole set, every time; the page
+  // sends one tap at a time and keeps polls from undoing it (app.js picksEpoch).
+  'POST /api/rotation/regions': async (req, res, url) => {
+    const { regions } = await readBody(req);
+    if (!Array.isArray(regions)) return sendJson(res, 400, { error: 'regions must be a list' });
+    return sendJson(res, 200, { ok: true, picked: setPickedRegions(regions) });
   },
 
   'POST /api/rotation/toggle': async (req, res, url) => {

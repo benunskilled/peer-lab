@@ -605,19 +605,36 @@
 
 
   // ---------- not on the map (collapsible side panel) ----------
-  function setSide(open) {
+  // `remember`: the reader's own click, kept for the next visit. Opened by
+  // mapFollowsPeers it is not, and not stored either.
+  function setSide(open, remember = true) {
     $("unplaced").hidden = !open;
     $("sideToggle").setAttribute("aria-expanded", String(open));
-    store.set(SIDE_KEY, open ? "1" : "0");
+    if (remember) { store.set(SIDE_KEY, open ? "1" : "0"); sideTouched = true; }
     if (state.world && state.data) placeMarkers(); // map width changed
   }
+  let sideTouched = false;
   $("sideToggle").addEventListener("click", () => setSide($("unplaced").hidden));
   // Like every other fold, a tap on what it opened closes it again - unless
   // the reader is selecting text.
   $("unplaced").addEventListener("click", () => {
     if (String(window.getSelection()).length === 0) setSide(false);
   });
-  setSide(store.get(SIDE_KEY) === "1"); // collapsed unless opened before
+  setSide(store.get(SIDE_KEY) === "1", false); // collapsed unless opened before
+
+  // Not one peer with a place (only Tor or I2P, say): no empty world and no
+  // legend for it, and the list of what is not on the map open in its place.
+  // Once a peer has a place, the world is back and the list as the reader
+  // keeps it (15.11.2026). A click on the list in between is theirs.
+  let worldShown = true;
+  function mapFollowsPeers(anyPlaced) {
+    if (anyPlaced === worldShown) return;
+    worldShown = anyPlaced;
+    $("mapWrap").hidden = !anyPlaced;
+    $("mapCard").querySelector(".map-legend").hidden = !anyPlaced;
+    if (!sideTouched) setSide(anyPlaced ? store.get(SIDE_KEY) === "1" : true, false);
+    if (anyPlaced) window.dispatchEvent(new Event("resize"));
+  }
 
   function renderUnplaced() {
     const rows = new Map();

@@ -1700,3 +1700,141 @@ test('slot fill: after three restarts a Core that keeps going away no longer hol
   assert.ok(!isManual(asia));
   peerRotation.setEnabled(false);
 });
+
+// 15.11.2026: five candidates in Africa failed in half an hour after a peer
+// was removed by hand, and the page named only the last. The status carries
+// every one since the slot came free, and nothing once it is filled again.
+test('the status lists every candidate tried since a slot came free', () => {
+  const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const t0 = Date.now() - 30 * 60 * 1000;
+  const log = db.instance.prepare('INSERT INTO rotation_log (at, action, address) VALUES (?, ?, ?)');
+  const tried = db.instance.prepare('INSERT INTO slot_fill_tried (address, tried_at, ok, reason, started_at, network) VALUES (?, ?, ?, ?, ?, ?)');
+  log.run(t0 - 60 * 60 * 1000, 'promote', '203.0.113.1:8333');
+  tried.run('203.0.113.9:8333', t0 - 50 * 60 * 1000, 0, 'no_connection', t0 - 56 * 60 * 1000, 'clearnet'); // before: not shown
+  log.run(t0, 'unmanual', '203.0.113.2:8333');
+  tried.run('203.0.113.2:8333', t0, 0, 'removed', null, 'clearnet'); // the removal itself: not a try
+  tried.run('198.51.100.1:8333', t0 + 6 * 60000, 0, 'no_connection', t0 + 7000, 'clearnet');
+  tried.run('198.51.100.2:8333', t0 + 20 * 60000, 0, 'disguised', t0 + 18 * 60000, 'clearnet');
+
+  const got = triesSinceFree();
+  assert.equal(got.since, t0);
+  assert.deepEqual(got.tries.map((x) => [x.address, x.reason]), [['198.51.100.2:8333', 'disguised'], ['198.51.100.1:8333', 'no_connection']]);
+  assert.deepEqual(got.freed.map((f) => [f.action, f.address]), [['unmanual', '203.0.113.2:8333']]);
+
+  log.run(t0 + 25 * 60000, 'promote', '198.51.100.3:8333');
+  assert.equal(triesSinceFree(), null, 'filled again: no list');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});
+
+test('with two slots free and one filled since, the other one\'s tries still show, counted in full', () => {
+  const { triesSinceFree } = require('../src/lib/peer-rotation/log');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const t0 = Date.now() - 60 * 60 * 1000;
+  const log = db.instance.prepare('INSERT INTO rotation_log (at, action, address) VALUES (?, ?, ?)');
+  const tried = db.instance.prepare('INSERT INTO slot_fill_tried (address, tried_at, ok, reason, started_at, network) VALUES (?, ?, ?, ?, ?, ?)');
+  log.run(t0, 'retire', '203.0.113.2:8333');
+  log.run(t0 + 1000, 'retire', '203.0.113.3:8333');
+  log.run(t0 + 10 * 60000, 'promote', '198.51.100.1:8333');
+  for (let i = 0; i < 12; i++) tried.run(`198.51.100.${10 + i}:8333`, t0 + (12 + 3 * i) * 60000, 0, 'no_connection', t0 + (11 + 3 * i) * 60000, 'clearnet');
+  const got = triesSinceFree();
+  assert.equal(got.since, t0 + 10 * 60000, 'from the slot filled');
+  assert.equal(got.total, 12);
+  assert.equal(got.tries.length, 10, 'ten shown');
+  db.instance.prepare('DELETE FROM rotation_log').run();
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});
+
+// 15.11.2026: regions picked on the page take the next free slot, spread
+// among them; with none left there, the usual pick takes over and says so.
+test('slot fill: a picked region takes the free slot, and with none left the usual pick does', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  const asia = inBook('198.18.0.90', 'AS');
+  const oceania = inBook('198.18.0.91', 'OC');
+  const peers = setPeers([coreOut()]);
+  // Without a pick, either missing region; with Oceania picked, Oceania.
+  assert.deepEqual(setPickedRegions(['OC', 'nowhere']), ['OC'], 'only regions are kept');
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, oceania);
+  assert.equal(fill.currentTrial().note, 'Oceania picked by you');
+  assert.deepEqual(fill.lastPicks(), { regions: ['OC'], empty: false });
+  await fill.abandon(fill.currentTrial().address);
+
+  // Picked South America, which has no candidate: the usual pick, said so.
+  setPickedRegions(['SA']);
+  fill.markTried(oceania, false, Date.now(), { reason: 'no_connection', startedAt: Date.now() });
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, asia);
+  assert.equal(fill.currentTrial().note, 'Asia had none');
+  assert.deepEqual(fill.lastPicks(), { regions: ['SA'], empty: true });
+  setPickedRegions([]);
+});
+
+// The same day: Europe had one outbound and 163 inbound, Oceania two outbound
+// and 12 inbound, and the slot went to Europe. A region twenty or more peers
+// came to on their own counts one more - only one.
+test('slot fill: a region with twenty inbound peers counts one more, and no more than one', () => {
+  const spread = require('../src/lib/peer-rotation/spread');
+  const counts = spread.totalCounts([], { EU: 1, OC: 2 }, { EU: 163, OC: 12, NA: 19 });
+  assert.deepEqual(counts, { EU: 2, OC: 2 });
+  // EU and OC both at 2 now: the one fewer peers came to on their own goes first.
+  const eu = at('198.18.1.1:8333', 'EU');
+  const oc = at('198.18.1.2:8333', 'OC');
+  const ranked = spread.rankForGap([{ address: eu }, { address: oc }], [], { EU: 1, OC: 2 }, { EU: 163, OC: 12 });
+  assert.equal(ranked[0].address, oc);
+});
+
+// Review 15.11.2026: Europe and Africa picked, Africa only in "new" - Africa,
+// the gap, goes first; Europe's "tried" addresses do not shut it out.
+test('slot fill: among picked regions the spread holds, a "new"-only one included', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  inBook('198.18.2.1', 'EU');
+  inBook('198.18.2.2', 'EU');
+  const africa = inNew('198.18.2.9', 'AF');
+  setPickedRegions(['EU', 'AF']);
+  await step(setPeers([coreOut()]), Date.now());
+  assert.equal(fill.currentTrial().address, africa);
+  assert.equal(fill.currentTrial().note, 'Africa picked by you');
+  setPickedRegions([]);
+});
+
+// 15.11.2026: in a picked region, an operator Core's own outbound peers use
+// may come in once nobody else there can; one a manual peer has, never.
+test('slot fill: a picked region lets in an operator Core uses, only when nobody else there fits, never one a manual peer has', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU', 'Hetzner');
+  at(seedLivePeer({ eligible: 144 }), 'NA', 'Amazon');
+  const amazon = inBook('198.18.3.1', 'AF', { operator: 'Amazon', country: 'ZA' });
+  inBook('198.18.3.2', 'AF', { operator: 'Hetzner', country: 'ZA' });
+  const asia = inBook('198.18.3.3', 'AS', { operator: 'Sakura' });
+  const peers = setPeers([coreOut()]);
+  setPickedRegions(['AF']);
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, amazon, 'Amazon, which Core uses; never Hetzner, a manual peer\'s');
+  await fill.abandon(fill.currentTrial().address);
+  // Without a pick the rule holds whole: no Amazon in Africa, someone else.
+  setPickedRegions([]);
+  fill.markTried(amazon, false, Date.now() - 2 * 86400000, { reason: 'no_connection', startedAt: Date.now() - 2 * 86400000 });
+  await step(peers, Date.now());
+  assert.equal(fill.currentTrial().address, asia);
+});
+
+test('slot fill: an address not reached is tried again after a day, a wrong one after a week', () => {
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  fill.markTried('203.0.113.50:8333', false, now - 2 * day, { reason: 'no_connection', startedAt: now - 2 * day });
+  fill.markTried('203.0.113.51:8333', false, now - 2 * day, { reason: 'disguised', startedAt: now - 2 * day });
+  fill.markTried('203.0.113.52:8333', false, now - 3600000, { reason: 'no_connection', startedAt: now - 3600000 });
+  const { recentlyFailedForTest } = fill;
+  const failed = recentlyFailedForTest(now);
+  assert.equal(failed.has('203.0.113.50:8333'), false, 'not reached two days ago: tried again');
+  assert.equal(failed.has('203.0.113.51:8333'), true, 'not the Core it names: a week');
+  assert.equal(failed.has('203.0.113.52:8333'), true, 'not reached an hour ago: not yet');
+  db.instance.prepare('DELETE FROM slot_fill_tried').run();
+});

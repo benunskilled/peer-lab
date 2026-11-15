@@ -209,7 +209,10 @@ async function adoptExternalManualPeers() {
 const SHARED_PROXY_NETWORKS = new Set(['onion', 'i2p', 'cjdns']);
 
 // Every non-manual connection Core currently holds to the same host, with the
-// proxy networks left alone.
+// proxy networks' INBOUND sessions left alone: those all carry the proxy's
+// address. An outbound Tor or I2P session carries the peer's own name, and is
+// dropped like any other so the manual one can take its place (15.11.2026:
+// left up, Core saw the host as connected and never dialled the addnode).
 //
 // By host, not by address, and that is the whole fix. An inbound peer is added
 // under the LISTENING address the port probe found (ip:8333), while its live
@@ -222,7 +225,7 @@ function liveNonManualSessionsForHost(peers, address) {
   const host = hostFromAddress(address);
   return peers.filter(
     (p) => p.connection_type !== 'manual'
-      && !SHARED_PROXY_NETWORKS.has(String(p.network || '').toLowerCase())
+      && !((p.inbound || p.connection_type === 'inbound') && SHARED_PROXY_NETWORKS.has(String(p.network || '').toLowerCase()))
       && hostFromAddress(p.addr) === host,
   );
 }

@@ -78,7 +78,7 @@ async function retireOfflineManualPeers(ranking, onTrial = null, peers = [], sti
     if (!stillOn()) break;
 
     await peerSync.removeTrustedPeer(peer.address);
-    // Held against for a week, like a candidate Core could not reach: the
+    // Held against for a week, like a candidate that answered wrong: the
     // gap this leaves is in its own region, so the fill that follows in the
     // same pass would otherwise pick it straight back.
     markTried(peer.address, false, now, { reason: 'offline' });

@@ -81,6 +81,12 @@ module.exports = {
   // turns up.
   manualPerRegion: Number(pick(process.env.MANUAL_PER_REGION, '1')),
 
+  // A region this many peers came to on their own (inbound) counts one more
+  // in the spread - see peer-rotation/spread.js totalCounts. One, however many:
+  // inbound peers are chosen by others, and a stranger opening connections
+  // from one region must not be able to steer the node's own away from it.
+  inboundBonusAt: Number(pick(process.env.INBOUND_BONUS_AT, '20')),
+
   // How long a manual peer may stay offline before the slot fill gives its
   // slot to someone else (peer-rotation/rules.js, offlineGraceMs): an hour for
   // a peer that has never delivered a block first, a day for one that has.

@@ -1492,3 +1492,26 @@ details.card.panel summary { gap: 8px; }
 details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6px; }
 .card.panel h2.fold-title::before { margin: 0 2px 0 1px; width: 6px; height: 6px; }
 
+
+/* Slot Fill: the candidates tried since a slot came free, under the top row
+   of the log (15.11.2026). Time, place, how it ended - one line each, the
+   place cut before the reason is. */
+.slot-tries { margin-top: 6px; }
+.slot-tries summary { cursor: pointer; color: var(--muted); width: fit-content; }
+.slot-tries summary:hover { color: var(--text); }
+.slot-tries ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.slot-tries li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) auto; gap: 0 10px; align-items: baseline; color: var(--muted); }
+.slot-tries .st-when { font-variant-numeric: tabular-nums; }
+.slot-tries .st-where { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) { .slot-tries ul { gap: 8px; } .slot-tries li { grid-template-columns: 3.4em minmax(0, 1fr); } .slot-tries .st-what { grid-column: 2; } }
+
+/* Slot Fill: the regions as switches (15.11.2026). Off, an outline; picked,
+   filled orange like the page's other buttons. Under .panel, whose buttons
+   are orange by default (the rule above). */
+.region-picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.panel .region-pick { font-size: 13px; font-weight: 500; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.panel .region-pick b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.panel .region-pick:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.panel .region-pick.on { background: var(--accent); border-color: var(--accent); color: #1a1200; }
+.panel .region-pick.on b { color: #1a1200; }
+.panel .region-pick:disabled { opacity: .45; cursor: default; }
