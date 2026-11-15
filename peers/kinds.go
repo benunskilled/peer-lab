@@ -162,8 +162,8 @@ var kindRules = []struct {
 	// package names). Both versions send their own name with version 0.3.
 	// Bitflash's wallet speaks Bitcoin P2P itself and loads only headers and
 	// compact filter hashes from peers that offer NODE_COMPACT_FILTERS
-	// (docs.bitflash.network/atomic-swaps); that "/Bitflash:btc-light/" is
-	// its name was not found in a source (11.11.2026).
+	// (docs.bitflash.network/atomic-swaps), as "/Bitflash:btc-light/"
+	// (src/btclight.cpp in bitflash-network/bitflash).
 	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - the dashboard has no rule for it either.

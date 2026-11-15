@@ -66,6 +66,11 @@ var aboutRules = []aboutRule{
 	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
 	// the version message; three took 7 to 16 MB of blocks each. Not found
 	// anywhere, so the text says only what it names itself.
+	// The form btc-rpc-proxy sends when it fetches a block the node lacks
+	// from a peer: "BTC RPC Proxy v<version>" (src/fetch_blocks.rs L49 in
+	// Kixunil/btc-rpc-proxy, Martin Habovštiak; 15.11.2026). Another form
+	// only names itself.
+	{regexp.MustCompile(`^BTC RPC Proxy v[0-9]`), "BTC RPC Proxy, which guards Bitcoin Core's RPC and fetches blocks the node lacks from peers", "BTC RPC Proxy", ""},
 	{regexp.MustCompile(`^BTC RPC Proxy `), "Names itself an RPC proxy for Bitcoin; no public source", "Names an RPC proxy", ""},
 	// Bisq's userAgent option defaults to "Bisq" (common/.../config/Config.java
 	// in bisq-network/bisq), handed to bitcoinj in WalletsSetup.java.
@@ -269,7 +274,9 @@ var aboutRules = []aboutRule{
 	// "/Rust BIP-157:<version>/rust-bitcoin:<version>/" (src/network/outbound.rs
 	// in 2140-dev/kyoto).
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK", "Kyoto light client (BDK)", ""},
-	{regexp.MustCompile(`^/Bitflash:btc-light/`), "Named like Bitflash's wallet, which follows the chain by headers and compact filters (docs.bitflash.network)", "Named like Bitflash", ""},
+	// n.agent = "/Bitflash:btc-light/" (src/btclight.cpp L424 in
+	// bitflash-network/bitflash, 15.11.2026).
+	{regexp.MustCompile(`^/Bitflash:btc-light/`), "Bitflash's wallet, which follows the chain by headers and compact filters (docs.bitflash.network)", "Bitflash wallet", ""},
 	// "/Floresta:<version>/" (bin/florestad/build.rs in getfloresta/Floresta).
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node", "Floresta Utreexo node", ""},
 	// format!("/electrs:{}/", ELECTRS_VERSION) (src/p2p.rs in romanz/electrs,
@@ -302,9 +309,12 @@ var aboutRules = []aboutRule{
 	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
 	// hands over one of its own transactions and leaves, introducing itself
 	// with this fixed name and no services so nobody can tell which node sent
-	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
-	// node this was written for came from a Tor exit, v2, offering nothing.
-	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving", "Probably Core's broadcast", ""},
+	// it (net_processing.cpp, IsPrivateBroadcastConn; PR #29415). The name is
+	// that of pynode, Jeff Garzik's Python node from 2013, which sends it too
+	// (MY_SUBVERSION in node.py, jgarzik/pynode): two sources, one string.
+	// The one seen on the node this was written for came from a Tor exit, v2,
+	// offering nothing.
+	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Bitcoin Core handing over a transaction privately, then leaving - or pynode, Jeff Garzik's Python node from 2013, whose name Core borrows for this", "Core broadcast or pynode", ""},
 	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
 	// rune 1:0 in chains of transactions; on the node this was written for it
 	// pushed unannounced 66-byte transactions, the size of such a sweep. The
@@ -360,6 +370,8 @@ var aboutRules = []aboutRule{
 	// 21. to 25.10.2026, the bare name asked for addresses and headers and
 	// wanted no transactions.
 	{regexp.MustCompile(`^/btcwire:[^/]*/$`), "A program on btcd's Go library that set no name of its own", "btcd library, no own name", ""},
+	// btcd's example and wire default together (15.11.2026): exactly this.
+	{regexp.MustCompile(`^/btcwire:0\.5\.0/peer:1\.0\.0/$`), "A program built from the example code in btcd's Go library, keeping its name", "btcd sample code", ""},
 	{regexp.MustCompile(`^/btcwire:[^/]*/peer:1\.0\.0/$`), "Probably a program built from the example code in btcd's Go library, keeping its name", "Probably btcd sample code", ""},
 	// RESET (Trac-Systems/reset) is a coin clocked by Bitcoin's blocks; a
 	// share of its reward goes to whoever brings in a new block first. Its
@@ -507,8 +519,10 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)Bitcoin SV`), "Bitcoin SV, the node of BSV, which split from Bitcoin Cash in 2018", "Bitcoin SV (BSV)", ""},
 	{regexp.MustCompile(`(?i)Bitcoin XT`), "Bitcoin XT, a fork of Core for bigger blocks that went on to Bitcoin Cash", "Bitcoin XT", ""},
 	{regexp.MustCompile(`(?i)SuperBitcoin`), "Super Bitcoin, a fork of Bitcoin from December 2017 with a chain of its own", "Super Bitcoin fork", ""},
-	// USER_AGENT "/iriumd:1.9.66/" (src/p2p_wire.rs in iriumlabs/irium).
-	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own", "Irium altcoin", ""},
+	// USER_AGENT "/iriumd:1.9.66/" (src/p2p_wire.rs in iriumlabs/irium), the
+	// one wire code it uses for Bitcoin's network too: version, getheaders,
+	// headers (15.11.2026).
+	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own; its node also reads Bitcoin's block headers", "Irium altcoin", ""},
 	// v-dimension/vds-core sends "/MagicBean:x/" (CLIENT_NAME in
 	// src/clientversion.cpp), so "VDS <version>" is only the name.
 	{regexp.MustCompile(`(?i)vds[_ ]`), "Names VDS, an altcoin with a chain of its own", "Names VDS", ""},
