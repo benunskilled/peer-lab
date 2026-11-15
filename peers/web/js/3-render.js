@@ -400,6 +400,7 @@
     renderBlockCard();
     renderMarkers();
     renderUnplaced();
+    mapFollowsPeers(d.peers.some((p) => p.cc));
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     if (!dashboard().folding()) holdAnchor(anchor);
