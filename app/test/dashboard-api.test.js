@@ -785,3 +785,33 @@ test('GET /api/storage answers from a cache for a minute, and a reset clears it'
   await api('/api/storage');
   assert.equal(scans, 4, 'and after the clock stepped back, instead of waiting for it to catch up');
 });
+
+// 15.11.2026: a body over 1 MB cut the connection with no answer at all.
+test('a request body over 1 MB gets a 413 answer, not a dropped connection', async () => {
+  const http = require('http');
+  const { port } = new URL(baseUrl);
+  const status = await new Promise((resolve, reject) => {
+    let answered = false;
+    const req = http.request({ host: '127.0.0.1', port, path: '/api/peers/probe', method: 'POST', headers: { 'Content-Type': 'application/json' } }, (res) => {
+      answered = true;
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => resolve({ code: res.statusCode, body }));
+      res.on('error', () => resolve({ code: res.statusCode, body }));
+    });
+    // Once the server has answered and closed, the rest of the upload fails: expected.
+    req.on('error', (err) => setTimeout(() => { if (!answered) reject(err); }, 1000));
+    const chunk = Buffer.alloc(64 * 1024, 'a');
+    let sent = 0;
+    const pump = () => {
+      while (sent < 2 * 1024 * 1024 && !answered) {
+        sent += chunk.length;
+        if (!req.write(chunk)) return req.once('drain', pump);
+      }
+      req.end();
+    };
+    pump();
+  });
+  assert.equal(status.code, 413);
+  assert.match(status.body, /too large/);
+});

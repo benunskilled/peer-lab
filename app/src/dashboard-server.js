@@ -165,11 +165,24 @@ function readBody(req) {
     // multi-byte character, which decoding each chunk on its own would break.
     const chunks = [];
     let size = 0;
+    let tooLarge = false;
     req.on('data', (chunk) => {
       size += chunk.length;
+      // The rest is read and dropped, so the answer arrives intact - a
+      // socket closed with unread data resets, and the reset can take the
+      // answer with it. Past 16 MB it is closed regardless.
+      if (tooLarge) {
+        if (size > 16_000_000) req.destroy();
+        return;
+      }
       if (size > 1_000_000) {
+        // Not cut off here: cutting it left the caller with a dropped
+        // connection and no word why (15.11.2026). The answer (413, below)
+        // goes out, the rest is read and dropped, and the connection stays
+        // usable.
+        tooLarge = true;
+        chunks.length = 0;
         reject(new Error('body too large'));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -1062,7 +1075,10 @@ const server = http.createServer(async (req, res) => {
     // place entirely.
     if (/invalid JSON body|body too large/i.test(err.message || '')) {
       logger.debug('rejected a malformed request body', { path: pathname, error: err.message });
-      if (!res.headersSent) sendJson(res, 400, { error: err.message });
+      // The rest of an oversize body is read and dropped (readBody), so the
+      // answer reaches the caller instead of a reset connection.
+      const tooLarge = /body too large/i.test(err.message);
+      if (!res.headersSent) sendJson(res, tooLarge ? 413 : 400, { error: tooLarge ? 'request body too large (1 MB at most)' : err.message });
       return;
     }
     logger.error('request handler error', { path: pathname, error: err.message });
