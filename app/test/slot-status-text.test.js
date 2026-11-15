@@ -54,3 +54,10 @@ test('a peer before on an unknown reason or place still reads as a sentence', ()
     lastTry: { at, reason: 'something_new', country: null, region: null } };
   assert.match(text(st, at).rest, /The peer before was not kept\.$/);
 });
+
+test('the status text is plain text: a place with & or an apostrophe is not escaped in it', () => {
+  const text = slotStatusText();
+  const at = 1_000_000_000_000;
+  const st = { at, state: 'full', slots: { used: 8, max: 8, offline: [{ where: "Côte d'Ivoire & Co", freesInMs: 30 * 60 * 1000 }] } };
+  assert.match(text(st, at).rest, /Côte d'Ivoire & Co/);
+});

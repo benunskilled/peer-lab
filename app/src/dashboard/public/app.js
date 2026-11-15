@@ -331,15 +331,15 @@ const LIST_COUNTS_MAX_AGE_MS = 45000;
 // Full relay and block relay are told apart in the Outbound table below.
 // The Manual tile counts connected peers, but a locked peer that is offline
 // still holds its slot: with one, the tile says how many slots are used, so
-// it never reads "7 of 8" above a list that has no slot free.
-// `trials: false` for the tile: a candidate Slot Fill is testing comes and
-// goes every few seconds, and the tile jumped with each (15.11.2026). It
-// counts once added; the log says what is being tested.
-function manualSlotsUsed({ trials = true } = {}) {
-  return (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address) && (trials || p.status !== 'TESTING')).length;
+// it never reads "7 of 8" above a list that has no slot free. A candidate
+// Slot Fill is testing holds a slot too, so it counts there - but not in the
+// big number (peer list, 3-render.js): it comes and goes every few seconds,
+// and the number jumped with each (15.11.2026).
+function manualSlotsUsed() {
+  return (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address)).length;
 }
 function drawTiles({ inbound, outbound, manual }) {
-  const used = manualSlotsUsed({ trials: false });
+  const used = manualSlotsUsed();
   const stats = [
     ['Total', inbound + outbound + manual, ''],
     ['Inbound', inbound, 'inbound'],
@@ -1092,7 +1092,7 @@ function slotStatusText(st, now, trial = st && st.trial) {
       const doing = { connecting: 'Core is connecting to it.', headers: 'Connected, waiting for its first block.', checking: 'Connected, checking it.' }[t.phase] || 'Core is testing it.';
       return {
         state: 'trial',
-        head: `Testing a new peer${where ? ` in ${escapeHtml(where)}` : ''}.`,
+        head: `Testing a new peer${where ? ` in ${where}` : ''}.`,
         // Why the peer before went: under the oldest candidate only.
         rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${!st.trial || t.address === st.trial.address ? lastTryText(st) : ''}`,
         short: 'on · testing a peer',
@@ -1102,7 +1102,7 @@ function slotStatusText(st, now, trial = st && st.trial) {
       const off = slots.offline || [];
       // freesInMs is from the pass that wrote the status, up to ten minutes ago.
       const since = st.at ? Math.max(0, now - st.at) : 0;
-      const peerIn = (o) => (o.where ? `Your peer in ${escapeHtml(o.where)}` : 'One peer');
+      const peerIn = (o) => (o.where ? `Your peer in ${o.where}` : 'One peer');
       const rest = off.length
         ? off.map((o) => (o.keeps ? `${peerIn(o)} is offline, but locked, so it keeps its slot.`
           : o.freesInMs == null ? `${peerIn(o)} is offline.`
@@ -1209,7 +1209,8 @@ function rotationEntryRow(entry, extra = '') {
 // news - "Added", "Removed" - is written under it, and the row moves on to
 // the next state. A candidate on trial is a row like the others, with its
 // place and provider; any other state is its sentence, "All 8 slots in use."
-// head and rest are HTML already (slotStatusText escapes what it puts in).
+// head and rest are plain text, escaped where they go into the page (here,
+// rotationEntryRow).
 let shownNow = ''; // the top row as last drawn, '' for none
 // Under the top row while a slot is free: every candidate tried since it came
 // free, and what freed it (15.11.2026). Folded to one line; open stays open
