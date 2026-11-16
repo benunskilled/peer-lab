@@ -32,14 +32,3 @@ test('with every region held once, a region Core reaches anyway goes before the 
   assert.equal(spread.leastMissed(peer('as', 'AS', 0), [], trusted, ranking, weakestTrustedPeer), null);
 });
 
-// An inbound Tor peer reaches Core through the local Tor proxy and carries its
-// plain address; Core's own word on the network says it is Tor.
-test('inbound peers are counted by region, Tor by what Core says, not by the proxy address', () => {
-  const rows = [
-    { address: '10.21.21.11:40000', live: true, direction: 'inbound', privateNetwork: 'Tor', place: { region: '', key: '', operator: '', country: '' } },
-    { address: '198.18.0.1:8333', live: true, direction: 'inbound', place: { region: 'EU', key: 'a', operator: '', country: 'DE' } },
-    { address: '198.18.0.2:8333', live: false, direction: 'inbound', place: { region: 'EU', key: 'b', operator: '', country: 'DE' } },
-    { address: '198.18.0.3:8333', live: true, direction: 'outbound', place: { region: 'AS', key: 'c', operator: '', country: 'JP' } },
-  ];
-  assert.deepEqual(spread.inboundRegionsOf(rows), { TOR: 1, EU: 1 });
-});

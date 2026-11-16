@@ -597,31 +597,14 @@ test('slot fill: Core\'s own outbound peers count too - a region they crowd wait
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'AS');
   for (let i = 0; i < 3; i++) at(seedLivePeer({ eligible: 144 }), 'EU');
   inBook('198.18.0.50', 'EU');
-  const asia = inBook('198.18.0.51', 'AS');
+  // Another country than the manual peer's in Asia: both are new countries.
+  const asia = inBook('198.18.0.51', 'AS', { country: 'SG' });
 
   await step(setPeers([coreOut()]), Date.now());
 
   assert.equal(fill.currentTrial().address, asia, 'Asia has one connection, Europe three of Core\'s own');
 });
 
-// 14.11.2026: Europe, Asia and Africa had one outbound connection each, and
-// the slot went to Europe, where hundreds of peers had come in on their own.
-test('slot fill: between regions with as few outbound connections, the one with fewer inbound peers goes first', async () => {
-  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'AS');
-  at(seedLivePeer({ eligible: 144 }), 'EU');
-  for (let i = 0; i < 5; i++) at(seedLivePeer({ direction: 'inbound', connectionType: 'inbound' }), 'AS');
-  const europe = inBook('198.18.0.50', 'EU');
-  // A country the manual peers do not have yet, like Europe's: only the
-  // inbound peers can tell the two apart.
-  inBook('198.18.0.51', 'AS', { country: 'SG' });
-  // Several orders of the address book: the shuffle must not decide it.
-  for (let round = 0; round < 5; round++) {
-    await step(setPeers([coreOut()]), Date.now());
-    assert.equal(fill.currentTrial().address, europe, 'one outbound each; Asia has five inbound, Europe none');
-    await fill.abandon(europe);
-    db.instance.exec(`DELETE FROM meta WHERE key = 'slot_fill_trial'; DELETE FROM trusted_peer WHERE address = '${europe}';`);
-  }
-});
 
 test('slot fill: with clearnet, no second I2P connection - Core\'s own counts - and the note says how few', async () => {
   at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
@@ -1775,18 +1758,18 @@ test('slot fill: a picked region takes the free slot, and with none left the usu
   setPickedRegions([]);
 });
 
-// The same day: Europe had one outbound and 163 inbound, Oceania two outbound
-// and 12 inbound, and the slot went to Europe. A region twenty or more peers
-// came to on their own counts one more - only one.
-test('slot fill: a region with twenty inbound peers counts one more, and no more than one', () => {
+// 16.11.2026: three in Australia and two in Brazil. Wide instead: a country
+// no manual peer is in comes first, a second from one only when none is left.
+test('slot fill: a new country before the emptiest region, a repeat only when nothing else is left', () => {
   const spread = require('../src/lib/peer-rotation/spread');
-  const counts = spread.totalCounts([], { EU: 1, OC: 2 }, { EU: 163, OC: 12, NA: 19 });
-  assert.deepEqual(counts, { EU: 2, OC: 2 });
-  // EU and OC both at 2 now: the one fewer peers came to on their own goes first.
-  const eu = at('198.18.1.1:8333', 'EU');
-  const oc = at('198.18.1.2:8333', 'OC');
-  const ranked = spread.rankForGap([{ address: eu }, { address: oc }], [], { EU: 1, OC: 2 }, { EU: 163, OC: 12 });
-  assert.equal(ranked[0].address, oc);
+  const held = [{ address: at('198.18.1.10:8333', 'OC', 'X1', 'AU'), trusted: true }];
+  const au = at('198.18.1.11:8333', 'OC', 'X2', 'AU');
+  const jp = at('198.18.1.12:8333', 'AS', 'X3', 'JP');
+  // Oceania has one, Asia two (Core's own): Asia's Japan still goes before a second Australian.
+  const ranked = spread.rankForGap([{ address: au }, { address: jp }], held, { AS: 2 });
+  assert.deepEqual(ranked.map((c) => c.address), [jp, au]);
+  assert.deepEqual(spread.rankForGap([{ address: au }], held, {}).map((c) => c.address), [au], 'alone, it still goes in');
+  assert.deepEqual(spread.totalCounts([], { EU: 1 }), { EU: 1 }, 'inbound peers count for nothing');
 });
 
 // Review 15.11.2026: Europe and Africa picked, Africa only in "new" - Africa,

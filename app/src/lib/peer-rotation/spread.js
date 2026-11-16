@@ -32,7 +32,6 @@ const network = require('../network');
 const { unreachableNetwork } = require('../address');
 
 const TARGET_PER_REGION = config.manualPerRegion;
-const INBOUND_BONUS_AT = config.inboundBonusAt;
 
 // Tor and I2P count as regions of their own: a path that runs through
 // neither your provider nor any continent's routing is the most different
@@ -79,38 +78,30 @@ function countriesByRegion(peers) {
 }
 
 // Outbound connections per region, Core's own and the manual ones together.
-// Outbound connections per region, Core's and the manual ones together, and
-// one more for a region at least INBOUND_BONUS_AT peers came to on their own
-// (15.11.2026: Europe had one outbound and 163 inbound, Oceania two outbound
-// and 12 inbound, and the slot went to Europe). Never more than one: inbound
-// peers are others' choice (config.inboundBonusAt). It also decides which
-// region is missing: one with no outbound but twenty inbound is reached, and
-// waits behind one with neither. Not for eviction (leastMissed), which keeps
-// the outbound paths the node really holds.
-function totalCounts(trusted, coreRegions, inboundRegions = {}) {
+// Inbound peers no longer count (16.11.2026: the bonus for a region twenty
+// came to on their own made the spread harder to follow, and it went).
+function totalCounts(trusted, coreRegions) {
   const counts = { ...coreRegions };
   for (const [r, n] of Object.entries(regionCounts(trusted))) counts[r] = (counts[r] || 0) + n;
-  for (const [r, n] of Object.entries(inboundRegions)) if (n >= INBOUND_BONUS_AT) counts[r] = (counts[r] || 0) + 1;
   return counts;
 }
 
 /**
- * How good a newcomer would be for the spread, lower is better: a region with
- * fewer outbound connections first, Core's and the manual ones counted
- * together; between regions with as few, the one fewer peers came to on their
- * own (inboundRegions: 14.11.2026, Europe, Asia and Africa had one outbound
- * each, and the slot went to Europe, where hundreds of inbound peers were);
- * then a country the manual peers do not have yet. Within that, the order
- * they came in (fill.js shuffles the address book) - the sort is stable. A
- * node without an open port has no inbound peers, and for it nothing changes.
+ * How good a newcomer would be for the spread, lower is better (16.11.2026:
+ * wide, a net around the world rather than three in Australia and two in
+ * Brazil). First a country no manual peer is in yet - a second one from the
+ * same country only when no other is left; then the region with the fewest
+ * outbound connections, Core's and the manual ones together; then a country
+ * Core's own outbound peers are not in either. Within that, the order they
+ * came in (fill.js shuffles the address book) - the sort is stable.
  */
-function rankForGap(candidates, trusted, coreRegions, inboundRegions = {}) {
-  const counts = totalCounts(trusted, coreRegions, inboundRegions);
+function rankForGap(candidates, trusted, coreRegions, coreCountries = new Set()) {
+  const counts = totalCounts(trusted, coreRegions);
   const held = countriesByRegion(trusted);
   const keyOf = (c) => {
     const { region, country } = placeOf(c);
-    const knownCountry = region && country && held[region] && held[region].has(country) ? 1 : 0;
-    return [region ? counts[region] || 0 : Infinity, region ? inboundRegions[region] || 0 : Infinity, knownCountry];
+    const manualHas = region && country && held[region] && held[region].has(country) ? 1 : 0;
+    return [manualHas, region ? counts[region] || 0 : Infinity, country && coreCountries.has(country) ? 1 : 0];
   };
   return candidates
     .map((c, i) => ({ c, k: keyOf(c), i }))
@@ -143,17 +134,9 @@ function coreRegionsOf(ranking) {
   return regionCounts(coreOutbound(ranking));
 }
 
-// How many peers that came to this node on their own sit in each region.
-// An inbound Tor peer comes through the local Tor proxy and carries its plain
-// address: Core's word on the network (privateNetwork) places it.
-function inboundRegionsOf(ranking) {
-  const counts = {};
-  for (const p of ranking) {
-    if (!p.live || p.direction !== 'inbound') continue;
-    const r = PRIVATE_REGIONS[p.privateNetwork] || placeOf(p).region;
-    if (r) counts[r] = (counts[r] || 0) + 1;
-  }
-  return counts;
+// The countries Core's own outbound peers are in.
+function coreCountriesOf(ranking) {
+  return new Set(coreOutbound(ranking).map((p) => placeOf(p).country).filter(Boolean));
 }
 
 // The operators Core's own outbound peers are with.
@@ -190,6 +173,6 @@ function leastMissed(newcomer, evictable, trusted, ranking, weakest) {
 }
 
 module.exports = {
-  TARGET_PER_REGION, INBOUND_BONUS_AT, REGION_NAMES, placeOf, regionCounts, totalCounts, rankForGap, admit, describe, coreRegionsOf,
-  coreOperatorsOf, inboundRegionsOf, leastMissed,
+  TARGET_PER_REGION, REGION_NAMES, placeOf, regionCounts, totalCounts, rankForGap, admit, describe, coreRegionsOf,
+  coreOperatorsOf, coreCountriesOf, leastMissed,
 };

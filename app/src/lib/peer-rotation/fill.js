@@ -500,7 +500,7 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // Counted over all outbound connections, Core's own too (spread.js).
   const coreRegions = spread.coreRegionsOf(ranking);
   const coreKeys = spread.coreOperatorsOf(ranking);
-  const inbound = spread.inboundRegionsOf(ranking);
+  const coreCountries = spread.coreCountriesOf(ranking);
   const picked = new Set(pickedRegions());
   const inPicked = (c) => picked.has(spread.placeOf(c).region);
   // Where clearnet works, one Tor and one I2P connection are enough, Core's
@@ -512,15 +512,11 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // The order for the next pick, over the manual set as it stands with the
   // candidates already put on trial in this call.
   const order = () => {
-    // With the one more for a region many peers came to on their own: that
-    // decides which region is missing and which goes first. The note in the
-    // log says the outbound count alone, what the reader can count in the
-    // tables.
-    const counts = spread.totalCounts(trusted, coreRegions, inbound);
     const outbound = spread.totalCounts(trusted, coreRegions);
+    const counts = outbound;
     const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
     const inGap = (c) => gaps.has(spread.placeOf(c).region);
-    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, inbound);
+    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, coreCountries);
     // A picked Tor or I2P is the reader's word against that rule.
     const capped = (c) => {
       const { region } = spread.placeOf(c);
