@@ -612,7 +612,7 @@ test('a race from before a reset is not written into the emptied history', async
   db.instance.prepare("DELETE FROM meta WHERE key = 'stratum_reset_at'").run();
 });
 
-// Review G4, Ben: Miss is "connected and silent". A pool with no connection
+// Review G4: Miss is "connected and silent". A pool with no connection
 // during the race, or one that came up only mid-race, is not charged.
 test('a pool with no connection during the race is not charged a miss', async () => {
   const at = Date.now();

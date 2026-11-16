@@ -162,7 +162,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.closest && e.target.closest("input, textarea, select")) return;
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Enter") return;
-    const rows = [...document.querySelectorAll("#tables tr[data-anchor]")].filter((r) => r.offsetParent);
+    const rows = [...document.querySelectorAll("#tables tr[data-anchor]:not(.leaving)")].filter((r) => r.offsetParent);
     const at = rows.indexOf(document.activeElement);
     if (e.key === "Enter") {
       if (at >= 0) { rows[at].click(); e.preventDefault(); }
@@ -422,6 +422,7 @@
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     if (!dashboard().folding()) holdAnchor(anchor);
+    placeLeaving(y);
     restoreReloadY();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();

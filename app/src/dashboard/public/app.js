@@ -227,8 +227,7 @@ function fitTables() {
   // What the reader is looking at: the first heading or row at the top of the
   // window. When the layout changes, that stays where it was - restoring the
   // old scroll position instead threw the reader a screen or more down the
-  // moment the tables above turned into taller cards. (The panels opt out of
-  // the browser's own scroll anchoring, see .card in style.css.)
+  // moment the tables above turned into taller cards.
   const anchor = window.scrollY > 0
     ? [...document.querySelectorAll('h2, h3, .table-wrap tbody tr')].find((e) => {
       // A hidden element has a rect of zeros.
@@ -704,7 +703,11 @@ window.peerLab = {
   onTrial: (address) => (rankingByAddress.get(address) || {}).status === 'TESTING',
   // Manual peers that are not connected: they still hold their slot, and the
   // list shows them so they can be unlocked or removed.
-  offlineManual: () => (lastPeerRanking || []).filter((p) => p.trusted && !p.live && !justGone.has(p.address)),
+  // `present`: the addresses in the peer list now. A manual peer gone from it
+  // counts as offline at once, not when the ranking (20 s apart) says so:
+  // the row stood, went, and came back as offline 20 s later (16.11.2026).
+  offlineManual: (present) => (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address)
+    && (!p.live || (present && !present.has(p.address)))),
   // "0 of 8 slots free · all kept", for the head of the manual list.
   manualSummary: () => {
     const manual = (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address));
@@ -726,6 +729,17 @@ window.peerLab = {
   acting: () => actionsInFlight > 0,
   // Disconnected or removed here a moment ago: not in the list any more.
   gone: (address) => justGone.has(address),
+  // Its row stays a moment with this word ("Removed"), or null.
+  leaving: (address) => (leaving.get(address) || {}).text || null,
+  // Its 5 s are over: drawn again in this last moment, it is already gliding.
+  leavingOut: (address) => { const l = leaving.get(address); return Boolean(l && Date.now() - l.at >= LEAVE_MS); },
+  // The place for the slim row, once: `take` says it has been used.
+  leavingPlace: (take) => {
+    if (leavingPlace && Date.now() - leavingPlace.at > LEAVE_MS) leavingPlace = null;
+    const p = leavingPlace;
+    if (take) leavingPlace = null;
+    return p;
+  },
   // The peer list's part of Esc: closes something and says true, or false.
   onEscape: (step) => { escapeSteps.push(step); },
   actionsHtml: (address) => {
@@ -929,6 +943,31 @@ const GONE_MS = 40000;
 // two seconds after its interval, which /api/status sends (15 s by default).
 let GONE_RECHECK_MS = 17000;
 const justGone = new Map(); // address -> time it was removed or disconnected
+// The row of a peer removed or disconnected here stays a moment, closed and
+// slim, saying so, then glides out (16.11.2026: the row and its open panel
+// went at once, and on a phone everything below jumped a screen up under the
+// finger). The list keeps the row; this says how long and what it says.
+const LEAVE_MS = 5000;
+const GLIDE_MS = 400;
+const leaving = new Map(); // address -> { at, text }
+// Where on screen the button was tapped: the slim row comes to stand there,
+// so the panel closing does not pull what was below up under the finger.
+let leavingPlace = null; // { address, top, at }
+function markLeaving(address, text, top) {
+  const at = Date.now();
+  leaving.set(address, { at, text });
+  leavingPlace = typeof top === 'number' ? { address, top, at, y: window.scrollY } : null;
+  window.dispatchEvent(new Event('peerlab:ranking'));
+  setTimeout(() => {
+    for (const tr of document.querySelectorAll('#tables tr.leaving')) {
+      if (tr.dataset.anchor && tr.dataset.anchor.endsWith(' ' + address)) tr.classList.add('out');
+    }
+  }, LEAVE_MS);
+  setTimeout(() => {
+    if (leaving.get(address) && leaving.get(address).at === at) leaving.delete(address);
+    window.dispatchEvent(new Event('peerlab:ranking'));
+  }, LEAVE_MS + GLIDE_MS);
+}
 const recheckGone = () => setTimeout(() => refreshPeers().catch(() => {}), GONE_RECHECK_MS);
 
 // A counter, not a flag. A boolean only covered the time the POST was in
@@ -1138,8 +1177,10 @@ function renderSlotStatus() {
     const rows = (html) => (html.match(/<tr[\s>]/g) || []).length;
     const n = rows(row);
     if (row && shownNow && n === rows(shownNow) && tbody && tbody.children.length >= n) {
-      for (let i = 0; i < n; i++) tbody.firstElementChild.remove();
-      tbody.insertAdjacentHTML('afterbegin', row.trim());
+      holdPlace(() => {
+        for (let i = 0; i < n; i++) tbody.firstElementChild.remove();
+        tbody.insertAdjacentHTML('afterbegin', row.trim());
+      });
       shownNow = row;
     } else {
       renderRotationLog(lastRotationLog);
@@ -1275,7 +1316,33 @@ function nowRow(now) {
     </tr>`;
 }
 
+// What the reader is looking at stays where it is while the Slot Fill log
+// above it grows or shrinks (16.11.2026: three rows "being tested" pushed
+// Stratum and Traffic 445 px down under somebody reading them). The anchor is
+// the topmost card or row on screen below the log's own top, as the peer list
+// keeps its rows (3-render.js holdAnchor).
+function holdPlace(change) {
+  const log = document.getElementById('rotation-log-table');
+  const from = log ? log.getBoundingClientRect().top : 0;
+  const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight && r.top > from; };
+  // Every candidate on screen, in page order: a full redraw of the log drops
+  // its rows, and then the next one still there (the card below) holds.
+  const seen = window.scrollY > 0 && from < 0
+    ? [...document.querySelectorAll('main .card[id], #rotation-log-table tbody tr')].filter(onScreen)
+      .map((e) => [e, e.getBoundingClientRect().top])
+    : [];
+  change();
+  const kept = seen.find(([e]) => e.isConnected);
+  if (kept) {
+    const d = kept[0].getBoundingClientRect().top - kept[1];
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+}
+
 function renderRotationLog(log) {
+  holdPlace(() => drawRotationLog(log));
+}
+function drawRotationLog(log) {
   const tbody = document.querySelector('#rotation-log-table tbody');
   if (!tbody) return;
 
@@ -1844,6 +1911,8 @@ document.body.addEventListener('click', async (e) => {
     pendingPeers.add(address);
   }
   const originalLabel = btn.textContent;
+  // Where the button stands when the answer comes (the reader may have scrolled meanwhile).
+  const tapTop = () => (btn.isConnected && btn.getBoundingClientRect().height ? btn.getBoundingClientRect().top : undefined);
   if (isPeerOrPoolAction) {
     btn.disabled = true;
     // The lock is an icon, not a label - replacing its text with an ellipsis
@@ -1872,6 +1941,8 @@ document.body.addEventListener('click', async (e) => {
       // Added back within the wait after a removal: it belongs in the tables again.
       justGone.delete(address);
       justGone.delete(result.address);
+      leaving.delete(address);
+      leaving.delete(result.address);
       showToast(
         result.note
           ? `${result.note}${result.warning ? ` ${result.warning}` : ''}`
@@ -1884,6 +1955,7 @@ document.body.addEventListener('click', async (e) => {
     if (action === 'untrust') {
       await api('/api/peers/untrust', { method: 'POST', body: JSON.stringify({ address }) });
       justGone.set(address, Date.now());
+      markLeaving(address, 'Removed', tapTop());
       recheckGone();
       showToast(`Removed ${address} as manual peer and disconnected it.`, 'success');
     }
@@ -1891,7 +1963,7 @@ document.body.addEventListener('click', async (e) => {
       await api('/api/peers/disconnect', { method: 'POST', body: JSON.stringify({ address }) });
       // A manual peer stays manual and Core dials it again, so only a non-manual one leaves the tables.
       const was = (lastPeerRanking || []).find((p) => p.address === address);
-      if (!was || !was.trusted) justGone.set(address, Date.now());
+      if (!was || !was.trusted) { justGone.set(address, Date.now()); markLeaving(address, 'Disconnected', tapTop()); }
       recheckGone();
       showToast(`Disconnected ${address}.`, 'success');
     }

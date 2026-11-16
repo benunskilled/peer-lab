@@ -100,7 +100,27 @@
       }
     } else if (entries.length) {
       row("First job", span("", entries[0].label));
+    } else if (poolRowSeen && Date.now() - firstSeenAt(b.hash) < POOL_ROW_WAIT_MS) {
+      // The race is written seconds after the block: its row waits here
+      // rather than appear late and push the whole page down (16.11.2026).
+      row(own0Label || "Your pool", span("miss", "\u2026"));
     }
+    if (own) { poolRowSeen = true; own0Label = "Your pool"; }
+    else if (entries.length) { poolRowSeen = true; own0Label = "First job"; }
+  }
+  // Whether the blocks before had a pool row, and when each block was first
+  // seen here, for the placeholder above. A minute and a half covers the race
+  // (eight seconds) and a check with Core; after that no row is a fact.
+  const POOL_ROW_WAIT_MS = 90 * 1000;
+  let poolRowSeen = false;
+  let own0Label = "";
+  const seenAt = new Map();
+  function firstSeenAt(hash) {
+    if (!seenAt.has(hash)) {
+      seenAt.set(hash, Date.now());
+      if (seenAt.size > 20) seenAt.delete(seenAt.keys().next().value);
+    }
+    return seenAt.get(hash);
   }
 
   function renderBlockCard() {

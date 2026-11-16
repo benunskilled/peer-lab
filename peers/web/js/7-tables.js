@@ -34,14 +34,20 @@
     // A panel left open for a peer that is gone must not pop open when its address comes back.
     const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
     // An offline manual peer is a row too, and stays open like any other.
-    for (const r of dashboard().offlineManual()) live.add("manual " + r.address);
+    for (const r of dashboard().offlineManual(new Set(state.data.peers.map((p) => p.addr)))) live.add("manual " + r.address);
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
     const root = $("tables");
     root.textContent = "";
     root.removeAttribute("aria-busy");
     let picksShown = false;
+    const shown = new Map();
     for (const g of GROUPS) {
       const { peers, all, kindPool } = groupPeers(g);
+      // A row removed or disconnected a moment ago stands where it was, as
+      // it was last shown, saying so (see markLeaving in app.js).
+      // Not under a filter: a slim row there would stand outside it.
+      const rows = state.place || state.group ? peers : peers.concat([...lastShown.values()].filter((r) => r.g === g && !peers.some((p) => p.addr === r.p.addr)
+        && dashboard().leaving && dashboard().leaving(r.p.addr)).map((r) => ({ ...r.p, leaving: dashboard().leaving(r.p.addr), leftAt: r.i })));
       const card = document.createElement("section");
       card.className = "card group-card";
       card.id = "group-" + g;
@@ -61,7 +67,7 @@
         card.appendChild(spread);
       }
 
-      if (!peers.length) {
+      if (!rows.length) {
         const p = document.createElement("p");
         p.className = "empty";
         // No inbound at all is what most nodes see; say what brings them.
@@ -78,10 +84,12 @@
       // far down the page, so it shows its top ten - in the order of the
       // current sort - with a toggle for the rest. The others never get long.
       const limited = g === "inbound" && peers.length > INBOUND_LIMIT;
-      card.appendChild(peerTable(g, peers, limited && !state.showAllInbound));
+      card.appendChild(peerTable(g, rows, limited && !state.showAllInbound));
+      rows.forEach((p, i) => shown.set(p.addr, { g, p, i }));
       if (limited) showAllButton(card, head.summary, g, peers);
       root.appendChild(card);
     }
+    lastShown = shown;
     // A second kind turned up since a name was picked: no card shows the name
     // chips any more, so the pick goes too rather than filter two kinds unseen.
     // Asked of all cards together: the pick sits in one of them, and asked of
@@ -139,7 +147,7 @@
     // dashboard's picture is older: it stands once, as connected.
     if (g === "manual" && !state.place && !state.group) {
       const here = new Set(state.data.peers.map((p) => p.addr));
-      peers = peers.concat(dashboard().offlineManual().filter((r) => !here.has(r.address)).map(offlinePeer));
+      peers = peers.concat(dashboard().offlineManual(here).filter((r) => !here.has(r.address)).map(offlinePeer));
     }
     return { peers, all, kindPool };
   }
@@ -245,6 +253,14 @@
       const x = col.val(a), y = col.val(b);
       return (x < y ? -1 : x > y ? 1 : 0) * s.dir;
     });
+    // A leaving row keeps its place, not where the sort would put it now:
+    // among equals it fell to the end of the group.
+    const back = peers.filter((p) => p.leaving).sort((a, b) => a.leftAt - b.leftAt);
+    if (back.length) {
+      const rest = peers.filter((p) => !p.leaving);
+      for (const p of back) rest.splice(Math.min(p.leftAt, rest.length), 0, p);
+      peers.splice(0, peers.length, ...rest);
+    }
 
     const wrap = document.createElement("div");
     wrap.className = "scroll";
@@ -277,10 +293,45 @@
     return wrap;
   }
 
+  // A row removed or disconnected here comes to stand where its button was
+  // tapped: its open panel closing would otherwise pull what was below up
+  // under the finger, a screen's height on a phone (16.11.2026).
+  // `y`: the scroll position before this drawing. A reader who scrolled
+  // since the tap keeps their own place.
+  function placeLeaving(y) {
+    const pl = dashboard().leavingPlace && dashboard().leavingPlace(false);
+    if (!pl) return;
+    if (Math.abs(y - pl.y) > 2) { dashboard().leavingPlace(true); return; }
+    const tr = [...document.querySelectorAll("#tables tr.leaving")].find((t) => t.dataset.anchor.endsWith(" " + pl.address));
+    if (!tr) return;
+    dashboard().leavingPlace(true);
+    const d = tr.getBoundingClientRect().top - pl.top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+
+  // The rows of the last drawing, by address: what a leaving row looks like.
+  let lastShown = new Map();
+
   // One peer's row, and its open detail below it if it was left open.
   function peerRow(tbody, g, p) {
     const tr = document.createElement("tr");
     tr.dataset.anchor = g + " " + p.addr;
+    if (p.leaving) {
+      // Closed and slim: the address and what happened to it.
+      tr.className = "leaving" + (dashboard().leavingOut && dashboard().leavingOut(p.addr) ? " out" : "");
+      const td = document.createElement("td");
+      td.colSpan = COLS.length;
+      td.className = "leave-cell";
+      const div = document.createElement("div");
+      div.className = "leave";
+      const a = document.createElement("span");
+      a.textContent = p.addr;
+      div.append(a, " \u00b7 " + p.leaving);
+      td.appendChild(div);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
     // The peer that brought the newest block, for as long as the star
     // is up - one rule for "just delivered", in the row and on the map.
     if (deliveredNow.has(p.addr)) tr.className = "delivered-now";
