@@ -181,3 +181,19 @@ test('two peers matching one block credits neither, and keeps the block as uncle
   assert.equal(credited, 0, 'nobody is credited');
   assert.equal(db.instance.prepare(`SELECT COUNT(*) AS n FROM relay_observation WHERE race_id = ?`).get(race.id).n, 3, 'all three were still there for it');
 });
+
+// Review G7 (15.11.2026): three blocks, each matched by two peers, credit
+// nobody - and were reported as healthy.
+test('blocks that matched several peers credit nobody and are not called healthy', () => {
+  const startAt = Date.UTC(2026, 0, 1);
+  for (let i = 0; i < 3; i += 1) {
+    const detectedAtMs = startAt + i * 600_000;
+    relay.recordRace({
+      blockHash: String(i).padStart(64, 'c'),
+      detectedAtMs,
+      peers: [peer('198.51.100.1:8333', detectedAtMs), peer('198.51.100.2:8333', detectedAtMs)],
+    });
+  }
+  assert.ok(db.instance.prepare('SELECT first_count AS fc FROM relay_race').all().every((r) => r.fc === 2));
+  assert.equal(blocks.attributionHealth().ok, false);
+});

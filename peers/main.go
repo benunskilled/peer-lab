@@ -632,20 +632,35 @@ func isBlockHash(s string) bool {
 	return true
 }
 
-// acceptsGzip reads Accept-Encoding as a list: "gzip" or "*" counts, unless
-// its weight is zero ("gzip;q=0" means: never gzip).
+// acceptsGzip reads Accept-Encoding as a list: "gzip" with a weight above
+// zero, or "*" when gzip is not named at all ("*;q=1, gzip;q=0" means: never
+// gzip; review G9, 15.11.2026: the first match used to win). The same cases
+// are tested for the dashboard's copy (dashboard-server.js acceptsGzip).
 func acceptsGzip(header string) bool {
+	gzipQ, starQ := -1.0, -1.0
 	for _, part := range strings.Split(header, ",") {
-		name, params, _ := strings.Cut(strings.TrimSpace(part), ";")
-		name = strings.ToLower(strings.TrimSpace(name))
-		if name != "gzip" && name != "*" {
-			continue
+		fields := strings.Split(part, ";")
+		name := strings.ToLower(strings.TrimSpace(fields[0]))
+		q := 1.0
+		for _, f := range fields[1:] {
+			k, v, _ := strings.Cut(strings.TrimSpace(f), "=")
+			if strings.EqualFold(strings.TrimSpace(k), "q") {
+				n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+				if err != nil {
+					n = 0
+				}
+				q = n
+			}
 		}
-		q := strings.ReplaceAll(strings.ToLower(params), " ", "")
-		if q == "q=0" || strings.HasPrefix(q, "q=0.0") && strings.Trim(strings.TrimPrefix(q, "q="), "0.") == "" {
-			return false
+		switch name {
+		case "gzip":
+			gzipQ = q
+		case "*":
+			starQ = q
 		}
-		return true
 	}
-	return false
+	if gzipQ >= 0 {
+		return gzipQ > 0
+	}
+	return starQ > 0
 }

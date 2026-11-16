@@ -104,10 +104,29 @@ const SECURITY_HEADERS = {
 // block of output was full.
 const GZIP_MIN_BYTES = 1024;
 
+// "gzip" with a weight above zero, or "*" when gzip is not named at all:
+// "gzip;q=0" means never (review G9, 15.11.2026: any "gzip" in the header
+// counted). The same cases are tested for the peers service (main.go).
+function acceptsGzip(header) {
+  let gzipQ = -1;
+  let starQ = -1;
+  for (const part of String(header || '').split(',')) {
+    const [name, ...params] = part.split(';').map((x) => x.trim());
+    let q = 1;
+    for (const p of params) {
+      const [k, v] = p.split('=').map((x) => x.trim());
+      if (k.toLowerCase() === 'q') q = Number.isFinite(Number(v)) && v !== '' ? Number(v) : 0;
+    }
+    if (name.toLowerCase() === 'gzip') gzipQ = q;
+    else if (name === '*') starQ = q;
+  }
+  return gzipQ >= 0 ? gzipQ > 0 : starQ > 0;
+}
+
 function sendBody(res, status, headers, body) {
   let out = Buffer.from(body);
   const extra = { Vary: 'Accept-Encoding' };
-  const takesGzip = /\bgzip\b/.test(res.req?.headers['accept-encoding'] || '');
+  const takesGzip = acceptsGzip(res.req?.headers['accept-encoding']);
   if (takesGzip && out.length >= GZIP_MIN_BYTES && !/^image\/(png|jpeg|webp)/.test(headers['Content-Type'])) {
     out = zlib.gzipSync(out);
     extra['Content-Encoding'] = 'gzip';
@@ -1137,4 +1156,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { server, main, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };
+module.exports = { server, main, acceptsGzip, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };
