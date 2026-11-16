@@ -366,13 +366,19 @@ func newHandler(src *source, dash *dashboardClient) http.Handler {
 			NoRelay     bool   `json:"no_relay,omitempty"`
 			LinkingLion bool   `json:"linking_lion,omitempty"`
 			Fork        string `json:"fork,omitempty"`
+			// Why a Disguised peer is one, for Slot Fill's log line.
+			Why string `json:"why,omitempty"`
 		}
 		snap := src.get(ctx)
 		out := struct {
 			Peers []kind `json:"peers"`
 		}{Peers: make([]kind, 0, len(snap.Peers))}
 		for _, p := range snap.Peers {
-			out.Peers = append(out.Peers, kind{p.Addr, p.Kind, p.NoRelay, p.LinkingLion, p.Fork})
+			why := ""
+			if p.Kind == fakeWalletKind {
+				why = disguisedWhy(p.About)
+			}
+			out.Peers = append(out.Peers, kind{p.Addr, p.Kind, p.NoRelay, p.LinkingLion, p.Fork, why})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")

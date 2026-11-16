@@ -356,3 +356,36 @@ func withAlso(about string, reasons []string) string {
 	}
 	return about
 }
+
+// disguisedWhy is a Disguised peer's about in one line, for Slot Fill's log
+// (16.11.2026): what it claims and what gave it away - "claims Bitcoin Core
+// 27.1, but it lacks NETWORK_LIMITED, which every Core since 0.16 offers".
+// Only the evidence after " - " of the first "Probably:" line; empty when the
+// about holds none.
+func disguisedWhy(about string) string {
+	claim, why := "", ""
+	for _, line := range strings.Split(about, "\n") {
+		if c, ok := strings.CutPrefix(line, "Claims: "); ok && claim == "" {
+			claim = c
+		}
+		if w, ok := strings.CutPrefix(line, "Probably: "); ok && why == "" {
+			if _, evidence, cut := strings.Cut(w, " - "); cut {
+				w = evidence
+			} else {
+				w = "it is probably " + w
+			}
+			if !strings.HasPrefix(w, "it ") {
+				w = "it " + w
+			}
+			why = w
+		}
+	}
+	switch {
+	case why == "":
+		return ""
+	case claim == "":
+		return why
+	default:
+		return "claims " + claim + ", but " + why
+	}
+}

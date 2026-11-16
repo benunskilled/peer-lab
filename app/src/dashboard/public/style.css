@@ -627,7 +627,10 @@ button.b-peer:hover { text-decoration-style: solid; }
 @keyframes arrived { from { background-color: rgba(247, 147, 26, .16); } }
 /* Scrolling back up on a phone: the sections, a tap away. */
 .jump-bar { position: fixed; z-index: 30; left: 50%; top: 8px; transform: translate(-50%, calc(-100% - 16px)); display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(17, 24, 32, .92); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); transition: transform .2s ease; max-width: calc(100vw - 16px); }
-.jump-bar.shown { transform: translate(-50%, 0); }
+/* --jump-top: below the open inbound list's bar while that is pinned
+   (3-render.js). Only in the shown state: hidden, the bar stays off-screen
+   whatever it is, and does not flash over the bar as that pins. */
+.jump-bar.shown { transform: translate(-50%, calc(var(--jump-top, 8px) - 8px)); }
 .jump-bar button { font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; padding: 8px 11px; border-radius: 999px; white-space: nowrap; }
 .jump-bar button:active { background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) {

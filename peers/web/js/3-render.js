@@ -116,6 +116,15 @@
       if (c) go(label, c);
     }
   }
+  // On a phone the bar comes down from the top, where the open inbound list
+  // pins its name and "Top 10": it goes below that bar, not over it (it hid
+  // both, and the button could not be tapped; 16.11.2026).
+  function placeJumpBar() {
+    const pinned = document.querySelector(".stick.on > div");
+    const r = pinned && pinned.getBoundingClientRect();
+    const top = r && r.height && r.top <= 1 ? Math.round(r.bottom) + 8 : 8;
+    jumpBar.style.setProperty("--jump-top", top + "px");
+  }
   window.addEventListener("scroll", () => {
     const y = window.scrollY;
     if (Date.now() < jumpedUntil) { lastY = y; return; }
@@ -126,6 +135,8 @@
     const show = phone ? up && y > window.innerHeight : y > window.innerHeight;
     const hide = phone ? down || y < window.innerHeight / 2 : y < window.innerHeight;
     jumpBar.classList.toggle("corner", !phone);
+    // After the list has pinned or released its bar in this same scroll.
+    if (phone) requestAnimationFrame(placeJumpBar);
     if (show) {
       if (!jumpBar.classList.contains("shown")) { fillJumpBar(); jumpBar.classList.add("shown"); }
     } else if (hide) jumpBar.classList.remove("shown");

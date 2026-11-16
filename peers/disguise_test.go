@@ -387,3 +387,16 @@ func TestGivesOwnAddress(t *testing.T) {
 		t.Fatalf("own address alone made it %q", p.Kind)
 	}
 }
+
+func TestDisguisedWhyForSlotFillsLog(t *testing.T) {
+	for about, want := range map[string]string{
+		"Claims: Bitcoin Core 27.1\nProbably: not Bitcoin Core - it lacks NETWORK_LIMITED, which every Core since 0.16 offers":              "claims Bitcoin Core 27.1, but it lacks NETWORK_LIMITED, which every Core since 0.16 offers",
+		"Claims: Bitcoin Core 25.0\nProbably: a crawler - it asked for addresses 14 times, Core asks once\nAlso: it pings every 10 seconds": "claims Bitcoin Core 25.0, but it asked for addresses 14 times, Core asks once",
+		"Probably: not what it claims - it offers encrypted v2 connections, which that software never had":                                  "it offers encrypted v2 connections, which that software never had",
+		"Some wallet": "",
+	} {
+		if got := disguisedWhy(about); got != want {
+			t.Errorf("disguisedWhy(%q) = %q, want %q", about, got, want)
+		}
+	}
+}

@@ -274,6 +274,11 @@ function verdictsByKey(kinds) {
   return out;
 }
 const listSaysDisguised = (m) => Boolean(m) && m.kind === 'Disguised';
+// The log line for a Disguised peer: the peer list's reason when it gave one
+// ("claims Bitcoin Core 27.1, but it lacks NETWORK_LIMITED, ..."), so the log
+// shows what gave it away (16.11.2026), else the general line.
+const disguisedNote = (m) => (m && m.why ? `Disguised: ${m.why}` : 'Disguised: not the Core it names');
+const WTXID_NOTE = "Disguised: it names Core but left out wtxidrelay when connecting, which every Core since 0.21 sends";
 
 function whyNot(session, fake = false, fork = null) {
   if (fake) return { code: 'disguised', text: 'connected, but it is not the Core it names' };
@@ -330,7 +335,9 @@ async function settleOne(trial, peers, chain, now, force, verdictOf = () => null
   // Only while Core holds the candidate: the list's word is about a session.
   // Its Disguised only: its fork mark comes without the wait for a first
   // header height that otherChain() keeps (review, 15.11.2026).
-  const fake = disguised(session, peers) || listSaysDisguised(verdictOf(session));
+  const listed = verdictOf(session);
+  const byRule = disguised(session, peers);
+  const fake = byRule || listSaysDisguised(listed);
   const fork = fake ? null : otherChain(session, chain);
   if (!fake && !fork && works(session, chain, trial.tip)) {
     dropTrial(trial.address);
@@ -360,7 +367,8 @@ async function settleOne(trial, peers, chain, now, force, verdictOf = () => null
     // chain, or not the Core it names: rare, and worth seeing (15.11.2026).
     // One that just did not answer stays in the list of tries only.
     if (fork || fake) {
-      logAction({ action: 'rejected', address: trial.address, note: fork ? `Follows another chain (${fork})` : 'Disguised: not the Core it names' });
+      const note = fork ? `Follows another chain (${fork})` : listed && listed.why ? disguisedNote(listed) : byRule ? WTXID_NOTE : disguisedNote(null);
+      logAction({ action: 'rejected', address: trial.address, note });
     }
     const { region, country } = spread.placeOf({ address: trial.address });
     writeLastTry({ at: now, reason: why.code, minutes, country: country || null, region: spread.REGION_NAMES[region] || null });
@@ -392,13 +400,14 @@ async function dropUnmasked(kinds, peers, stillOn = () => true, now = Date.now()
   const out = [];
   for (const { address } of rows) {
     if (onTrial.has(keyOf(address)) || !manualSession(peers, address)) continue;
-    if (!listSaysDisguised(verdicts.get(keyOf(address)))) continue;
+    const listed = verdicts.get(keyOf(address));
+    if (!listSaysDisguised(listed)) continue;
     // Each removal waits for Core: switched off, locked or removed by hand
     // meanwhile, the rest is left alone (as retire.js does).
     if (!stillOn() || !still.get(address, ADDED_LABEL)) break;
     await peerSync.removeTrustedPeer(address);
     markTried(address, false, now, { reason: 'disguised' });
-    logAction({ action: 'rejected', address, note: 'Disguised: not the Core it names' });
+    logAction({ action: 'rejected', address, note: disguisedNote(listed) });
     logger.info('slot fill: added peer taken out again, the peer list calls it Disguised', { address });
     out.push(address);
   }
