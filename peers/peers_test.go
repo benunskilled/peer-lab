@@ -371,7 +371,7 @@ func TestHTTP(t *testing.T) {
 		}
 		for _, p := range got.Peers {
 			for k := range p {
-				if k != "addr" && k != "kind" && k != "no_relay" && k != "linking_lion" && k != "fork" {
+				if k != "addr" && k != "kind" && k != "no_relay" && k != "linking_lion" && k != "fork" && k != "why" {
 					t.Errorf("kinds carries %q", k)
 				}
 			}

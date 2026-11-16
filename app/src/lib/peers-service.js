@@ -136,6 +136,8 @@ function kindsOf(body) {
     if (p.no_relay === true) m.noRelay = true;
     if (p.linking_lion === true) m.lion = true;
     if (str(p.fork)) m.fork = str(p.fork);
+    // Why a Disguised peer is one, for Slot Fill's log line.
+    if (str(p.why)) m.why = str(p.why);
     out.set(p.addr, m);
   }
   return out;

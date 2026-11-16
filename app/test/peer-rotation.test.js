@@ -2064,14 +2064,15 @@ test('slot fill: a candidate the peer list calls Disguised is out at once', asyn
   const peers = setPeers([coreOut(), manualSession(asia)]);
   const chain = await rpc.getBlockchainInfo();
 
-  const settled = await fill.settle(peers, chain, t0 + 30 * 1000, { kinds: new Map([[asia, { kind: 'Disguised' }]]) });
+  const why = 'claims Bitcoin Core 27.1, but it lacks NETWORK_LIMITED, which every Core since 0.16 offers';
+  const settled = await fill.settle(peers, chain, t0 + 30 * 1000, { kinds: new Map([[asia, { kind: 'Disguised', why }]]) });
 
   assert.equal(settled.reverted, 1, 'not kept, though Core holds a working connection');
   assert.ok(!isManual(asia));
   assert.equal(db.instance.prepare('SELECT reason FROM slot_fill_tried WHERE address = ?').get(asia).reason, 'disguised');
   const row = logRows().find((r) => r.address === asia);
   assert.equal(row && row.action, 'rejected');
-  assert.equal(row.note, 'Disguised: not the Core it names');
+  assert.equal(row.note, `Disguised: ${why}`, 'what gave it away, for those who never see such a peer inbound');
 });
 
 test('slot fill: the peer list\'s fork mark alone does not throw out a candidate on our tip', async () => {
