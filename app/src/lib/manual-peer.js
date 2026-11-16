@@ -24,19 +24,23 @@ const MAGIC = {
 
 const sha256d = (buf) => crypto.createHash('sha256').update(crypto.createHash('sha256').update(buf).digest()).digest();
 
-// A bare version message: no services, empty user agent, no tx relay.
-// Enough for a node to answer with its own version, and nothing more. The
-// start height is `mark`, a number no real chain is at: if our own Core
-// answered, its getpeerinfo shows an inbound peer with that startingheight
-// (selfMark below).
-function versionMessage(magic, mark = 0) {
-  const payload = Buffer.alloc(86);
+// A bare version message: no services, height 0, no tx relay. Enough for a
+// node to answer with its own version, and nothing more. The user agent is
+// `mark`, random letters for this one probe: if our own Core answered, its
+// getpeerinfo shows an inbound peer with that subver (answeredBySelf). Not
+// the start height: Core 32 no longer shows it in getpeerinfo (tried against
+// a regtest Core 32.1 before 1.0.0).
+function versionMessage(magic, mark = '') {
+  const ua = Buffer.from(mark, 'ascii');
+  if (ua.length > 252) throw new Error('user agent too long for a one-byte length');
+  const payload = Buffer.alloc(80 + 1 + ua.length + 5);
   payload.writeInt32LE(70016, 0);
   payload.writeBigInt64LE(BigInt(Math.floor(Date.now() / 1000)), 12);
   // addr_recv and addr_from stay zero: services 0, address ::, port 0.
   crypto.randomBytes(8).copy(payload, 72);
-  // user agent length 0 at 80, start height at 81, relay 0 at 85.
-  payload.writeInt32LE(mark, 81);
+  payload.writeUInt8(ua.length, 80);
+  ua.copy(payload, 81);
+  // start height 0 and relay 0 after it.
   const header = Buffer.alloc(24);
   Buffer.from(magic, 'hex').copy(header, 0);
   header.write('version', 4, 'ascii');
@@ -56,8 +60,8 @@ function versionMessage(magic, mark = 0) {
  * container, not through Core's proxy. The slot fill never probes; it lets
  * Core connect (peer-rotation/fill.js).
  */
-// A start height far above any chain's, and different on every probe.
-const selfMark = () => 1000000000 + crypto.randomInt(1000000000);
+// Different on every probe, and nothing a real client sends.
+const selfMark = () => `/${crypto.randomBytes(8).toString('hex')}/`;
 
 // Whether the node that answered is our own Core: reached through the
 // Umbrel's LAN or public address, umbrel.local, or a forwarded port, it looks
@@ -67,7 +71,7 @@ const selfMark = () => 1000000000 + crypto.randomInt(1000000000);
 async function answeredBySelf(mark) {
   try {
     const peers = await rpc.getPeerInfo();
-    return Array.isArray(peers) && peers.some((p) => p.inbound && p.startingheight === mark);
+    return Array.isArray(peers) && peers.some((p) => p.inbound && p.subver === mark);
   } catch (err) {
     logger.debug('getpeerinfo failed during a probe', { error: err.message });
     return false;

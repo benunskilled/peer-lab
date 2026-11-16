@@ -770,8 +770,9 @@ test('our own Core reached by another address (LAN, public, umbrel.local) is ref
   let mark = null;
   const { server, port } = await withListeningPort((socket) => {
     socket.once('data', (buf) => {
-      // The start height of the version we were sent (header 24 + offset 81).
-      mark = buf.readInt32LE(24 + 81);
+      // The user agent of the version we were sent (header 24, length at 80).
+      const len = buf.readUInt8(24 + 80);
+      mark = buf.subarray(24 + 81, 24 + 81 + len).toString('ascii');
       socket.write(versionMessage(MAGIC.mainnet));
     });
     socket.on('error', () => {});
@@ -784,8 +785,8 @@ test('our own Core reached by another address (LAN, public, umbrel.local) is ref
       { name: 'ipv6', limited: false, reachable: true, proxy: '' },
     ] }));
     mock.method(rpc, 'getPeerInfo', async () => [
-      { addr: '198.51.100.1:8333', inbound: true, startingheight: 976150 },
-      { addr: '10.21.0.1:51234', inbound: true, startingheight: mark },
+      { addr: '198.51.100.1:8333', inbound: true, subver: '/Satoshi:32.1.0/' },
+      { addr: '10.21.0.1:51234', inbound: true, subver: mark },
     ]);
     const tested = await probePeer(`127.0.0.1:${port}`);
     assert.equal(tested.ok, false);
@@ -793,10 +794,10 @@ test('our own Core reached by another address (LAN, public, umbrel.local) is ref
     const added = await manualAddPeer(`127.0.0.1:${port}`);
     assert.equal(added.ok, false);
     assert.deepEqual(calls, []);
-    assert.ok(mark > 976150, 'a height no chain is at');
+    assert.match(mark, /^\/[0-9a-f]{16}\/$/, 'random, and nothing a real client sends');
 
     // Another node, same probe: Core shows no peer with our mark.
-    mock.method(rpc, 'getPeerInfo', async () => [{ addr: '198.51.100.1:8333', inbound: true, startingheight: 976150 }]);
+    mock.method(rpc, 'getPeerInfo', async () => [{ addr: '198.51.100.1:8333', inbound: true, subver: '/Satoshi:32.1.0/' }]);
     assert.equal((await probePeer(`127.0.0.1:${port}`)).ok, true);
   } finally {
     server.close();
