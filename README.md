@@ -102,7 +102,7 @@ Tested with Bitcoin Core 32.1.
 
 ### Coming from Bitcoin Lab or Peer Map
 
-Peer Lab replaces both. Turn off Bitcoin Lab's Slot Fill, or uninstall Bitcoin Lab and Peer Map, before you install Peer Lab. Peer Lab keeps the manual peers already set in Core that connect, but starts with its own data; nothing is imported.
+Peer Lab replaces both. Switch off Bitcoin Lab's Slot Fill, install Peer Lab, then uninstall Bitcoin Lab and Peer Map. Peer Lab keeps the manual peers already set in Core that connect, but starts with its own data; nothing is imported.
 
 ## Development
 
