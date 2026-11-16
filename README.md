@@ -90,7 +90,7 @@ For every new block, the first pool to send fresh work sets the reference time a
 
 No peer address goes to any outside service: the map, the locations and the operators are built into the app. Peer Lab talks to Core through RPC and ZMQ and changes only live connections and the `addnode` list. It never touches `bitcoin.conf`, wallets, keys or block files. More in [SECURITY.md](SECURITY.md).
 
-On my node Peer Lab uses about 230 MB of RAM across its five services and almost no CPU, and its database grows by about 5 MB a day.
+On my node, with about 400 peers, Peer Lab uses about 230 MB of RAM across its five services and almost no CPU, and its database grows by about 5 MB a day.
 
 ## Install
 
