@@ -34,7 +34,7 @@
     // A panel left open for a peer that is gone must not pop open when its address comes back.
     const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
     // An offline manual peer is a row too, and stays open like any other.
-    for (const r of dashboard().offlineManual()) live.add("manual " + r.address);
+    for (const r of dashboard().offlineManual(new Set(state.data.peers.map((p) => p.addr)))) live.add("manual " + r.address);
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
     const root = $("tables");
     root.textContent = "";
@@ -139,7 +139,7 @@
     // dashboard's picture is older: it stands once, as connected.
     if (g === "manual" && !state.place && !state.group) {
       const here = new Set(state.data.peers.map((p) => p.addr));
-      peers = peers.concat(dashboard().offlineManual().filter((r) => !here.has(r.address)).map(offlinePeer));
+      peers = peers.concat(dashboard().offlineManual(here).filter((r) => !here.has(r.address)).map(offlinePeer));
     }
     return { peers, all, kindPool };
   }

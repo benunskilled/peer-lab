@@ -704,7 +704,11 @@ window.peerLab = {
   onTrial: (address) => (rankingByAddress.get(address) || {}).status === 'TESTING',
   // Manual peers that are not connected: they still hold their slot, and the
   // list shows them so they can be unlocked or removed.
-  offlineManual: () => (lastPeerRanking || []).filter((p) => p.trusted && !p.live && !justGone.has(p.address)),
+  // `present`: the addresses in the peer list now. A manual peer gone from it
+  // counts as offline at once, not when the ranking (20 s apart) says so:
+  // the row stood, went, and came back as offline 20 s later (16.11.2026).
+  offlineManual: (present) => (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address)
+    && (!p.live || (present && !present.has(p.address)))),
   // "0 of 8 slots free · all kept", for the head of the manual list.
   manualSummary: () => {
     const manual = (lastPeerRanking || []).filter((p) => p.trusted && !justGone.has(p.address));
@@ -1138,8 +1142,10 @@ function renderSlotStatus() {
     const rows = (html) => (html.match(/<tr[\s>]/g) || []).length;
     const n = rows(row);
     if (row && shownNow && n === rows(shownNow) && tbody && tbody.children.length >= n) {
-      for (let i = 0; i < n; i++) tbody.firstElementChild.remove();
-      tbody.insertAdjacentHTML('afterbegin', row.trim());
+      holdPlace(() => {
+        for (let i = 0; i < n; i++) tbody.firstElementChild.remove();
+        tbody.insertAdjacentHTML('afterbegin', row.trim());
+      });
       shownNow = row;
     } else {
       renderRotationLog(lastRotationLog);
@@ -1275,7 +1281,30 @@ function nowRow(now) {
     </tr>`;
 }
 
+// What the reader is looking at stays where it is while the Slot Fill log
+// above it grows or shrinks (16.11.2026: three rows "being tested" pushed
+// Stratum and Traffic 445 px down under somebody reading them). The anchor is
+// the topmost card or row on screen below the log's own top, as the peer list
+// keeps its rows (3-render.js holdAnchor).
+function holdPlace(change) {
+  const log = document.getElementById('rotation-log-table');
+  const from = log ? log.getBoundingClientRect().top : 0;
+  const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight && r.top > from; };
+  const anchor = window.scrollY > 0 && from < 0
+    ? [...document.querySelectorAll('main .card[id], #rotation-log-table tbody tr')].find(onScreen)
+    : null;
+  const top = anchor ? anchor.getBoundingClientRect().top : 0;
+  change();
+  if (anchor && anchor.isConnected) {
+    const d = anchor.getBoundingClientRect().top - top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+}
+
 function renderRotationLog(log) {
+  holdPlace(() => drawRotationLog(log));
+}
+function drawRotationLog(log) {
   const tbody = document.querySelector('#rotation-log-table tbody');
   if (!tbody) return;
 
