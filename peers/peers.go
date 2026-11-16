@@ -676,8 +676,10 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 // (net_processing.cpp: SetupAddressRelay returns false for them, so no
 // getaddr). So a real Core or Knots that connected to this node with
 // transactions off and asked for addresses runs with blocksonly=1; one that
-// did not ask opened the connection for blocks only. Only once its handshake
-// is done (verack) and only for a node, not for software borrowing the name.
+// did not ask wants blocks only on this connection. Why - a block-relay-only
+// link of its own or something posing as one - the wire does not say, so the
+// text says only what it asked for. Only once its handshake is done (verack)
+// and only for a node, not for software borrowing the name.
 func noTxWhy(r rawPeer, kind string) string {
 	if r.ConnectionType == "block-relay-only" {
 		return "Your node opened this connection for blocks only"
@@ -688,7 +690,7 @@ func noTxWhy(r rawPeer, kind string) string {
 		if recv["getaddr"] > 0 {
 			return "Its node probably runs with blocksonly=1: it wants no transactions from other nodes"
 		}
-		return "Its node opened this connection for blocks only"
+		return "It asked for blocks only on this connection"
 	}
 	return "Wants no transactions from your node"
 }
