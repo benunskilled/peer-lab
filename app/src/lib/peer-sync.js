@@ -112,14 +112,27 @@ async function syncTrustedToAddnode(knownAddedNodes) {
 
   let added = 0;
   let queued = 0;
+  // Asked again right before each add, and once more after it: the list was
+  // read before the awaits below, and a peer removed by hand meanwhile (the
+  // dashboard is another process) was handed back to Core, then adopted
+  // again, padlocked, once its removal mark ran out (review, 16.11.2026).
+  const stillWanted = db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ?');
+  const wanted = (address) => Boolean(stillWanted.get(address)) && !recentRemovals()[keyOf(address)];
   for (const { address } of trusted) {
     if (existingAddrs.has(keyOf(address))) continue;
     if (slotsUsed >= config.maxManualPeers) {
       queued += 1;
       continue;
     }
+    if (!wanted(address)) continue;
     try {
       await rpc.addNode(address, 'add');
+      if (!wanted(address)) {
+        // Removed while Core was being told: take it back out.
+        await rpc.addNode(address, 'remove').catch(() => {});
+        logger.info('a peer removed during the sync was not restored', { address });
+        continue;
+      }
       added += 1;
       slotsUsed += 1;
       logger.info('restored trusted peer as addnode', { address });

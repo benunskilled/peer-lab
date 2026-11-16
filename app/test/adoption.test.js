@@ -175,3 +175,27 @@ test('a manual peer takes the spelling Core holds it under; two rows for one pee
   await peerSync.syncTrustedToAddnode([{ addednode: '198.51.100.41' }]);
   assert.ok(!db.instance.prepare("SELECT 1 FROM trusted_peer WHERE address IN ('198.51.100.41', '198.51.100.41:8333')").get());
 });
+
+// Review 16.11.2026: a restore after a Core restart works through the list
+// it read first; a peer removed by hand meanwhile was handed back to Core.
+test('a peer removed by hand during the sync is not handed back to Core', async () => {
+  const peerSync = require('../src/lib/peer-sync');
+  const ins = db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, NULL, 1, ?)');
+  ins.run('203.0.113.70:8333', 1);
+  ins.run('203.0.113.71:8333', 2);
+  ins.run('203.0.113.72:8333', 3);
+  const sent = [];
+  mock.method(rpc, 'getPeerInfo', async () => []);
+  mock.method(rpc, 'disconnectNode', async () => {});
+  mock.method(rpc, 'addNode', async (a, c) => {
+    sent.push(`${c} ${a}`);
+    // The dashboard removes .71 while Core is told about .70 ...
+    if (c === 'add' && a === '203.0.113.70:8333') db.instance.prepare("DELETE FROM trusted_peer WHERE address = '203.0.113.71:8333'").run();
+    // ... and .72 while Core is told about .72 itself.
+    if (c === 'add' && a === '203.0.113.72:8333') db.instance.prepare("DELETE FROM trusted_peer WHERE address = '203.0.113.72:8333'").run();
+  });
+
+  await peerSync.syncTrustedToAddnode([]);
+
+  assert.deepEqual(sent, ['add 203.0.113.70:8333', 'add 203.0.113.72:8333', 'remove 203.0.113.72:8333']);
+});
