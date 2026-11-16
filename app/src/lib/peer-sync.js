@@ -116,8 +116,10 @@ async function syncTrustedToAddnode(knownAddedNodes) {
   // read before the awaits below, and a peer removed by hand meanwhile (the
   // dashboard is another process) was handed back to Core, then adopted
   // again, padlocked, once its removal mark ran out (review, 16.11.2026).
+  // The row alone: a removal deletes it at once, and a row that is there
+  // after a removal mark is the peer added again by hand (review).
   const stillWanted = db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ?');
-  const wanted = (address) => Boolean(stillWanted.get(address)) && !recentRemovals()[keyOf(address)];
+  const wanted = (address) => Boolean(stillWanted.get(address));
   for (const { address } of trusted) {
     if (existingAddrs.has(keyOf(address))) continue;
     if (slotsUsed >= config.maxManualPeers) {
@@ -128,8 +130,14 @@ async function syncTrustedToAddnode(knownAddedNodes) {
     try {
       await rpc.addNode(address, 'add');
       if (!wanted(address)) {
-        // Removed while Core was being told: take it back out.
-        await rpc.addNode(address, 'remove').catch(() => {});
+        // Removed while Core was being told: take it back out, and if Core
+        // will not have it now, the next sync does (pending removals).
+        await rpc.addNode(address, 'remove').catch((err) => {
+          if (notAdded(err)) return;
+          const pending = pendingRemovals();
+          pending[keyOf(address)] = Date.now();
+          savePendingRemovals(pending);
+        });
         logger.info('a peer removed during the sync was not restored', { address });
         continue;
       }
@@ -497,6 +505,12 @@ async function addTrustedPeer(address, label, options = {}) {
       if (countTrusted() - (freeable ? 1 : 0) >= config.maxManualPeers) return false;
       if (freeable) {
         db.instance.prepare(`DELETE FROM trusted_peer WHERE address = ?`).run(toEvict.address);
+        // Noted with the delete, in this transaction: if the app stops before
+        // Core is told below, the next sync takes it out of Core rather than
+        // leave a ninth addnode no row stands for (review G2, 16.11.2026).
+        const pending = pendingRemovals();
+        pending[keyOf(toEvict.address)] = Date.now();
+        savePendingRemovals(pending);
         claimed = true;
       }
     }
@@ -632,6 +646,14 @@ function noteRemoved(key) {
   }).immediate();
 }
 
+// Core has let go of it: a removal noted ahead (a slot freed by an add) is done.
+function clearPending(key) {
+  const pending = pendingRemovals();
+  if (!(key in pending)) return;
+  delete pending[key];
+  savePendingRemovals(pending);
+}
+
 const notAdded = (err) => /not been added|not added/i.test((err && err.message) || '');
 
 /**
@@ -653,7 +675,9 @@ async function removeTrustedPeer(address0, { disconnect = true } = {}) {
     // keeps trying to maintain the connection even though we've forgotten
     // it, silently holding a manual slot the UI now thinks is free.
     await rpc.addNode(address, 'remove');
+    clearPending(keyOf(address));
   } catch (err) {
+    if (notAdded(err)) clearPending(keyOf(address));
     // "Node has not been added" is the end state we wanted. Anything else
     // means Core may still hold the entry: remember it, so the sync removes
     // it again instead of adopting it back.

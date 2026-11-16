@@ -199,3 +199,19 @@ test('a peer removed by hand during the sync is not handed back to Core', async 
 
   assert.deepEqual(sent, ['add 203.0.113.70:8333', 'add 203.0.113.72:8333', 'remove 203.0.113.72:8333']);
 });
+
+// Review: a peer removed and added again by hand within the removal mark's
+// five minutes is still restored to Core.
+test('a peer added again after a removal is restored, the mark notwithstanding', async () => {
+  const peerSync = require('../src/lib/peer-sync');
+  db.instance.prepare("INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.80:8333', NULL, 1, 1)").run();
+  mock.method(rpc, 'getPeerInfo', async () => []);
+  mock.method(rpc, 'disconnectNode', async () => {});
+  mock.method(rpc, 'addNode', async () => {});
+  await peerSync.removeTrustedPeer('203.0.113.80:8333', { disconnect: false });
+  db.instance.prepare("INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.80:8333', NULL, 1, 2)").run();
+  const sent = [];
+  rpc.addNode.mock.mockImplementation(async (a, c) => { sent.push(`${c} ${a}`); });
+  await peerSync.syncTrustedToAddnode([]);
+  assert.deepEqual(sent, ['add 203.0.113.80:8333']);
+});
