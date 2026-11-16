@@ -26,6 +26,7 @@ const zmqHost = pick(process.env.BITCOIN_ZMQ_HOST, process.env.APP_BITCOIN_NODE_
 const zmqPort = pick(process.env.BITCOIN_ZMQ_HASHBLOCK_PORT, process.env.APP_BITCOIN_ZMQ_HASHBLOCK_PORT, '28334');
 
 const dataDir = pick(process.env.DATA_DIR, '/data');
+const network = pick(process.env.BITCOIN_NETWORK, process.env.APP_BITCOIN_NETWORK, 'mainnet');
 
 module.exports = {
   // The app's own app_proxy container on umbrelOS 1.x
@@ -37,7 +38,7 @@ module.exports = {
     rpcUrl: `http://${bitcoinHost}:${bitcoinRpcPort}/`,
     rpcUser: bitcoinRpcUser,
     rpcPass: bitcoinRpcPass,
-    network: pick(process.env.BITCOIN_NETWORK, process.env.APP_BITCOIN_NETWORK, 'mainnet'),
+    network,
     zmqHashBlockUrl: zmqExplicit || `tcp://${zmqHost}:${zmqPort}`,
   },
   sqlitePath: pick(process.env.SQLITE_PATH, `${dataDir}/sqlite/peerlab.db`),
@@ -47,7 +48,11 @@ module.exports = {
   // or when "Add as Manual" re-probes an existing peer's host (this matters
   // most for inbound peers, whose getpeerinfo address is their ephemeral
   // outbound source port, not the port their node actually listens on).
-  manualPeerPorts: [8333, 9333],
+  // Off mainnet the network's own default port, the one Core fills in too
+  // (address.js DEFAULT_PORTS) - 8333 never answers on testnet (review before
+  // 1.0.0).
+  manualPeerPorts: network === 'mainnet' || network === 'main' ? [8333, 9333]
+    : [require('./address').DEFAULT_PORTS[network] || 8333],
 
   // Bitcoin Core only actively maintains a limited number of simultaneous
   // "manual" (addnode) connections - MAX_ADDNODE_CONNECTIONS in its own

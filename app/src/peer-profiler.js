@@ -288,7 +288,7 @@ function restoreAfterCoreRestart() {
   if (restoring) return restoring;
   logger.info('Bitcoin Core restarted - restoring the manual peers now');
   restoring = adoptExternalManualPeers()
-    .then((adoptResult) => syncTrustedToAddnode(adoptResult.addedNodes))
+    .then((adoptResult) => syncTrustedToAddnode(adoptResult.addedNodes, { afterRestart: true }))
     .then((result) => logger.info('restored manual peers after Core restart', result))
     .catch((err) => logger.warn('restoring manual peers after Core restart failed', { error: err.message }))
     .finally(() => { restoring = null; });

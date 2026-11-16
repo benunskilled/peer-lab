@@ -6,7 +6,7 @@ const config = require('./config');
 const peerSync = require('./peer-sync');
 const { isValidPort } = require('./validate');
 // Address parsing/formatting lives in one module - see address.js for why.
-const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork, DEFAULT_PORTS } = require('./address');
+const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork, ipv4InCidr, DEFAULT_PORTS } = require('./address');
 const rpc = require('./rpc');
 const logger = require('./logger').make('manual-peer');
 const { logAction } = require('./peer-rotation/log');
@@ -24,15 +24,23 @@ const MAGIC = {
 
 const sha256d = (buf) => crypto.createHash('sha256').update(crypto.createHash('sha256').update(buf).digest()).digest();
 
-// A bare version message: no services, empty user agent, height 0, no tx
-// relay. Enough for a node to answer with its own version, and nothing more.
-function versionMessage(magic) {
-  const payload = Buffer.alloc(86);
+// A bare version message: no services, height 0, no tx relay. Enough for a
+// node to answer with its own version, and nothing more. The user agent is
+// `mark`, random letters for this one probe: if our own Core answered, its
+// getpeerinfo shows an inbound peer with that subver (answeredBySelf). Not
+// the start height: Core 32 no longer shows it in getpeerinfo (tried against
+// a regtest Core 32.1 before 1.0.0).
+function versionMessage(magic, mark = '') {
+  const ua = Buffer.from(mark, 'ascii');
+  if (ua.length > 252) throw new Error('user agent too long for a one-byte length');
+  const payload = Buffer.alloc(80 + 1 + ua.length + 5);
   payload.writeInt32LE(70016, 0);
   payload.writeBigInt64LE(BigInt(Math.floor(Date.now() / 1000)), 12);
   // addr_recv and addr_from stay zero: services 0, address ::, port 0.
   crypto.randomBytes(8).copy(payload, 72);
-  // user agent length 0 at 80, start height 0 at 81, relay 0 at 85.
+  payload.writeUInt8(ua.length, 80);
+  ua.copy(payload, 81);
+  // start height 0 and relay 0 after it.
   const header = Buffer.alloc(24);
   Buffer.from(magic, 'hex').copy(header, 0);
   header.write('version', 4, 'ascii');
@@ -52,20 +60,50 @@ function versionMessage(magic) {
  * container, not through Core's proxy. The slot fill never probes; it lets
  * Core connect (peer-rotation/fill.js).
  */
+// Different on every probe, and nothing a real client sends.
+const selfMark = () => `/${crypto.randomBytes(8).toString('hex')}/`;
+
+// Whether the node that answered is our own Core: reached through the
+// Umbrel's LAN or public address, umbrel.local, or a forwarded port, it looks
+// like any other node from here. Core has just read our version, so the
+// connection is in its getpeerinfo with our mark while the socket is open.
+// Core not answering: no proof either way, the probe stands.
+// Core sends its version a few lines before it stores ours (net_processing,
+// v32.1 L3916 and L3929, one handler call): asked in between, the subver is
+// still empty. Practically never, so asked once more after a moment.
+async function answeredBySelf(mark) {
+  for (const waitMs of [0, 250]) {
+    if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+    try {
+      const peers = await rpc.getPeerInfo();
+      if (Array.isArray(peers) && peers.some((p) => p.inbound && p.subver === mark)) return true;
+    } catch (err) {
+      logger.debug('getpeerinfo failed during a probe', { error: err.message });
+      return false;
+    }
+  }
+  return false;
+}
+
+// Resolves true when a node on this chain answers, 'self' when that node is
+// our own Core, false otherwise.
 function probePort(host, port, timeoutMs = 3000) {
   const magic = MAGIC[config.bitcoin.network] || MAGIC.mainnet;
+  const mark = selfMark();
   return new Promise((resolve) => {
     const socket = net.connect({ host, port });
     let settled = false;
     let got = Buffer.alloc(0);
-    const done = (ok) => {
+    const done = async (ok) => {
       if (settled) return;
       settled = true;
+      // Open until Core has been asked: closed, the connection leaves its list.
+      const self = ok && await answeredBySelf(mark);
       socket.destroy();
-      resolve(ok);
+      resolve(self ? 'self' : ok);
     };
     socket.setTimeout(timeoutMs);
-    socket.once('connect', () => socket.write(versionMessage(magic)));
+    socket.once('connect', () => socket.write(versionMessage(magic, mark)));
     socket.on('data', (chunk) => {
       got = Buffer.concat([got, chunk]);
       if (got.length < 16) return;
@@ -170,6 +208,8 @@ async function probePeer(rawInput) {
   const { addr, port: explicitPort } = resolveHostPort(host);
   const route = await routeOf(addr);
   if (route && route.refuse) return { ok: false, error: route.refuse };
+  const own = ownAddress(addr);
+  if (own) return { ok: false, error: own };
   // Reached through Tor or I2P: not tested from here, handed to Core as it is.
   // Without a port, the network's default - there is no port to search for.
   if (route && route.via) {
@@ -197,11 +237,13 @@ async function probePeer(rawInput) {
       return { ok: false, error: `${explicitPort} is not a valid port (1-65535)` };
     }
     const reachable = await probePort(addr, explicitPort);
+    if (reachable === 'self') return { ok: false, error: OWN };
     if (!reachable) return { ok: false, error: `no Bitcoin node answering at ${formatAddress(addr, explicitPort)}` };
     return { ok: true, address: formatAddress(addr, explicitPort), triedPorts: [explicitPort] };
   }
 
   const address = await findListeningAddress(addr);
+  if (address === 'self') return { ok: false, error: OWN };
   if (address) return { ok: true, address, triedPorts: config.manualPeerPorts };
 
   return {
@@ -230,6 +272,44 @@ async function probePeer(rawInput) {
  * answer, the last answer may still send the address to Core or refuse it,
  * never test it from here: the reader is asked to try again.
  */
+/**
+ * The node itself is no peer. Two ways it could be typed in:
+ *  - an address inside Umbrel's app network: the Docker gateway (every relayed
+ *    inbound peer shows as 10.21.0.1, so adding it would disconnect them all),
+ *    Core's own container, or another app;
+ *  - one of the addresses Core says it is reachable at (getnetworkinfo
+ *    localaddresses, its own onion among them).
+ * Either would hand Core an addnode to itself, which it refuses forever while
+ * the entry holds a manual slot (review before 1.0.0). Loopback is left alone:
+ * in this container it is the container, never Core, and nothing listens.
+ */
+const OWN = "That is your own node, or an app on your Umbrel, not a peer.";
+// One spelling per IPv6 literal (2001:0db8:0::7 is 2001:db8::7), and an
+// IPv4-mapped one in either form back to dotted IPv4.
+function plainHost(raw) {
+  let host = String(raw || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (host.includes(':')) {
+    try {
+      host = new URL(`http://[${host}]/`).hostname.slice(1, -1);
+    } catch {
+      return host;
+    }
+    const mapped = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mapped) {
+      const [hi, lo] = mapped.slice(1).map((h) => parseInt(h, 16));
+      host = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+    }
+  }
+  return host;
+}
+function ownAddress(addr) {
+  const host = plainHost(addr);
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) && config.umbrelInternalNetworkCidr
+    && ipv4InCidr(host, config.umbrelInternalNetworkCidr)) return OWN;
+  const local = ((netInfo && netInfo.localaddresses) || []).map((a) => plainHost(a.address));
+  return local.includes(host) ? OWN : null;
+}
+
 const NET_NAME = { Tor: 'onion', I2P: 'i2p' };
 const TEST_VIA = (via) => `Your node reaches this peer through ${via}. To keep your node's address private, ` +
   "Peer Lab doesn't test it from here. Add & Keep hands it straight to Core.";
@@ -288,7 +368,8 @@ function routeFrom(answer, addr, overlay) {
 
 /**
  * Given a bare host, returns the first configured P2P port where a Bitcoin
- * node answers - already in Core's own address format - or null if none does.
+ * node answers - already in Core's own address format - 'self' if that node
+ * is our own Core, or null if none does.
  *
  * Shared on purpose: Slot Fill has to answer exactly this
  * question for an inbound candidate (whose observed port is its ephemeral
@@ -299,6 +380,7 @@ function routeFrom(answer, addr, overlay) {
 async function findListeningAddress(host) {
   for (const port of config.manualPeerPorts) {
     const reachable = await probePort(host, port);
+    if (reachable === 'self') return 'self';
     if (reachable) return formatAddress(host, port);
   }
   return null;

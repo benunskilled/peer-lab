@@ -58,6 +58,9 @@ Where each tag comes from:
 - AtlasPool, Braiins Solo, Satoshi Radio, SoloHash, SoloMining.de, 2Miners,
   Parasite, mutatrum, Blitzpool, MintSolo: the text in a mining job each pool
   handed out to a stratum subscribe, October 2026.
+- SoloLuck, "/sololuck.io/": the pool's own entry in an open pull request to
+  that list ([bitcoin-data/mining-pools#132](https://github.com/bitcoin-data/mining-pools/pull/132),
+  tag only, a ckpool-based solo pool with no block yet in November 2026).
 - F2Pool's lowercase tags "/f2pool/m" and "/f2pool.kz/c" (F2Pool's
   Kazakhstan branch): the list has only "F2Pool", and the match is exact.
   Both pay 546 sat to 1K6KoYC69NnafWJ7YgtrpwJxBLiijWqwa6 like F2Pool's other

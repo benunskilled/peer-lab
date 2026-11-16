@@ -467,11 +467,11 @@ function noteBook(candidates, nets, now) {
  * MAX_TRIALS on trial at once. `peers` is getpeerinfo from this pass. Returns
  * the addresses put on trial, an empty list for none.
  */
-async function start(ranking, peers, chain, now = Date.now()) {
+async function start(ranking, peers, chain, now = Date.now(), { maxTrials = MAX_TRIALS } = {}) {
   const started = [];
   // As many on trial as may be: nothing to ask Core, and the page keeps what
   // the last look found (15 s checks while trials run, review 15.11.2026).
-  if (trials().length >= MAX_TRIALS) return started;
+  if (trials().length >= maxTrials) return started;
   lastLook = null;
   lastBook = null;
   lastPicks = null;
@@ -484,7 +484,7 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // With every slot in use the book is still counted, for the page: how
   // much there would be to pick from (noteBook). Nothing is tried.
   const full = trusted.length >= max;
-  const room = () => Math.min(MAX_TRIALS - trials().length, max - trusted.length);
+  const room = () => Math.min(maxTrials - trials().length, max - trusted.length);
 
   let networkInfo;
   try {

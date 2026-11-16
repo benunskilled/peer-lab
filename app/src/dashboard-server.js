@@ -806,21 +806,24 @@ const routes = {
   'POST /api/peers/untrust': async (req, res, url) => {
     const { address } = await readBody(req);
     if (!readAddress(res, address)) return true;
-    const wasManual = Boolean(db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ?').get(address));
+    // By any spelling, as the removal itself goes: a page drawn before the row
+    // took Core's spelling still sends the old one (review before 1.0.0).
+    const stored = peerSync.trustedSpelling(address);
+    const wasManual = Boolean(db.instance.prepare('SELECT 1 FROM trusted_peer WHERE address = ?').get(stored));
     await peerSync.removeTrustedPeer(address);
     // In the log: a slot freed by hand is what Slot Fill fills next, and the
     // entry it writes then needs this one before it to make sense.
     if (wasManual) {
       try {
         // No note: where it was is under its address.
-        peerRotation.logAction({ action: 'unmanual', address });
+        peerRotation.logAction({ action: 'unmanual', address: stored });
       } catch (err) {
         logger.warn('Slot Fill log entry for a removal failed', { address, error: err.message });
       }
       // The freed slot is filled at the profiler's next poll, after the log
       // entry above, and the peer is not tried again for a week.
       try {
-        peerRotation.freedByHand(address);
+        peerRotation.freedByHand(stored);
       } catch (err) {
         logger.warn('slot fill request after a removal failed', { address, error: err.message });
       }

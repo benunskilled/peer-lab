@@ -6,7 +6,7 @@ Slot Fill offers Tor and I2P once they are turned on in Core. Without a pick, it
 
 To customise the app, set environment variables in your Docker Compose configuration. The tables below list the available settings and their defaults.
 
-Where both a `BITCOIN_*` variable and an `APP_BITCOIN_*` equivalent exist, the `BITCOIN_*` value takes precedence. Slot Fill and Stratum Race are switched on in the dashboard.
+Where both a `BITCOIN_*` variable and an `APP_BITCOIN_*` equivalent exist, the `BITCOIN_*` value takes precedence in the Node services. The `peers` service reads only `APP_BITCOIN_NODE_IP`, `APP_BITCOIN_RPC_PORT`, `APP_BITCOIN_RPC_USER` and `APP_BITCOIN_RPC_PASS`, and does not start without them. Slot Fill and Stratum Race are switched on in the dashboard.
 
 Apply shared settings consistently to the services that use them, then recreate the affected containers. See [compose.dev.yml](../../compose.dev.yml) for a Compose example and [src/lib/config.js](../src/lib/config.js) for the configuration source.
 

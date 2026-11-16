@@ -737,3 +737,69 @@ test('G1: no direct test unless Core has just said no proxy is in the way', asyn
     server.close();
   }
 });
+
+test('the node itself is refused: an address in Umbrel\'s app network or one Core is reachable at', async () => {
+  const calls = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { calls.push(`addnode ${cmd} ${addr}`); });
+  mock.method(rpc, 'disconnectNode', async (addr) => { calls.push(`disconnect ${addr}`); });
+  mock.method(rpc, 'getNetworkInfo', async () => ({
+    networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+      { name: 'onion', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+    ],
+    localaddresses: [
+      { address: '203.0.113.7', port: 8333 },
+      { address: '2001:db8::7', port: 8333 },
+      { address: 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz234567.onion', port: 8333 },
+    ],
+  }));
+
+  for (const input of ['10.21.0.1', '10.21.21.8:8333', '203.0.113.7', '[2001:db8::7]:8333', '2001:0DB8:0:0::7',
+    '[::ffff:10.21.0.1]:8333', '[::ffff:a15:1]:8333', '0:0:0:0:0:ffff:10.21.0.1',
+    'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz234567.onion']) {
+    const result = await manualAddPeer(input);
+    assert.equal(result.ok, false, input);
+    assert.match(result.error, /your own node/, input);
+  }
+  assert.deepEqual(calls, [], 'nothing reaches Core');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 0);
+});
+
+test('our own Core reached by another address (LAN, public, umbrel.local) is refused: it shows our probe among its peers', async () => {
+  let mark = null;
+  const { server, port } = await withListeningPort((socket) => {
+    socket.once('data', (buf) => {
+      // The user agent of the version we were sent (header 24, length at 80).
+      const len = buf.readUInt8(24 + 80);
+      mark = buf.subarray(24 + 81, 24 + 81 + len).toString('ascii');
+      socket.write(versionMessage(MAGIC.mainnet));
+    });
+    socket.on('error', () => {});
+  });
+  try {
+    const calls = [];
+    mock.method(rpc, 'addNode', async (addr, cmd) => { calls.push(`addnode ${cmd} ${addr}`); });
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+    ] }));
+    mock.method(rpc, 'getPeerInfo', async () => [
+      { addr: '198.51.100.1:8333', inbound: true, subver: '/Satoshi:32.1.0/' },
+      { addr: '10.21.0.1:51234', inbound: true, subver: mark },
+    ]);
+    const tested = await probePeer(`127.0.0.1:${port}`);
+    assert.equal(tested.ok, false);
+    assert.match(tested.error, /your own node/);
+    const added = await manualAddPeer(`127.0.0.1:${port}`);
+    assert.equal(added.ok, false);
+    assert.deepEqual(calls, []);
+    assert.match(mark, /^\/[0-9a-f]{16}\/$/, 'random, and nothing a real client sends');
+
+    // Another node, same probe: Core shows no peer with our mark.
+    mock.method(rpc, 'getPeerInfo', async () => [{ addr: '198.51.100.1:8333', inbound: true, subver: '/Satoshi:32.1.0/' }]);
+    assert.equal((await probePeer(`127.0.0.1:${port}`)).ok, true);
+  } finally {
+    server.close();
+  }
+});
