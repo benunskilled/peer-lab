@@ -103,6 +103,7 @@ test('a ckpool-run pool is named by its own tag, not as CKPool', () => {
     'ckpool /braiinssolo/': 'Braiins Solo',
     'ckpool /Mined by Satoshi Radio/': 'Satoshi Radio',
     'ckpool /pool.mutatrum.com/': 'mutatrum',
+    'ckpool /sololuck.io/': 'SoloLuck',
     'AtlasPool/FRA': 'AtlasPool',
     'eu/solo.ckpool.org/': 'Solo CK',
     'ckpool': 'CKPool',
