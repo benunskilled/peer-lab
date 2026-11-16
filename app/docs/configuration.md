@@ -2,7 +2,7 @@
 
 Peer Lab is ready to use with its default settings. On Umbrel, the connection details for Bitcoin Core are supplied automatically.
 
-Slot Fill can add Tor and I2P peers if Core connects out over those networks. On Umbrel: **Bitcoin Node → Settings → Outgoing Peer Connections**.
+Slot Fill offers Tor and I2P once they are turned on in Core. Without a pick, it goes there only while Core itself connects out over them. On Umbrel: **Bitcoin Node → Settings → Outgoing Peer Connections**.
 
 To customise the app, set environment variables in your Docker Compose configuration. The tables below list the available settings and their defaults.
 
