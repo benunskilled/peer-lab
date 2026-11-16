@@ -497,7 +497,9 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // the reader may pick, Tor and I2P included whenever Core may use them.
   const nets = usableNetworks(networkInfo, peers);
   const offered = offeredNetworks(networkInfo, peers);
-  if (!offered.size) return looked('no_network', {}, started);
+  // No outbound connection at all and nothing picked: the usual pick has no
+  // network, and the page says so rather than "nothing found" (review).
+  if (!offered.size || (!nets.size && !pickedRegions().length)) return looked('no_network', {}, started);
   const banned = await bannedMatcher();
   if (!banned) return looked('core', {}, started);
 

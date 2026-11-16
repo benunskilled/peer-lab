@@ -840,6 +840,7 @@ test('slot fill: Tor and I2P are offered wherever Core may use them, and a pick 
   const peers = () => setPeers([coreOut('ipv4'), { id: 9, addr: `${'e'.repeat(56)}.onion:8333`, network: 'onion', connection_type: 'inbound' }]);
 
   assert.equal((await step(peers(), Date.now())).started, 0, 'unpicked: not where Core is not connected out');
+  assert.equal(fill.lastLook().why, 'none_fit');
   const book = fill.lastBook();
   assert.equal(book.regions.TOR, 1, 'Tor has its button, with what there is');
   assert.equal(book.regions.I2P, 0, 'I2P too, Core may use it');
@@ -854,6 +855,11 @@ test('slot fill: Tor and I2P are offered wherever Core may use them, and a pick 
   } finally {
     setPickedRegions([]);
   }
+
+  // No outbound connection at all: the page says so, not "nothing found".
+  require('../src/lib/peer-rotation/addrbook').resetForTests();
+  await step(setPeers([{ id: 9, addr: `${'e'.repeat(56)}.onion:8333`, network: 'onion', connection_type: 'inbound' }]), Date.now());
+  assert.equal(fill.lastLook().why, 'no_network');
 });
 
 test('slot fill: nothing Core has banned', async () => {
