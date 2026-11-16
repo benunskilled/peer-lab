@@ -618,7 +618,7 @@ test('slot fill: with clearnet, no second I2P connection - Core\'s own counts - 
   await step(peers, Date.now());
 
   assert.equal(fill.currentTrial().address, asia, 'Asia and I2P have one connection each; I2P is full');
-  assert.equal(fill.currentTrial().note, 'Asia had only 1');
+  assert.equal(fill.currentTrial().note, 'Japan, a new country');
 });
 
 test('slot fill: with clearnet and an I2P connection already, an I2P candidate alone is not taken', async () => {
@@ -2135,4 +2135,18 @@ test('with Slot Fill on, the profiler runs a pass at start, once', () => {
   peerRotation.setEnabled(false);
   peerRotation._resetStartPassForTest();
   assert.equal(peerRotation.waitsForFirstPass(), false, 'off: none');
+});
+
+// Review 16.11.2026: once no region is missing, a second Australian from
+// "tried" came before New Zealand, which was only in "new".
+test('slot fill: a new country from "new" goes before a country again from "tried"', async () => {
+  for (const r of ['EU', 'NA', 'AS', 'AF', 'SA']) at(seedLivePeer({ eligible: 144 }), r);
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'OC', 'op-au1', 'AU');
+  inBook('198.18.9.1', 'OC', { operator: 'op-au2', country: 'AU' });
+  const nz = inNew('198.18.9.2');
+  at(nz, 'OC', 'op-nz', 'NZ');
+  require('../src/lib/peer-rotation/addrbook').resetForTests();
+  await step(setPeers([coreOut()]), Date.now());
+  assert.equal(fill.currentTrial().address, nz);
+  assert.equal(fill.currentTrial().note, 'New Zealand, a new country');
 });

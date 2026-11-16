@@ -15,9 +15,11 @@
  *
  * So the free slots are spread, and counted over all of the node's outbound
  * connections, Core's own and the manual ones (10.11.2026: a manual peer in
- * Europe beside Core's five there added nothing). The region with the fewest
- * of them (the six continents, Tor and I2P) gets the next free slot, and no
- * operator Core or a manual peer already uses gets in again. A slot no
+ * Europe beside Core's five there added nothing). A region with none of them
+ * (the six continents, Tor and I2P) gets the next free slot; after that a
+ * country no manual peer is in yet, in the region with the fewest
+ * (16.11.2026: wide, not three in Australia). No operator Core or a manual
+ * peer already uses gets in again. A slot no
  * missing region can fill goes to anyone the operator rule lets in. Nobody
  * is ever moved out for the spread.
  *
