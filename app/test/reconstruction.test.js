@@ -184,3 +184,14 @@ test('an unclear block is left out of the shares, like one that was not told', (
   add(3, 'unclear', null);
   assert.deepEqual(blocks.reconstructionLast(), { blocks: 2, mempool: 1, asked: 1, full: 0, askedAvgBytes: 20000 });
 });
+
+// Review G5 (15.11.2026): the first of two blocks moments apart can finish
+// last; its older snapshot replaced the newer, and the block after was then
+// compared with neither.
+test('a late block does not replace the snapshot of a newer one', () => {
+  relay.reconstructionOf([peer(1, { recv: { cmpctblock: 100 } })], { height: 300 }, 5_000_000);
+  relay.reconstructionOf([peer(1, { recv: { cmpctblock: 300 } })], { height: 302 }, 5_100_000);
+  // 301's questions come back after 302's.
+  relay.reconstructionOf([peer(1, { recv: { cmpctblock: 200 } })], { height: 301 }, 5_050_000);
+  assert.equal(relay.reconstructionOf([peer(1, { recv: { cmpctblock: 400 } })], { height: 303 }, 5_700_000).kind, 'mempool');
+});

@@ -815,3 +815,11 @@ test('a request body over 1 MB gets a 413 answer, not a dropped connection', asy
   assert.equal(status.code, 413);
   assert.match(status.body, /too large/);
 });
+
+// Review G9: the same Accept-Encoding cases as the peers service
+// (peers/testdata/accept-encoding.json), so the two never disagree.
+test('gzip is offered by the same rule as the peers service', () => {
+  const { acceptsGzip } = require('../src/dashboard-server');
+  const cases = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../../peers/testdata/accept-encoding.json'), 'utf8'));
+  for (const [header, want] of cases) assert.equal(acceptsGzip(header), want, header);
+});

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -51,5 +52,23 @@ func TestGzipped(t *testing.T) {
 	}
 	if rec := get("/app.js", map[string]string{"Accept-Encoding": "gzip", "Range": "bytes=0-9"}); rec.Header().Get("Content-Encoding") != "" {
 		t.Error("a range request was packed")
+	}
+}
+
+// Review G9 (15.11.2026): "*;q=1, gzip;q=0" means never gzip. One list of
+// cases for this and the dashboard's copy (app/test/dashboard-api.test.js).
+func TestAcceptsGzipSharedCases(t *testing.T) {
+	raw, err := os.ReadFile("testdata/accept-encoding.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases [][2]any
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cases {
+		if got := acceptsGzip(c[0].(string)); got != c[1].(bool) {
+			t.Errorf("acceptsGzip(%q) = %v, want %v", c[0], got, c[1])
+		}
 	}
 }

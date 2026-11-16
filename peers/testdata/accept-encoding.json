@@ -1,0 +1,15 @@
+[
+  ["gzip", true],
+  ["gzip, deflate, br", true],
+  ["GZIP;Q=0.5", true],
+  ["gzip;q=0", false],
+  ["gzip;q=0.000", false],
+  ["*;q=1, gzip;q=0", false],
+  ["gzip;q=0, *", false],
+  ["*", true],
+  ["*;q=0", false],
+  ["br, deflate", false],
+  ["x-gzip", false],
+  ["", false],
+  ["gzip;q=abc", false]
+]

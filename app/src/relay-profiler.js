@@ -364,7 +364,12 @@ let lastSnapshot = null;
 function reconstructionOf(peers, header, detectedAtMs) {
   const height = header && Number.isInteger(header.height) ? header.height : null;
   const before = lastSnapshot && height != null && lastSnapshot.height === height - 1 ? lastSnapshot : null;
-  lastSnapshot = { ...reconstruction.snapshot(peers, detectedAtMs), height };
+  // Of two blocks moments apart, the first one's questions can come back
+  // last: its older snapshot must not replace the newer one, or the block
+  // after is compared with neither (review G5, 15.11.2026). Same height - a
+  // reorg's replacement - does replace it.
+  const older = lastSnapshot && height != null && lastSnapshot.height != null && height < lastSnapshot.height;
+  if (!older) lastSnapshot = { ...reconstruction.snapshot(peers, detectedAtMs), height };
   return reconstruction.classify(before, peers);
 }
 

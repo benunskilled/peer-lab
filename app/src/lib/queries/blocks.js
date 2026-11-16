@@ -307,7 +307,10 @@ function attributionHealth() {
 
   const healthy = { ok: true, blocks: rows.length, reason: null, skewMs: null };
   if (rows.length < ATTRIBUTION_SAMPLE) return healthy;
-  if (rows.some((r) => r.firstCount > 0)) return healthy;
+  // Credited means exactly one match: with two or more nobody is credited
+  // (relay-profiler.js, isFirstPeer), so three such blocks are no sign of
+  // health (review G7, 15.11.2026).
+  if (rows.some((r) => r.firstCount === 1)) return healthy;
 
   // Nobody credited across the whole sample. Is the clock the explanation?
   const deltas = rows
