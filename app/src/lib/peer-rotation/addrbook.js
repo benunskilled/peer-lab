@@ -97,6 +97,20 @@ function usableNetworks(networkInfo, peers) {
 }
 
 /**
+ * The networks the reader may pick from (16.11.2026: "I want to see all
+ * addresses and decide myself"): the usable ones, and Tor and I2P wherever
+ * Core may use them, connected there right now or not. Which networks Core
+ * dials out on is chance; Tor with seven inbound and no outbound at the
+ * moment had no button. IPv6 stays out unless it works: in a container
+ * without an IPv6 route every candidate there would fail.
+ */
+function offeredNetworks(networkInfo, peers) {
+  const allowed = new Set(((networkInfo && networkInfo.networks) || []).filter((n) => n.reachable).map((n) => n.name));
+  const usable = usableNetworks(networkInfo, peers);
+  return new Set(NETWORKS.filter((n) => usable.has(n) || ((n === 'onion' || n === 'i2p') && allowed.has(n))));
+}
+
+/**
  * Whether Core has banned an address. Core keeps its bans as subnets, and its
  * manual dial path does not look at them, so the slot fill has to. Null when
  * Core does not say - no answer about bans is no licence to ignore them.
@@ -130,4 +144,4 @@ function resetForTests() {
   book = null;
 }
 
-module.exports = { bookEntries, usableNetworks, bannedMatcher, servesBlocks, resetForTests };
+module.exports = { bookEntries, usableNetworks, offeredNetworks, bannedMatcher, servesBlocks, resetForTests };
