@@ -1068,8 +1068,9 @@ function lastTryText(st) {
   // showed "couldn&#39;t" (15.11.2026).
   return ` The peer before${where ? `, in ${where},` : ''} ${whyText(l.reason)}.`;
 }
-// "8 of 8 slots used · 4,812 addresses to pick from · none in Africa", and
-// per region under it, each a button to pick it (15.11.2026).
+// "8 of 8 slots used · 4,812 addresses to pick from", and per region under
+// it, each a button to pick it (15.11.2026). A region with none shows 0 on
+// its button; the line does not repeat it (16.11.2026).
 const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
   const box = document.getElementById('slot-book');
@@ -1082,8 +1083,6 @@ function renderSlotBook() {
   // pass: the two sit close together on the page and must agree.
   const used = manualSlotsUsed();
   const n = (x) => Number(x).toLocaleString('en-US');
-  const regions = Object.entries(b.regions || {}).sort((x, y) => y[1] - x[1]);
-  const none = regions.filter(([, c]) => !c).map(([r]) => BOOK_REGIONS[r] || r);
   // The buttons in a fixed order, so none moves under a finger when a count
   // changes; a picked region the book no longer lists (Tor gone) still has
   // its button, to be unpicked.
@@ -1097,7 +1096,7 @@ function renderSlotBook() {
   const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
   const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
   document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
-    + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : none.length && b.total ? ` \u00b7 none in ${none.join(', ')}` : '');
+    + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : '');
   // Each region a switch (15.11.2026): picked, the next free slots go there.
   // One with nothing to pick from cannot be picked, but stays to be unpicked.
   const html = buttons.map(([r, c]) => {

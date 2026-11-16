@@ -36,7 +36,7 @@ const { logAction } = require('./log');
 const { addressKey, hostFromAddress, unreachableNetwork } = require('../address');
 const spread = require('./spread');
 const { pickedRegions } = require('./picks');
-const { bookEntries, usableNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
+const { bookEntries, usableNetworks, offeredNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
 const { otherChainOf } = require('../queries/ranking-row');
 
 const TRIAL_KEY = 'slot_fill_trial';
@@ -442,7 +442,7 @@ const looked = (why, counts = {}, result = []) => { lastLook = { why, ...counts 
 // per region, for the line on the page ("4,812 addresses to pick from"):
 // those from "tried", Core has connected to them before - what the page says.
 // A region a usable network could reach but nobody in the book sits in is
-// there with 0, so the page can name it; Tor and I2P only where Core uses them.
+// there with 0, so the page can name it; Tor and I2P wherever Core may use them.
 // Cleared at every look, so a look that could not read the book shows none
 // rather than an old count beside a status that says the book is empty.
 let lastBook = null;
@@ -493,8 +493,11 @@ async function start(ranking, peers, chain, now = Date.now()) {
     logger.debug('slot fill: getnetworkinfo failed', { error: err.message });
     return looked('core', {}, started);
   }
+  // `nets`: where the usual pick looks. `offered`: what the page lists and
+  // the reader may pick, Tor and I2P included whenever Core may use them.
   const nets = usableNetworks(networkInfo, peers);
-  if (!nets.size) return looked('no_network', {}, started);
+  const offered = offeredNetworks(networkInfo, peers);
+  if (!offered.size) return looked('no_network', {}, started);
   const banned = await bannedMatcher();
   if (!banned) return looked('core', {}, started);
 
@@ -506,11 +509,11 @@ async function start(ranking, peers, chain, now = Date.now()) {
   ]);
   const failed = recentlyFailed(now);
   const all = await bookEntries(now);
-  const reachable = all.filter((c) => nets.has(c.network));
+  const reachable = all.filter((c) => offered.has(c.network));
   const book = freshFirst(reachable
     .filter((c) => !inUse.has(hostFromAddress(c.address)) && !banned(c.address) && !failed.has(keyOf(c.address))), now);
   const counts0 = { known: all.length, reachable: reachable.length, untried: book.length };
-  if (all.length) noteBook(book, nets, now);
+  if (all.length) noteBook(book, offered, now);
   if (full) return looked('full', {}, started);
   if (!all.length) return looked('no_book', counts0, started);
   if (room() <= 0) return started;
@@ -534,14 +537,18 @@ async function start(ranking, peers, chain, now = Date.now()) {
     const outbound = spread.totalCounts(trusted, coreRegions);
     const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (outbound[r] || 0) < spread.TARGET_PER_REGION));
     const inGap = (c) => gaps.has(spread.placeOf(c).region);
-    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, coreCountries);
+    const rankedAll = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, coreCountries);
     // A picked Tor or I2P is the reader's word against that rule.
     const capped = (c) => {
       const { region } = spread.placeOf(c);
       return clearnet && (region === 'TOR' || region === 'I2P') && (outbound[region] || 0) >= 1 && !picked.has(region);
     };
-    for (let i = ranked.length - 1; i >= 0; i--) if (capped(ranked[i])) ranked.splice(i, 1);
+    for (let i = rankedAll.length - 1; i >= 0; i--) if (capped(rankedAll[i])) rankedAll.splice(i, 1);
+    // The usual pick only where Core is connected out now; a picked region
+    // may be anywhere the page offers.
+    const ranked = rankedAll.filter((c) => nets.has(c.network));
     const tried = ranked.filter((c) => !c.fromNew);
+    const triedAll = rankedAll.filter((c) => !c.fromNew);
     // A missing region "tried" has nobody from may look in "new" (addrbook.js).
     // Nobody the provider rule would let in, that is: a region whose only
     // tried candidates are with providers already in use is still missing.
@@ -567,8 +574,8 @@ async function start(ranking, peers, chain, now = Date.now()) {
     // Core's own outbound peers use may come in, one the manual peers already
     // have never. Decided over the picked regions together, not each alone.
     const pickKeys = (keys) => {
-      const triedPicked = new Set(tried.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
-      const list = picked.size ? ranked.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
+      const triedPicked = new Set(triedAll.filter((c) => inPicked(c) && spread.admit(c, trusted, max, keys)).map((c) => spread.placeOf(c).region));
+      const list = picked.size ? rankedAll.filter((c) => inPicked(c) && (!c.fromNew || !triedPicked.has(spread.placeOf(c).region))) : [];
       return { list, left: list.some((c) => spread.admit(c, trusted, max, keys)) };
     };
     let mine = pickKeys(coreKeys);

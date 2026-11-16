@@ -584,7 +584,7 @@ test('slot fill: with every slot in use it adds nobody, but counts what there is
   assert.equal(book.regions.AS, 2);
   assert.equal(book.regions.EU, 1);
   assert.equal(book.regions.AF, 0, 'a continent nobody in the book sits in is named, with 0');
-  assert.equal('TOR' in book.regions, false, 'Tor only where Core uses it');
+  assert.equal('TOR' in book.regions, false, 'Tor only where Core may use it');
 
   // A look that cannot read the book shows no count, not the old one.
   rpc.call.mock.mockImplementation(async () => { throw new Error('down'); });
@@ -826,6 +826,34 @@ test('slot fill: only networks Core may use and is connected on right now', asyn
   const result = await step(setPeers([coreOut('ipv4'), coreOut('onion')]), Date.now());
   assert.equal(result.started, 1);
   assert.equal(fill.currentTrial().address, tor);
+});
+
+test('slot fill: Tor and I2P are offered wherever Core may use them, and a pick goes there; the usual pick does not', async () => {
+  const { setPickedRegions } = require('../src/lib/peer-rotation/picks');
+  mock.method(rpc, 'getNetworkInfo', async () => ({
+    networks: ['ipv4', 'ipv6', 'onion', 'i2p'].map((name) => ({ name, reachable: true, proxy: name === 'onion' ? '127.0.0.1:9050' : '' })),
+  }));
+  at(seedLivePeer({ eligible: 144, first: 50, trusted: true }), 'EU');
+  inBook('2001:db8::10', 'AS', { network: 'ipv6' });
+  const tor = inBook(`${'d'.repeat(56)}.onion`, null, { network: 'onion' });
+  // Tor inbound only, no outbound there: chance, not a broken network.
+  const peers = () => setPeers([coreOut('ipv4'), { id: 9, addr: `${'e'.repeat(56)}.onion:8333`, network: 'onion', connection_type: 'inbound' }]);
+
+  assert.equal((await step(peers(), Date.now())).started, 0, 'unpicked: not where Core is not connected out');
+  const book = fill.lastBook();
+  assert.equal(book.regions.TOR, 1, 'Tor has its button, with what there is');
+  assert.equal(book.regions.I2P, 0, 'I2P too, Core may use it');
+  assert.equal(book.regions.AS, 0, 'IPv6 stays out: it may have no route at all');
+
+  try {
+    setPickedRegions(['TOR']);
+    require('../src/lib/peer-rotation/addrbook').resetForTests();
+    const result = await step(peers(), Date.now());
+    assert.equal(result.started, 1, 'picked: the reader decides');
+    assert.equal(fill.currentTrial().address, tor);
+  } finally {
+    setPickedRegions([]);
+  }
 });
 
 test('slot fill: nothing Core has banned', async () => {
