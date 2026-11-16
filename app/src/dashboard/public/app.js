@@ -731,6 +731,8 @@ window.peerLab = {
   gone: (address) => justGone.has(address),
   // Its row stays a moment with this word ("Removed"), or null.
   leaving: (address) => (leaving.get(address) || {}).text || null,
+  // Its 5 s are over: drawn again in this last moment, it is already gliding.
+  leavingOut: (address) => { const l = leaving.get(address); return Boolean(l && Date.now() - l.at >= LEAVE_MS); },
   // The place for the slim row, once: `take` says it has been used.
   leavingPlace: (take) => {
     if (leavingPlace && Date.now() - leavingPlace.at > LEAVE_MS) leavingPlace = null;
@@ -954,7 +956,7 @@ let leavingPlace = null; // { address, top, at }
 function markLeaving(address, text, top) {
   const at = Date.now();
   leaving.set(address, { at, text });
-  leavingPlace = typeof top === 'number' ? { address, top, at } : null;
+  leavingPlace = typeof top === 'number' ? { address, top, at, y: window.scrollY } : null;
   window.dispatchEvent(new Event('peerlab:ranking'));
   setTimeout(() => {
     for (const tr of document.querySelectorAll('#tables tr.leaving')) {

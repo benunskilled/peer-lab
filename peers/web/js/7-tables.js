@@ -45,7 +45,8 @@
       const { peers, all, kindPool } = groupPeers(g);
       // A row removed or disconnected a moment ago stands where it was, as
       // it was last shown, saying so (see markLeaving in app.js).
-      const rows = peers.concat([...lastShown.values()].filter((r) => r.g === g && !peers.some((p) => p.addr === r.p.addr)
+      // Not under a filter: a slim row there would stand outside it.
+      const rows = state.place || state.group ? peers : peers.concat([...lastShown.values()].filter((r) => r.g === g && !peers.some((p) => p.addr === r.p.addr)
         && dashboard().leaving && dashboard().leaving(r.p.addr)).map((r) => ({ ...r.p, leaving: dashboard().leaving(r.p.addr), leftAt: r.i })));
       const card = document.createElement("section");
       card.className = "card group-card";
@@ -295,9 +296,12 @@
   // A row removed or disconnected here comes to stand where its button was
   // tapped: its open panel closing would otherwise pull what was below up
   // under the finger, a screen's height on a phone (16.11.2026).
-  function placeLeaving() {
+  // `y`: the scroll position before this drawing. A reader who scrolled
+  // since the tap keeps their own place.
+  function placeLeaving(y) {
     const pl = dashboard().leavingPlace && dashboard().leavingPlace(false);
     if (!pl) return;
+    if (Math.abs(y - pl.y) > 2) { dashboard().leavingPlace(true); return; }
     const tr = [...document.querySelectorAll("#tables tr.leaving")].find((t) => t.dataset.anchor.endsWith(" " + pl.address));
     if (!tr) return;
     dashboard().leavingPlace(true);
@@ -314,7 +318,7 @@
     tr.dataset.anchor = g + " " + p.addr;
     if (p.leaving) {
       // Closed and slim: the address and what happened to it.
-      tr.className = "leaving";
+      tr.className = "leaving" + (dashboard().leavingOut && dashboard().leavingOut(p.addr) ? " out" : "");
       const td = document.createElement("td");
       td.colSpan = COLS.length;
       td.className = "leave-cell";

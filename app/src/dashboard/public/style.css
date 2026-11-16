@@ -420,6 +420,7 @@ table.peers.aligned { table-layout: fixed; }
    The glide only on .out: every redraw measures the tables first, and a
    transition there made the slim row twitch. */
 .peers tr.leaving td { color: var(--muted); }
+.peers tbody tr.leaving:not(.detail-row) { cursor: default; }
 .peers tr.leaving .leave { max-height: 3em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .peers tr.leaving.out td { padding-top: 0; padding-bottom: 0; transition: padding .4s ease; }
 .peers tr.leaving.out .leave { max-height: 0; opacity: 0; transition: max-height .4s ease, opacity .4s ease; }
