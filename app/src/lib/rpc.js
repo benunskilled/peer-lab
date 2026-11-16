@@ -104,6 +104,21 @@ function dropOnCut(res, method, reject) {
     if (!res.complete) reject(new Error(`RPC ${method}: connection closed mid-reply`));
   });
 }
+// The whole call has `timeoutMs`, not only the gaps between bytes (review
+// G6, 15.11.2026): http.request's timeout fires on silence, so a reply that
+// trickles in a byte at a time never ran out, and the poll behind it waited
+// with it. Settles once; the timer goes with the first answer. The time
+// includes a wait for one of the agent's four sockets, which the calls here
+// never come near.
+function deadline(req, method, timeoutMs, reject) {
+  const timer = setTimeout(() => {
+    req.destroy(new Error(`RPC ${method}: timed out after ${timeoutMs}ms`));
+    reject(new Error(`RPC ${method}: timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+  if (timer.unref) timer.unref();
+  return () => clearTimeout(timer);
+}
+
 // The body and the http.request options of one JSON-RPC call to Core.
 function request(method, params, timeoutMs) {
   const url = new URL(config.bitcoin.rpcUrl);
@@ -128,7 +143,10 @@ function request(method, params, timeoutMs) {
 }
 
 function call(method, params = [], { timeoutMs = 10000, maxBytes = MAX_RESPONSE_BYTES } = {}) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve0, reject0) => {
+    let done = () => {};
+    const resolve = (v) => { done(); resolve0(v); };
+    const reject = (e) => { done(); reject0(e); };
     const sentAtMs = Date.now();
     const { body, options } = request(method, params, timeoutMs);
     const req = http.request(
@@ -164,8 +182,20 @@ function call(method, params = [], { timeoutMs = 10000, maxBytes = MAX_RESPONSE_
             reject(new Error(`RPC ${method}: invalid JSON response (HTTP ${res.statusCode}): ${err.message}`));
             return;
           }
+          // JSON null, a list, or an object without `result`: not an answer
+          // (review G6: null threw outside this promise and took the process
+          // down; no `result` passed as a success with nothing in it). Core's
+          // own "no value" is `"result": null`, which is still one.
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            reject(new Error(`RPC ${method}: not a JSON-RPC reply (HTTP ${res.statusCode})`));
+            return;
+          }
           if (parsed.error) {
             reject(new Error(`RPC ${method} failed: ${parsed.error.message} (code ${parsed.error.code})`));
+            return;
+          }
+          if (!('result' in parsed)) {
+            reject(new Error(`RPC ${method}: reply without a result (HTTP ${res.statusCode})`));
             return;
           }
           resolve(parsed.result);
@@ -176,6 +206,7 @@ function call(method, params = [], { timeoutMs = 10000, maxBytes = MAX_RESPONSE_
 
     req.on('timeout', () => req.destroy(new Error(`RPC ${method}: timed out after ${timeoutMs}ms`)));
     req.on('error', reject);
+    done = deadline(req, method, timeoutMs, reject0);
     req.write(body);
     req.end();
   });
@@ -197,7 +228,10 @@ function timeCall(method, params = [], { timeoutMs = 30000, count = null } = {})
   // template, '"txid"', once per transaction. The tail of each chunk is kept
   // so a match split across two chunks is still found exactly once.
   const needle = count ? Buffer.from(count) : null;
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve0, reject0) => {
+    let done = () => {};
+    const resolve = (v) => { done(); resolve0(v); };
+    const reject = (e) => { done(); reject0(e); };
     const { body, options } = request(method, params, timeoutMs);
     const started = process.hrtime.bigint();
     const req = http.request(
@@ -220,6 +254,7 @@ function timeCall(method, params = [], { timeoutMs = 30000, count = null } = {})
           if (bytes < SHORT_REPLY_BYTES) {
             try {
               const parsed = JSON.parse(head);
+              if (!parsed || typeof parsed !== 'object') throw new Error('not an object');
               if (parsed.error) {
                 reject(new Error(`RPC ${method} failed: ${parsed.error.message} (code ${parsed.error.code})`));
                 return;
@@ -240,6 +275,7 @@ function timeCall(method, params = [], { timeoutMs = 30000, count = null } = {})
     );
     req.on('timeout', () => req.destroy(new Error(`RPC ${method}: timed out after ${timeoutMs}ms`)));
     req.on('error', reject);
+    done = deadline(req, method, timeoutMs, reject0);
     req.write(body);
     req.end();
   });

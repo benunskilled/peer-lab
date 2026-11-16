@@ -200,3 +200,32 @@ test('a reply Core cuts off halfway is an error, not a call that never ends', as
   await assert.rejects(rpc.call('getpeerinfo'), /closed mid-reply|aborted|socket hang up/);
   await assert.rejects(rpc.timeCall('getpeerinfo'), /closed mid-reply|aborted|socket hang up/);
 });
+
+// Review G6 (15.11.2026): the timeout measured only silence, so a reply that
+// trickles in a byte at a time never ran out.
+test('a call has its whole time, not only the gaps between bytes', async () => {
+  let timer;
+  handler = (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    timer = setInterval(() => res.write(' '), 50);
+    res.on('close', () => clearInterval(timer));
+  };
+  const started = Date.now();
+  await assert.rejects(rpc.call('getpeerinfo', [], { timeoutMs: 400 }), /timed out after 400ms/);
+  assert.ok(Date.now() - started < 2000, 'well before the trickle would end');
+  await assert.rejects(rpc.timeCall('getblocktemplate', [], { timeoutMs: 400 }), /timed out after 400ms/);
+  clearInterval(timer);
+});
+
+// Review G6: JSON null threw outside the promise and ended the process; an
+// object without `result` passed as a success with nothing in it.
+test('null, a list or an object without a result is not an answer; a null result is', async () => {
+  for (const body of [null, [], { id: 1, error: null }]) {
+    respond(body);
+    await assert.rejects(rpc.call('getpeerinfo'), /not a JSON-RPC reply|without a result/, JSON.stringify(body));
+  }
+  respond({ result: null, error: null });
+  assert.equal(await rpc.call('addnode'), null, 'Core\'s own "nothing" is still an answer');
+  respond(null);
+  await assert.rejects(rpc.timeCall('getblocktemplate'), /invalid short reply/);
+});
