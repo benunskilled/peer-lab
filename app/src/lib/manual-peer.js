@@ -6,7 +6,7 @@ const config = require('./config');
 const peerSync = require('./peer-sync');
 const { isValidPort } = require('./validate');
 // Address parsing/formatting lives in one module - see address.js for why.
-const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork, DEFAULT_PORTS } = require('./address');
+const { resolveHostPort, formatAddress, hostFromAddress, unreachableNetwork, ipv4InCidr, DEFAULT_PORTS } = require('./address');
 const rpc = require('./rpc');
 const logger = require('./logger').make('manual-peer');
 const { logAction } = require('./peer-rotation/log');
@@ -170,6 +170,8 @@ async function probePeer(rawInput) {
   const { addr, port: explicitPort } = resolveHostPort(host);
   const route = await routeOf(addr);
   if (route && route.refuse) return { ok: false, error: route.refuse };
+  const own = ownAddress(addr);
+  if (own) return { ok: false, error: own };
   // Reached through Tor or I2P: not tested from here, handed to Core as it is.
   // Without a port, the network's default - there is no port to search for.
   if (route && route.via) {
@@ -230,6 +232,26 @@ async function probePeer(rawInput) {
  * answer, the last answer may still send the address to Core or refuse it,
  * never test it from here: the reader is asked to try again.
  */
+/**
+ * The node itself is no peer. Two ways it could be typed in:
+ *  - an address inside Umbrel's app network: the Docker gateway (every relayed
+ *    inbound peer shows as 10.21.0.1, so adding it would disconnect them all),
+ *    Core's own container, or another app;
+ *  - one of the addresses Core says it is reachable at (getnetworkinfo
+ *    localaddresses, its own onion among them).
+ * Either would hand Core an addnode to itself, which it refuses forever while
+ * the entry holds a manual slot (review before 1.0.0). Loopback is left alone:
+ * in this container it is the container, never Core, and nothing listens.
+ */
+const OWN = "That is your own node, or an app on your Umbrel, not a peer.";
+function ownAddress(addr) {
+  const host = String(addr).replace(/^\[|\]$/g, '').toLowerCase();
+  const v4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? host : (host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/) || [])[1];
+  if (v4 && config.umbrelInternalNetworkCidr && ipv4InCidr(v4, config.umbrelInternalNetworkCidr)) return OWN;
+  const local = ((netInfo && netInfo.localaddresses) || []).map((a) => String(a.address || '').replace(/^\[|\]$/g, '').toLowerCase());
+  return local.includes(host) ? OWN : null;
+}
+
 const NET_NAME = { Tor: 'onion', I2P: 'i2p' };
 const TEST_VIA = (via) => `Your node reaches this peer through ${via}. To keep your node's address private, ` +
   "Peer Lab doesn't test it from here. Add & Keep hands it straight to Core.";

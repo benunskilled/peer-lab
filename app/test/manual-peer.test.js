@@ -737,3 +737,30 @@ test('G1: no direct test unless Core has just said no proxy is in the way', asyn
     server.close();
   }
 });
+
+test('the node itself is refused: an address in Umbrel\'s app network or one Core is reachable at', async () => {
+  const calls = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { calls.push(`addnode ${cmd} ${addr}`); });
+  mock.method(rpc, 'disconnectNode', async (addr) => { calls.push(`disconnect ${addr}`); });
+  mock.method(rpc, 'getNetworkInfo', async () => ({
+    networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+      { name: 'onion', limited: false, reachable: true, proxy: '10.21.21.11:9050' },
+    ],
+    localaddresses: [
+      { address: '203.0.113.7', port: 8333 },
+      { address: '2001:db8::7', port: 8333 },
+      { address: 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz234567.onion', port: 8333 },
+    ],
+  }));
+
+  for (const input of ['10.21.0.1', '10.21.21.8:8333', '203.0.113.7', '[2001:db8::7]:8333',
+    'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz234567.onion']) {
+    const result = await manualAddPeer(input);
+    assert.equal(result.ok, false, input);
+    assert.match(result.error, /your own node/, input);
+  }
+  assert.deepEqual(calls, [], 'nothing reaches Core');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 0);
+});

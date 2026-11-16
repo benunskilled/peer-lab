@@ -137,3 +137,18 @@ test('without the peers service there are no marks, and its list is not asked fo
 
   await new Promise((r) => srv.close(r));
 });
+
+test('without its own setting the check follows PEERS_URL, the full container name the store sets', async () => {
+  let path = null;
+  const srv = http.createServer((req, res) => { path = req.url; res.writeHead(200); res.end('ok\n'); });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  delete process.env.PEERS_HEALTH_URL;
+  process.env.PEERS_URL = `http://127.0.0.1:${srv.address().port}/`;
+  try {
+    assert.equal(await peersService.isUp(), true);
+    assert.equal(path, '/api/health');
+  } finally {
+    delete process.env.PEERS_URL;
+    await new Promise((r) => srv.close(r));
+  }
+});

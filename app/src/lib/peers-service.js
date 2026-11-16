@@ -21,7 +21,16 @@ const TIMEOUT_MS = 2000;
 
 // Read per call rather than at load: a test sets it between cases, and there
 // is no cost worth saving here.
-const target = () => process.env.PEERS_HEALTH_URL || DEFAULT_URL;
+// Without its own setting it follows PEERS_URL: the store sets that one with
+// the full container name in every service, but PEERS_HEALTH_URL only in the
+// dashboard, and the short name `peers` is not this app's alone on Umbrel's
+// shared network (review before 1.0.0).
+const target = () => {
+  if (process.env.PEERS_HEALTH_URL) return process.env.PEERS_HEALTH_URL;
+  const base = process.env.PEERS_URL;
+  if (!base) return DEFAULT_URL;
+  return base === 'off' ? 'off' : `${base.replace(/\/+$/, '')}/api/health`;
+};
 let checkedAtMs = 0;
 let present = false;
 let inFlight = null;
