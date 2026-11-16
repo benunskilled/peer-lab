@@ -227,8 +227,7 @@ function fitTables() {
   // What the reader is looking at: the first heading or row at the top of the
   // window. When the layout changes, that stays where it was - restoring the
   // old scroll position instead threw the reader a screen or more down the
-  // moment the tables above turned into taller cards. (The panels opt out of
-  // the browser's own scroll anchoring, see .card in style.css.)
+  // moment the tables above turned into taller cards.
   const anchor = window.scrollY > 0
     ? [...document.querySelectorAll('h2, h3, .table-wrap tbody tr')].find((e) => {
       // A hidden element has a rect of zeros.
@@ -1290,13 +1289,16 @@ function holdPlace(change) {
   const log = document.getElementById('rotation-log-table');
   const from = log ? log.getBoundingClientRect().top : 0;
   const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight && r.top > from; };
-  const anchor = window.scrollY > 0 && from < 0
-    ? [...document.querySelectorAll('main .card[id], #rotation-log-table tbody tr')].find(onScreen)
-    : null;
-  const top = anchor ? anchor.getBoundingClientRect().top : 0;
+  // Every candidate on screen, in page order: a full redraw of the log drops
+  // its rows, and then the next one still there (the card below) holds.
+  const seen = window.scrollY > 0 && from < 0
+    ? [...document.querySelectorAll('main .card[id], #rotation-log-table tbody tr')].filter(onScreen)
+      .map((e) => [e, e.getBoundingClientRect().top])
+    : [];
   change();
-  if (anchor && anchor.isConnected) {
-    const d = anchor.getBoundingClientRect().top - top;
+  const kept = seen.find(([e]) => e.isConnected);
+  if (kept) {
+    const d = kept[0].getBoundingClientRect().top - kept[1];
     if (Math.abs(d) >= 1) window.scrollBy(0, d);
   }
 }
