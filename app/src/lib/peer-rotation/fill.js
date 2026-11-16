@@ -81,6 +81,15 @@ const ATTEMPTS_PER_PASS = 3;
 const ADDING_MS = 60 * 1000;
 
 const keyOf = (address) => addressKey(address, config.bitcoin.network);
+let regionNames = null;
+function countryName(code) {
+  try {
+    regionNames = regionNames || new Intl.DisplayNames(['en'], { type: 'region' });
+    return regionNames.of(code) || code;
+  } catch {
+    return code;
+  }
+}
 
 // The candidates on trial, oldest first, as one JSON list in meta. A single
 // object is what versions with one trial at a time left behind.
@@ -509,7 +518,7 @@ async function start(ranking, peers, chain, now = Date.now()) {
   // Counted over all outbound connections, Core's own too (spread.js).
   const coreRegions = spread.coreRegionsOf(ranking);
   const coreKeys = spread.coreOperatorsOf(ranking);
-  const inbound = spread.inboundRegionsOf(ranking);
+  const coreCountries = spread.coreCountriesOf(ranking);
   const picked = new Set(pickedRegions());
   const inPicked = (c) => picked.has(spread.placeOf(c).region);
   // Where clearnet works, one Tor and one I2P connection are enough, Core's
@@ -520,16 +529,12 @@ async function start(ranking, peers, chain, now = Date.now()) {
 
   // The order for the next pick, over the manual set as it stands with the
   // candidates already put on trial in this call.
+  const heldCountries = () => new Set(trusted.map((p) => spread.placeOf(p).country).filter(Boolean));
   const order = () => {
-    // With the one more for a region many peers came to on their own: that
-    // decides which region is missing and which goes first. The note in the
-    // log says the outbound count alone, what the reader can count in the
-    // tables.
-    const counts = spread.totalCounts(trusted, coreRegions, inbound);
     const outbound = spread.totalCounts(trusted, coreRegions);
-    const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (counts[r] || 0) < spread.TARGET_PER_REGION));
+    const gaps = new Set(Object.keys(spread.REGION_NAMES).filter((r) => (outbound[r] || 0) < spread.TARGET_PER_REGION));
     const inGap = (c) => gaps.has(spread.placeOf(c).region);
-    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, inbound);
+    const ranked = spread.rankForGap(book.filter((c) => !inUse.has(hostFromAddress(c.address))), trusted, coreRegions, coreCountries);
     // A picked Tor or I2P is the reader's word against that rule.
     const capped = (c) => {
       const { region } = spread.placeOf(c);
@@ -543,10 +548,14 @@ async function start(ranking, peers, chain, now = Date.now()) {
     const triedGaps = new Set(tried.filter((c) => inGap(c) && spread.admit(c, trusted, max, coreKeys)).map((c) => spread.placeOf(c).region));
     const stand = ranked.filter((c) => c.fromNew && inGap(c) && !triedGaps.has(spread.placeOf(c).region));
     // The missing regions first, from "tried", then from "new" where "tried"
-    // has none; once none of them can be filled - a node that reaches only
-    // Tor, say - anyone the spread lets in from "tried", so that no slot stays
-    // empty for want of a perfect candidate.
-    const usual = [...tried.filter(inGap), ...stand, ...tried.filter((c) => !inGap(c))];
+    // has none; then a country no manual peer is in yet, "tried" first and
+    // "new" after (review 16.11.2026: a second Australian from "tried" came
+    // before New Zealand from "new"); a country again only when nothing else
+    // is left, so that no slot stays empty for want of a perfect candidate.
+    const fresh = (c) => !heldCountries().has(spread.placeOf(c).country || '-');
+    const usual = [...tried.filter(inGap), ...stand,
+      ...tried.filter((c) => !inGap(c) && fresh(c)), ...ranked.filter((c) => c.fromNew && !inGap(c) && fresh(c)),
+      ...tried.filter((c) => !inGap(c) && !fresh(c))];
     // Picked regions (picks.js): theirs only, "tried" first, then "new" - and
     // the usual pick once none of them has a candidate the spread lets in.
     // In ranked order, so the spread among them holds; "new" only for a picked
@@ -587,10 +596,14 @@ async function start(ranking, peers, chain, now = Date.now()) {
     inUse.add(hostFromAddress(c.address));
     const what = spread.describe(c);
     const { region } = spread.placeOf(c);
-    // Where it is shows under its address in the log; the note says why.
-    // How many connections its region had: none, or only as few as any.
+    // Where it is shows under its address in the log; the note says why: a
+    // region with none, a country new to the manual peers, or as few as any.
+    const { country } = spread.placeOf(c);
+    const newCountry = country && !heldCountries().has(country);
     const why = pickedLeft ? `${spread.REGION_NAMES[region] || 'a region'} picked by you`
-      : region ? `${spread.REGION_NAMES[region]} had ${outbound[region] ? `only ${outbound[region]}` : 'none'}` : 'free slot';
+      : region && !outbound[region] ? `${spread.REGION_NAMES[region]} had none`
+        : newCountry ? `${countryName(country)}, a new country`
+          : region ? `${spread.REGION_NAMES[region]} had only ${outbound[region]}` : 'free slot';
     // Written before the add: if the app stops between the two, the next pass
     // finds the trial and either its candidate (and judges it) or nothing.
     addTrial({
