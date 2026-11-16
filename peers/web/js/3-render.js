@@ -422,6 +422,7 @@
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     if (!dashboard().folding()) holdAnchor(anchor);
+    placeLeaving();
     restoreReloadY();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();

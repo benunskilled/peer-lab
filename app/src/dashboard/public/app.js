@@ -729,6 +729,15 @@ window.peerLab = {
   acting: () => actionsInFlight > 0,
   // Disconnected or removed here a moment ago: not in the list any more.
   gone: (address) => justGone.has(address),
+  // Its row stays a moment with this word ("Removed"), or null.
+  leaving: (address) => (leaving.get(address) || {}).text || null,
+  // The place for the slim row, once: `take` says it has been used.
+  leavingPlace: (take) => {
+    if (leavingPlace && Date.now() - leavingPlace.at > LEAVE_MS) leavingPlace = null;
+    const p = leavingPlace;
+    if (take) leavingPlace = null;
+    return p;
+  },
   // The peer list's part of Esc: closes something and says true, or false.
   onEscape: (step) => { escapeSteps.push(step); },
   actionsHtml: (address) => {
@@ -932,6 +941,31 @@ const GONE_MS = 40000;
 // two seconds after its interval, which /api/status sends (15 s by default).
 let GONE_RECHECK_MS = 17000;
 const justGone = new Map(); // address -> time it was removed or disconnected
+// The row of a peer removed or disconnected here stays a moment, closed and
+// slim, saying so, then glides out (16.11.2026: the row and its open panel
+// went at once, and on a phone everything below jumped a screen up under the
+// finger). The list keeps the row; this says how long and what it says.
+const LEAVE_MS = 5000;
+const GLIDE_MS = 400;
+const leaving = new Map(); // address -> { at, text }
+// Where on screen the button was tapped: the slim row comes to stand there,
+// so the panel closing does not pull what was below up under the finger.
+let leavingPlace = null; // { address, top, at }
+function markLeaving(address, text, top) {
+  const at = Date.now();
+  leaving.set(address, { at, text });
+  leavingPlace = typeof top === 'number' ? { address, top, at } : null;
+  window.dispatchEvent(new Event('peerlab:ranking'));
+  setTimeout(() => {
+    for (const tr of document.querySelectorAll('#tables tr.leaving')) {
+      if (tr.dataset.anchor && tr.dataset.anchor.endsWith(' ' + address)) tr.classList.add('out');
+    }
+  }, LEAVE_MS);
+  setTimeout(() => {
+    if (leaving.get(address) && leaving.get(address).at === at) leaving.delete(address);
+    window.dispatchEvent(new Event('peerlab:ranking'));
+  }, LEAVE_MS + GLIDE_MS);
+}
 const recheckGone = () => setTimeout(() => refreshPeers().catch(() => {}), GONE_RECHECK_MS);
 
 // A counter, not a flag. A boolean only covered the time the POST was in
@@ -1875,6 +1909,8 @@ document.body.addEventListener('click', async (e) => {
     pendingPeers.add(address);
   }
   const originalLabel = btn.textContent;
+  // Where the button stands when the answer comes (the reader may have scrolled meanwhile).
+  const tapTop = () => (btn.isConnected && btn.getBoundingClientRect().height ? btn.getBoundingClientRect().top : undefined);
   if (isPeerOrPoolAction) {
     btn.disabled = true;
     // The lock is an icon, not a label - replacing its text with an ellipsis
@@ -1903,6 +1939,8 @@ document.body.addEventListener('click', async (e) => {
       // Added back within the wait after a removal: it belongs in the tables again.
       justGone.delete(address);
       justGone.delete(result.address);
+      leaving.delete(address);
+      leaving.delete(result.address);
       showToast(
         result.note
           ? `${result.note}${result.warning ? ` ${result.warning}` : ''}`
@@ -1915,6 +1953,7 @@ document.body.addEventListener('click', async (e) => {
     if (action === 'untrust') {
       await api('/api/peers/untrust', { method: 'POST', body: JSON.stringify({ address }) });
       justGone.set(address, Date.now());
+      markLeaving(address, 'Removed', tapTop());
       recheckGone();
       showToast(`Removed ${address} as manual peer and disconnected it.`, 'success');
     }
@@ -1922,7 +1961,7 @@ document.body.addEventListener('click', async (e) => {
       await api('/api/peers/disconnect', { method: 'POST', body: JSON.stringify({ address }) });
       // A manual peer stays manual and Core dials it again, so only a non-manual one leaves the tables.
       const was = (lastPeerRanking || []).find((p) => p.address === address);
-      if (!was || !was.trusted) justGone.set(address, Date.now());
+      if (!was || !was.trusted) { justGone.set(address, Date.now()); markLeaving(address, 'Disconnected', tapTop()); }
       recheckGone();
       showToast(`Disconnected ${address}.`, 'success');
     }
