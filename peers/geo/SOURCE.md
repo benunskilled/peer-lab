@@ -17,7 +17,7 @@ from the same place for the same reason.
 ## Refresh
 
 With the other two IP tables: `sh refresh-data.sh` in the repository root. The City
-database at the source was still the 2026-10-02 build on 2026-11-14. By hand:
+database at the source was still the 2026-10-02 build on 2026-11-16. By hand:
 
 ```sh
 pip install maxminddb
@@ -31,7 +31,7 @@ This takes a few minutes. It also rewrites `geo/testdata/vectors.json`, the
 sample addresses `go test ./geo/` checks against.
 
 IPv6 is keyed on the upper 64 bits, so where two regions live inside one /64
-only the later one survives the build: 2,491 keys on this database. Those are
+only the later one survives the build: 2,535 keys on this database. Those are
 left out of the test vectors rather than covered by a tolerance - a test that
 allows a few wrong answers stops noticing when the number grows.
 

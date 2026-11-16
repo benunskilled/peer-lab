@@ -34,7 +34,7 @@ Apply shared settings consistently to the services that use them, then recreate 
 | `DASHBOARD_PORT` | Dashboard HTTP port *inside the container* | `8788` |
 | `LOG_LEVEL` | `error` / `warn` / `info` / `debug` | `info` |
 
-On Umbrel, the dashboard is available at `<your-umbrel>:8796`. The default `8788` is its internal container port.
+On Umbrel, the dashboard is available at `<your-umbrel>:8797`. The default `8788` is its internal container port.
 
 ## Peer measurement and Slot Fill
 

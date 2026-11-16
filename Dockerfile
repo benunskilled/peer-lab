@@ -5,7 +5,7 @@
 # The Go release is the one go.mod names, pinned by digest - the multi-arch
 # index, so this stage resolves on any build machine - like the images the
 # store pins. toolchain_test.go keeps the two in step.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS peers-build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS peers-build
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
