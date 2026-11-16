@@ -371,6 +371,11 @@ func disguisedWhy(about string) string {
 		if w, ok := strings.CutPrefix(line, "Probably: "); ok && why == "" {
 			if _, evidence, cut := strings.Cut(w, " - "); cut {
 				w = evidence
+			} else {
+				w = "it is probably " + w
+			}
+			if !strings.HasPrefix(w, "it ") {
+				w = "it " + w
 			}
 			why = w
 		}

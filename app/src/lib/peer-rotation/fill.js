@@ -367,7 +367,7 @@ async function settleOne(trial, peers, chain, now, force, verdictOf = () => null
     // chain, or not the Core it names: rare, and worth seeing (15.11.2026).
     // One that just did not answer stays in the list of tries only.
     if (fork || fake) {
-      const note = fork ? `Follows another chain (${fork})` : listSaysDisguised(listed) ? disguisedNote(listed) : byRule ? WTXID_NOTE : disguisedNote(null);
+      const note = fork ? `Follows another chain (${fork})` : listed && listed.why ? disguisedNote(listed) : byRule ? WTXID_NOTE : disguisedNote(null);
       logAction({ action: 'rejected', address: trial.address, note });
     }
     const { region, country } = spread.placeOf({ address: trial.address });
