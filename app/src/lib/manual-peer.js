@@ -68,14 +68,21 @@ const selfMark = () => `/${crypto.randomBytes(8).toString('hex')}/`;
 // like any other node from here. Core has just read our version, so the
 // connection is in its getpeerinfo with our mark while the socket is open.
 // Core not answering: no proof either way, the probe stands.
+// Core sends its version a few lines before it stores ours (net_processing,
+// v32.1 L3916 and L3929, one handler call): asked in between, the subver is
+// still empty. Practically never, so asked once more after a moment.
 async function answeredBySelf(mark) {
-  try {
-    const peers = await rpc.getPeerInfo();
-    return Array.isArray(peers) && peers.some((p) => p.inbound && p.subver === mark);
-  } catch (err) {
-    logger.debug('getpeerinfo failed during a probe', { error: err.message });
-    return false;
+  for (const waitMs of [0, 250]) {
+    if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+    try {
+      const peers = await rpc.getPeerInfo();
+      if (Array.isArray(peers) && peers.some((p) => p.inbound && p.subver === mark)) return true;
+    } catch (err) {
+      logger.debug('getpeerinfo failed during a probe', { error: err.message });
+      return false;
+    }
   }
+  return false;
 }
 
 // Resolves true when a node on this chain answers, 'self' when that node is
