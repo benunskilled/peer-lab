@@ -2186,24 +2186,25 @@ test('slot fill: a new country from "new" goes before a country again from "trie
   assert.equal(fill.currentTrial().note, 'New Zealand, a new country');
 });
 
-test('after many failed candidates in a row the 15-second check stops starting new ones; the ten-minute pass still does', async () => {
+test('after many failed candidates in a row only one is tried at a time; a kept one or switching on starts the count over', async () => {
   peerRotation.setEnabled(true);
-  peerRotation._resetFailStreak();
   setPeers([coreOut()]);
-  const starts = [];
+  const limits = [];
   mock.method(fill, 'settle', async () => ({ confirmed: 0, reverted: 3, left: 0, waiting: 0, gone: [] }));
-  mock.method(fill, 'start', async () => { starts.push(1); return []; });
-  const quickRounds = Math.ceil(peerRotation.FAILS_BEFORE_SLOWING / 3);
-  for (let i = 0; i < quickRounds; i += 1) await peerRotation.tick({ quick: true });
-  assert.equal(starts.length, quickRounds - 1, 'the round that reaches the limit starts none');
-  await peerRotation.tick({ quick: true });
-  assert.equal(starts.length, quickRounds - 1, 'still slowed');
-  await peerRotation.tick();
-  assert.equal(starts.length, quickRounds, 'the ten-minute pass tries again');
+  mock.method(fill, 'start', async (r, p, c, now, opts) => { limits.push(opts.maxTrials); return []; });
+  const rounds = Math.ceil(peerRotation.FAILS_BEFORE_SLOWING / 3);
+  for (let i = 0; i < rounds + 1; i += 1) await peerRotation.tick({ quick: true });
+  assert.deepEqual(limits, [...Array(rounds - 1).fill(3), 1, 1], 'the next still starts at once, one at a time');
 
-  // A candidate kept starts the count over.
   fill.settle.mock.mockImplementation(async () => ({ confirmed: 1, reverted: 0, left: 0, waiting: 0, gone: [] }));
   await peerRotation.tick({ quick: true });
-  assert.equal(starts.length, quickRounds + 1);
-  peerRotation._resetFailStreak();
+  assert.equal(limits.at(-1), 3);
+
+  fill.settle.mock.mockImplementation(async () => ({ confirmed: 0, reverted: 3, left: 0, waiting: 0, gone: [] }));
+  for (let i = 0; i < rounds; i += 1) await peerRotation.tick({ quick: true });
+  assert.equal(limits.at(-1), 1);
+  peerRotation.setEnabled(true);
+  fill.settle.mock.mockImplementation(async () => ({ confirmed: 0, reverted: 0, left: 1, waiting: 0, gone: [] }));
+  await peerRotation.tick({ quick: true });
+  assert.equal(limits.at(-1), 3, 'switched on again');
 });

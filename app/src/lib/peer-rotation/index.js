@@ -210,11 +210,12 @@ async function watchTrial(now = Date.now()) {
  */
 // `quick`: the 15-second check while trials run. It judges them; a new
 // candidate goes in only when one of them ended, not every 15 seconds.
-// Candidates that failed in a row. Past this many, a failed one is followed
-// at the ten-minute pass rather than at the next 15-second check: on a node
-// where nothing gets through (Tor alone, stale addresses) Slot Fill would
-// otherwise run all day, three addnode add/remove pairs every few minutes
-// (review before 1.0.0). A candidate that is kept starts the count over.
+// Candidates that failed in a row. Past this many, one candidate is tried at
+// a time instead of three: on a node where nothing gets through (Tor alone,
+// stale addresses) Slot Fill would otherwise run all day, three addnode
+// add/remove pairs every few minutes (review before 1.0.0). The next one
+// still starts as soon as one fails. A candidate that is kept, or switching
+// Slot Fill on, starts the count over.
 const FAILS_BEFORE_SLOWING = 9;
 let failStreak = 0;
 // Switching Slot Fill on again (from the dashboard, another process) starts
@@ -289,8 +290,8 @@ async function pass({ quick = false } = {}) {
   }
   // Into the free slots, beside the candidates still on trial.
   const ended = settled.confirmed + settled.reverted + settled.left + unmasked.length;
-  const slowed = quick && failStreak >= FAILS_BEFORE_SLOWING;
-  let started = (quick && !ended && !retired) || slowed ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
+  const maxTrials = failStreak >= FAILS_BEFORE_SLOWING ? 1 : fill.MAX_TRIALS;
+  let started = quick && !ended && !retired ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain, Date.now(), { maxTrials });
   // Switched off while this pass was adding: the switch-off could not see the
   // rows yet, so the candidates are taken out here, rather than left in slots
   // no later pass would look at.
@@ -377,7 +378,6 @@ module.exports = {
   PASS_EVERY_MS,
   TRIAL_CHECK_MS,
   FAILS_BEFORE_SLOWING,
-  _resetFailStreak: () => { failStreak = 0; },
   readStatus,
   waitsForFirstPass,
   scheduled,

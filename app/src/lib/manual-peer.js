@@ -24,15 +24,19 @@ const MAGIC = {
 
 const sha256d = (buf) => crypto.createHash('sha256').update(crypto.createHash('sha256').update(buf).digest()).digest();
 
-// A bare version message: no services, empty user agent, height 0, no tx
-// relay. Enough for a node to answer with its own version, and nothing more.
-function versionMessage(magic) {
+// A bare version message: no services, empty user agent, no tx relay.
+// Enough for a node to answer with its own version, and nothing more. The
+// start height is `mark`, a number no real chain is at: if our own Core
+// answered, its getpeerinfo shows an inbound peer with that startingheight
+// (selfMark below).
+function versionMessage(magic, mark = 0) {
   const payload = Buffer.alloc(86);
   payload.writeInt32LE(70016, 0);
   payload.writeBigInt64LE(BigInt(Math.floor(Date.now() / 1000)), 12);
   // addr_recv and addr_from stay zero: services 0, address ::, port 0.
   crypto.randomBytes(8).copy(payload, 72);
-  // user agent length 0 at 80, start height 0 at 81, relay 0 at 85.
+  // user agent length 0 at 80, start height at 81, relay 0 at 85.
+  payload.writeInt32LE(mark, 81);
   const header = Buffer.alloc(24);
   Buffer.from(magic, 'hex').copy(header, 0);
   header.write('version', 4, 'ascii');
@@ -52,20 +56,43 @@ function versionMessage(magic) {
  * container, not through Core's proxy. The slot fill never probes; it lets
  * Core connect (peer-rotation/fill.js).
  */
+// A start height far above any chain's, and different on every probe.
+const selfMark = () => 1000000000 + crypto.randomInt(1000000000);
+
+// Whether the node that answered is our own Core: reached through the
+// Umbrel's LAN or public address, umbrel.local, or a forwarded port, it looks
+// like any other node from here. Core has just read our version, so the
+// connection is in its getpeerinfo with our mark while the socket is open.
+// Core not answering: no proof either way, the probe stands.
+async function answeredBySelf(mark) {
+  try {
+    const peers = await rpc.getPeerInfo();
+    return Array.isArray(peers) && peers.some((p) => p.inbound && p.startingheight === mark);
+  } catch (err) {
+    logger.debug('getpeerinfo failed during a probe', { error: err.message });
+    return false;
+  }
+}
+
+// Resolves true when a node on this chain answers, 'self' when that node is
+// our own Core, false otherwise.
 function probePort(host, port, timeoutMs = 3000) {
   const magic = MAGIC[config.bitcoin.network] || MAGIC.mainnet;
+  const mark = selfMark();
   return new Promise((resolve) => {
     const socket = net.connect({ host, port });
     let settled = false;
     let got = Buffer.alloc(0);
-    const done = (ok) => {
+    const done = async (ok) => {
       if (settled) return;
       settled = true;
+      // Open until Core has been asked: closed, the connection leaves its list.
+      const self = ok && await answeredBySelf(mark);
       socket.destroy();
-      resolve(ok);
+      resolve(self ? 'self' : ok);
     };
     socket.setTimeout(timeoutMs);
-    socket.once('connect', () => socket.write(versionMessage(magic)));
+    socket.once('connect', () => socket.write(versionMessage(magic, mark)));
     socket.on('data', (chunk) => {
       got = Buffer.concat([got, chunk]);
       if (got.length < 16) return;
@@ -199,11 +226,13 @@ async function probePeer(rawInput) {
       return { ok: false, error: `${explicitPort} is not a valid port (1-65535)` };
     }
     const reachable = await probePort(addr, explicitPort);
+    if (reachable === 'self') return { ok: false, error: OWN };
     if (!reachable) return { ok: false, error: `no Bitcoin node answering at ${formatAddress(addr, explicitPort)}` };
     return { ok: true, address: formatAddress(addr, explicitPort), triedPorts: [explicitPort] };
   }
 
   const address = await findListeningAddress(addr);
+  if (address === 'self') return { ok: false, error: OWN };
   if (address) return { ok: true, address, triedPorts: config.manualPeerPorts };
 
   return {
@@ -328,7 +357,8 @@ function routeFrom(answer, addr, overlay) {
 
 /**
  * Given a bare host, returns the first configured P2P port where a Bitcoin
- * node answers - already in Core's own address format - or null if none does.
+ * node answers - already in Core's own address format - 'self' if that node
+ * is our own Core, or null if none does.
  *
  * Shared on purpose: Slot Fill has to answer exactly this
  * question for an inbound candidate (whose observed port is its ephemeral
@@ -339,6 +369,7 @@ function routeFrom(answer, addr, overlay) {
 async function findListeningAddress(host) {
   for (const port of config.manualPeerPorts) {
     const reachable = await probePort(host, port);
+    if (reachable === 'self') return 'self';
     if (reachable) return formatAddress(host, port);
   }
   return null;

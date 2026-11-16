@@ -82,24 +82,67 @@ function trustedSpelling(address) {
   return row ? row.address : address;
 }
 
-// What Core's addnode list held at the last sync, and Core's uptime then.
-// A peer Core held then and lacks now, with Core running all the while, was
-// removed from it outside this app (`bitcoin-cli addnode X remove`): that
-// removal is taken over rather than undone every ten minutes. After a Core
-// restart, or when this process has just started or cannot tell, every row is
-// handed back as before (review before 1.0.0).
+// What Core's addnode list held at the last sync, and when Core started then.
+// A peer Core held then and lacks now, with the same Core process running all
+// the while, was removed from it outside this app (`bitcoin-cli addnode X
+// remove`): that removal is taken over rather than undone every ten minutes.
+// After a Core restart, when this process has just started, or whenever it
+// cannot tell, every row is handed back as before (review before 1.0.0).
+// The start time, not the uptime: Core counts uptime from its start,
+// warm-up included, so a restart found late can show more uptime than the
+// last sync saw (review).
 let lastSync = null;
-async function coreKeptRunning() {
+const SAME_START_MS = 60 * 1000;
+async function coreStartedAt() {
   try {
     const uptime = Number(await rpc.call('uptime'));
-    if (!Number.isFinite(uptime)) return { running: false, uptime: null };
-    return { running: Boolean(lastSync) && lastSync.uptime != null && uptime >= lastSync.uptime, uptime };
+    return Number.isFinite(uptime) ? Date.now() - uptime * 1000 : null;
   } catch (err) {
-    return { running: false, uptime: null };
+    return null;
   }
 }
 
-async function syncTrustedToAddnode(knownAddedNodes) {
+async function takeOverOutsideRemovals(existingAddrs, afterRestart) {
+  const startedAt = await coreStartedAt();
+  const sameRun = !afterRestart && lastSync && startedAt != null
+    && Math.abs(startedAt - lastSync.startedAt) < SAME_START_MS;
+  const before = lastSync;
+  lastSync = startedAt == null ? null : { startedAt, held: existingAddrs };
+  if (!sameRun) return;
+  const recent = recentRemovals();
+  const gone = db.instance.prepare('SELECT address FROM trusted_peer').all()
+    .map((r) => r.address)
+    .filter((address) => {
+      const k = keyOf(address);
+      return !existingAddrs.has(k) && before.held.has(k) && !recent[k];
+    });
+  if (!gone.length) return;
+  // Asked again: the list handed in may be several calls old, and a peer
+  // removed and added again in the dashboard meanwhile is back in Core (review).
+  let fresh;
+  try {
+    fresh = new Set((await rpc.getAddedNodeInfo()).map((n) => keyOf(n.addednode)));
+  } catch (err) {
+    return;
+  }
+  const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
+  for (const address of gone) {
+    if (fresh.has(keyOf(address))) continue;
+    if (!dropped.run(address).changes) continue;
+    logger.info('removed from Core outside this app: no longer kept as a manual peer', { address });
+    try {
+      logAction({ action: 'unmanual', address, note: 'removed from Core outside Peer Lab' });
+      // As a removal in the dashboard: not tried again for a while, and the
+      // free slot is filled at the next poll. Required here: peer-rotation
+      // requires this module.
+      require('./peer-rotation').freedByHand(address);
+    } catch (err) {
+      logger.debug('log or slot fill after an outside removal failed', { error: err.message });
+    }
+  }
+}
+
+async function syncTrustedToAddnode(knownAddedNodes, { afterRestart = false } = {}) {
   let trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
   let addedNodes = [];
   try {
@@ -110,6 +153,7 @@ async function syncTrustedToAddnode(knownAddedNodes) {
     addedNodes = knownAddedNodes || await rpc.getAddedNodeInfo();
   } catch (err) {
     logger.warn('getaddednodeinfo failed, skipping addnode sync this round', { error: err.message });
+    lastSync = null;
     return { trusted: trusted.length, existing: 0, added: 0, queued: 0 };
   }
   // Compared by key: Core echoes an addnode in the spelling it was given, and
@@ -122,22 +166,7 @@ async function syncTrustedToAddnode(knownAddedNodes) {
   } catch (err) {
     logger.warn('taking Core\'s spelling failed, next sync', { error: err.message });
   }
-  const core = await coreKeptRunning();
-  if (core.running) {
-    const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
-    for (const { address } of db.instance.prepare('SELECT address FROM trusted_peer').all()) {
-      const k = keyOf(address);
-      if (existingAddrs.has(k) || !lastSync.held.has(k)) continue;
-      dropped.run(address);
-      logger.info('removed from Core outside this app: no longer kept as a manual peer', { address });
-      try {
-        logAction({ action: 'unmanual', address, note: 'removed from Core outside Peer Lab' });
-      } catch (err) {
-        logger.debug('rotation log write failed', { error: err.message });
-      }
-    }
-  }
-  lastSync = { uptime: core.uptime, held: existingAddrs };
+  await takeOverOutsideRemovals(existingAddrs, afterRestart);
   trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't

@@ -219,32 +219,63 @@ test('a peer added again after a removal is restored, the mark notwithstanding',
 test('a manual peer removed from Core outside the app stays removed while Core keeps running, and comes back after a restart', async () => {
   db.instance.exec('DELETE FROM rotation_log;');
   const put = db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, NULL, 1, 1)`);
-  put.run('198.51.100.7:8333');
+  put.run('198.51.100.70:8333');
   const added = [];
+  let coreList = [];
   mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
-  let uptime = 1000;
+  mock.method(rpc, 'getAddedNodeInfo', async () => coreList);
+  // Core's uptime as of a fixed start: the same process as long as the start
+  // time stays where it was.
+  let startedAt = Date.now() - 1000 * 1000;
   mock.method(rpc, 'call', async (method) => {
-    if (method === 'uptime') return uptime;
+    if (method === 'uptime') return Math.round((Date.now() - startedAt) / 1000);
     throw new Error(`unexpected ${method}`);
   });
 
-  // Core holds it: nothing to do.
-  await syncTrustedToAddnode([{ addednode: '198.51.100.7:8333' }]);
-  // `bitcoin-cli addnode 198.51.100.7:8333 remove`, Core still running.
-  uptime = 1600;
-  await syncTrustedToAddnode([]);
+  coreList = [{ addednode: '198.51.100.70:8333' }];
+  await syncTrustedToAddnode(coreList);
+  // `bitcoin-cli addnode 198.51.100.70:8333 remove`, Core still running.
+  coreList = [];
+  await syncTrustedToAddnode(coreList);
   assert.deepEqual(added, [], 'not handed back to Core');
   assert.deepEqual(rows(), [], 'the removal is taken over');
   const log = db.instance.prepare(`SELECT action, address FROM rotation_log`).all();
-  assert.deepEqual(log, [{ action: 'unmanual', address: '198.51.100.7:8333' }]);
+  assert.deepEqual(log, [{ action: 'unmanual', address: '198.51.100.70:8333' }]);
 
-  // After a Core restart a missing peer is handed back, as before.
-  put.run('198.51.100.8:8333');
-  await syncTrustedToAddnode([{ addednode: '198.51.100.8:8333' }]);
-  uptime = 30;
-  await syncTrustedToAddnode([]);
-  assert.deepEqual(added, ['add 198.51.100.8:8333']);
+  // A restart found late, after a long warm-up: more uptime than at the last
+  // sync, but another start. Handed back.
+  put.run('198.51.100.80:8333');
+  coreList = [{ addednode: '198.51.100.80:8333' }];
+  await syncTrustedToAddnode(coreList);
+  startedAt = Date.now() - 1500 * 1000;
+  coreList = [];
+  await syncTrustedToAddnode(coreList);
+  assert.deepEqual(added, ['add 198.51.100.80:8333']);
   assert.equal(rows().length, 1);
+});
+
+test('a peer removed and added again in the dashboard meanwhile is kept: Core is asked again before a row goes', async () => {
+  db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.6:8333', NULL, 1, 1)`).run();
+  mock.method(rpc, 'addNode', async () => {});
+  const startedAt = Date.now() - 1000 * 1000;
+  mock.method(rpc, 'call', async () => Math.round((Date.now() - startedAt) / 1000));
+  await syncTrustedToAddnode([{ addednode: '198.51.100.6:8333' }]);
+  // The list handed in is stale; Core holds it again by now.
+  mock.method(rpc, 'getAddedNodeInfo', async () => [{ addednode: '198.51.100.6:8333' }]);
+  await syncTrustedToAddnode([]);
+  assert.equal(rows().length, 1);
+});
+
+test('after a Core restart the takeover is skipped even when the start time looks the same', async () => {
+  db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.5:8333', NULL, 1, 1)`).run();
+  const added = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
+  mock.method(rpc, 'getAddedNodeInfo', async () => []);
+  const startedAt = Date.now() - 1000 * 1000;
+  mock.method(rpc, 'call', async () => Math.round((Date.now() - startedAt) / 1000));
+  await syncTrustedToAddnode([{ addednode: '198.51.100.5:8333' }]);
+  await syncTrustedToAddnode([], { afterRestart: true });
+  assert.deepEqual(added, ['add 198.51.100.5:8333']);
 });
 
 test('when Core does not say its uptime, a missing manual peer is handed back', async () => {

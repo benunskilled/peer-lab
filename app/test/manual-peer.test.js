@@ -765,3 +765,40 @@ test('the node itself is refused: an address in Umbrel\'s app network or one Cor
   assert.deepEqual(calls, [], 'nothing reaches Core');
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, 0);
 });
+
+test('our own Core reached by another address (LAN, public, umbrel.local) is refused: it shows our probe among its peers', async () => {
+  let mark = null;
+  const { server, port } = await withListeningPort((socket) => {
+    socket.once('data', (buf) => {
+      // The start height of the version we were sent (header 24 + offset 81).
+      mark = buf.readInt32LE(24 + 81);
+      socket.write(versionMessage(MAGIC.mainnet));
+    });
+    socket.on('error', () => {});
+  });
+  try {
+    const calls = [];
+    mock.method(rpc, 'addNode', async (addr, cmd) => { calls.push(`addnode ${cmd} ${addr}`); });
+    mock.method(rpc, 'getNetworkInfo', async () => ({ networks: [
+      { name: 'ipv4', limited: false, reachable: true, proxy: '' },
+      { name: 'ipv6', limited: false, reachable: true, proxy: '' },
+    ] }));
+    mock.method(rpc, 'getPeerInfo', async () => [
+      { addr: '198.51.100.1:8333', inbound: true, startingheight: 976150 },
+      { addr: '10.21.0.1:51234', inbound: true, startingheight: mark },
+    ]);
+    const tested = await probePeer(`127.0.0.1:${port}`);
+    assert.equal(tested.ok, false);
+    assert.match(tested.error, /your own node/);
+    const added = await manualAddPeer(`127.0.0.1:${port}`);
+    assert.equal(added.ok, false);
+    assert.deepEqual(calls, []);
+    assert.ok(mark > 976150, 'a height no chain is at');
+
+    // Another node, same probe: Core shows no peer with our mark.
+    mock.method(rpc, 'getPeerInfo', async () => [{ addr: '198.51.100.1:8333', inbound: true, startingheight: 976150 }]);
+    assert.equal((await probePeer(`127.0.0.1:${port}`)).ok, true);
+  } finally {
+    server.close();
+  }
+});
