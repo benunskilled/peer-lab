@@ -107,7 +107,9 @@ function dropOnCut(res, method, reject) {
 // The whole call has `timeoutMs`, not only the gaps between bytes (review
 // G6, 15.11.2026): http.request's timeout fires on silence, so a reply that
 // trickles in a byte at a time never ran out, and the poll behind it waited
-// with it. Settles once; the timer goes with the first answer.
+// with it. Settles once; the timer goes with the first answer. The time
+// includes a wait for one of the agent's four sockets, which the calls here
+// never come near.
 function deadline(req, method, timeoutMs, reject) {
   const timer = setTimeout(() => {
     req.destroy(new Error(`RPC ${method}: timed out after ${timeoutMs}ms`));
