@@ -210,6 +210,17 @@ async function watchTrial(now = Date.now()) {
  */
 // `quick`: the 15-second check while trials run. It judges them; a new
 // candidate goes in only when one of them ended, not every 15 seconds.
+// Candidates that failed in a row. Past this many, a failed one is followed
+// at the ten-minute pass rather than at the next 15-second check: on a node
+// where nothing gets through (Tor alone, stale addresses) Slot Fill would
+// otherwise run all day, three addnode add/remove pairs every few minutes
+// (review before 1.0.0). A candidate that is kept starts the count over.
+const FAILS_BEFORE_SLOWING = 9;
+let failStreak = 0;
+// Switching Slot Fill on again (from the dashboard, another process) starts
+// the count over.
+let streakFor = null;
+
 async function pass({ quick = false } = {}) {
   const idle = { enabled: false, retired: 0, started: 0, confirmed: 0, reverted: 0 };
   if (!isEnabled()) {
@@ -237,6 +248,11 @@ async function pass({ quick = false } = {}) {
   const kinds = peersService.peerKinds();
   const settled = await fill.settle(peers, chain, Date.now(), { kinds });
   const counted = { confirmed: settled.confirmed, reverted: settled.reverted };
+  const onRow = db.instance.prepare('SELECT value FROM meta WHERE key = ?').get(ON_AT_KEY);
+  const onAt = onRow ? onRow.value : null;
+  if (onAt !== streakFor) { streakFor = onAt; failStreak = 0; }
+  if (settled.confirmed) failStreak = 0;
+  failStreak += settled.reverted;
   // A candidate taken out: the next one goes in this pass, on a fresh
   // getpeerinfo without the ones just dropped. If Core does not answer now,
   // the next pass does it.
@@ -273,7 +289,8 @@ async function pass({ quick = false } = {}) {
   }
   // Into the free slots, beside the candidates still on trial.
   const ended = settled.confirmed + settled.reverted + settled.left + unmasked.length;
-  let started = quick && !ended && !retired ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
+  const slowed = quick && failStreak >= FAILS_BEFORE_SLOWING;
+  let started = (quick && !ended && !retired) || slowed ? [] : await fill.start(retired > 0 ? freshRanking() : ranking, peers, chain);
   // Switched off while this pass was adding: the switch-off could not see the
   // rows yet, so the candidates are taken out here, rather than left in slots
   // no later pass would look at.
@@ -359,6 +376,8 @@ function reportPass(peers, chain) {
 module.exports = {
   PASS_EVERY_MS,
   TRIAL_CHECK_MS,
+  FAILS_BEFORE_SLOWING,
+  _resetFailStreak: () => { failStreak = 0; },
   readStatus,
   waitsForFirstPass,
   scheduled,

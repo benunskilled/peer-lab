@@ -1738,7 +1738,7 @@ document.getElementById('manual-test-button').addEventListener('click', async ()
     else manualAddResult(`reachable - a node answered at ${result.address}. Nothing was added.`, 'ok');
   } catch (err) {
     // Refused before any test (a Tor name, a proxied network): "not reachable" would claim something nobody checked.
-    const untested = /cannot be tested|doesn't use|can't tell/.test(err.message);
+    const untested = /cannot be tested|doesn't use|can't tell|your own node/.test(err.message);
     manualAddResult(`${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
   } finally {
     manualAddBusy(false);

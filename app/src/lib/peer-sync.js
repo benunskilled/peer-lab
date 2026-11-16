@@ -7,6 +7,7 @@ const queries = require('./queries');
 const { hostFromAddress, addressKey } = require('./address');
 const { evictableTrusted } = require('./peer-rotation/rules');
 const spread = require('./peer-rotation/spread');
+const { logAction } = require('./peer-rotation/log');
 const logger = require('./logger').make('peer-sync');
 
 const keyOf = (address) => addressKey(address, config.bitcoin.network);
@@ -81,6 +82,23 @@ function trustedSpelling(address) {
   return row ? row.address : address;
 }
 
+// What Core's addnode list held at the last sync, and Core's uptime then.
+// A peer Core held then and lacks now, with Core running all the while, was
+// removed from it outside this app (`bitcoin-cli addnode X remove`): that
+// removal is taken over rather than undone every ten minutes. After a Core
+// restart, or when this process has just started or cannot tell, every row is
+// handed back as before (review before 1.0.0).
+let lastSync = null;
+async function coreKeptRunning() {
+  try {
+    const uptime = Number(await rpc.call('uptime'));
+    if (!Number.isFinite(uptime)) return { running: false, uptime: null };
+    return { running: Boolean(lastSync) && lastSync.uptime != null && uptime >= lastSync.uptime, uptime };
+  } catch (err) {
+    return { running: false, uptime: null };
+  }
+}
+
 async function syncTrustedToAddnode(knownAddedNodes) {
   let trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
   let addedNodes = [];
@@ -104,6 +122,22 @@ async function syncTrustedToAddnode(knownAddedNodes) {
   } catch (err) {
     logger.warn('taking Core\'s spelling failed, next sync', { error: err.message });
   }
+  const core = await coreKeptRunning();
+  if (core.running) {
+    const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
+    for (const { address } of db.instance.prepare('SELECT address FROM trusted_peer').all()) {
+      const k = keyOf(address);
+      if (existingAddrs.has(k) || !lastSync.held.has(k)) continue;
+      dropped.run(address);
+      logger.info('removed from Core outside this app: no longer kept as a manual peer', { address });
+      try {
+        logAction({ action: 'unmanual', address, note: 'removed from Core outside Peer Lab' });
+      } catch (err) {
+        logger.debug('rotation log write failed', { error: err.message });
+      }
+    }
+  }
+  lastSync = { uptime: core.uptime, held: existingAddrs };
   trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't
@@ -743,4 +777,5 @@ module.exports = {
   adoptExternalManualPeers,
   addTrustedPeer,
   removeTrustedPeer,
+  trustedSpelling,
 };

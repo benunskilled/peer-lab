@@ -755,7 +755,8 @@ test('the node itself is refused: an address in Umbrel\'s app network or one Cor
     ],
   }));
 
-  for (const input of ['10.21.0.1', '10.21.21.8:8333', '203.0.113.7', '[2001:db8::7]:8333',
+  for (const input of ['10.21.0.1', '10.21.21.8:8333', '203.0.113.7', '[2001:db8::7]:8333', '2001:0DB8:0:0::7',
+    '[::ffff:10.21.0.1]:8333', '[::ffff:a15:1]:8333', '0:0:0:0:0:ffff:10.21.0.1',
     'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz234567.onion']) {
     const result = await manualAddPeer(input);
     assert.equal(result.ok, false, input);

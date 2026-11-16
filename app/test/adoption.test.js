@@ -15,7 +15,7 @@ process.env.MAX_MANUAL_PEERS = '2';
 
 const db = require('../src/lib/db');
 const rpc = require('../src/lib/rpc');
-const { adoptExternalManualPeers } = require('../src/lib/peer-sync');
+const { adoptExternalManualPeers, syncTrustedToAddnode } = require('../src/lib/peer-sync');
 
 test.before(() => {
   db.open();
@@ -214,4 +214,45 @@ test('a peer added again after a removal is restored, the mark notwithstanding',
   rpc.addNode.mock.mockImplementation(async (a, c) => { sent.push(`${c} ${a}`); });
   await peerSync.syncTrustedToAddnode([]);
   assert.deepEqual(sent, ['add 203.0.113.80:8333']);
+});
+
+test('a manual peer removed from Core outside the app stays removed while Core keeps running, and comes back after a restart', async () => {
+  db.instance.exec('DELETE FROM rotation_log;');
+  const put = db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, NULL, 1, 1)`);
+  put.run('198.51.100.7:8333');
+  const added = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
+  let uptime = 1000;
+  mock.method(rpc, 'call', async (method) => {
+    if (method === 'uptime') return uptime;
+    throw new Error(`unexpected ${method}`);
+  });
+
+  // Core holds it: nothing to do.
+  await syncTrustedToAddnode([{ addednode: '198.51.100.7:8333' }]);
+  // `bitcoin-cli addnode 198.51.100.7:8333 remove`, Core still running.
+  uptime = 1600;
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, [], 'not handed back to Core');
+  assert.deepEqual(rows(), [], 'the removal is taken over');
+  const log = db.instance.prepare(`SELECT action, address FROM rotation_log`).all();
+  assert.deepEqual(log, [{ action: 'unmanual', address: '198.51.100.7:8333' }]);
+
+  // After a Core restart a missing peer is handed back, as before.
+  put.run('198.51.100.8:8333');
+  await syncTrustedToAddnode([{ addednode: '198.51.100.8:8333' }]);
+  uptime = 30;
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, ['add 198.51.100.8:8333']);
+  assert.equal(rows().length, 1);
+});
+
+test('when Core does not say its uptime, a missing manual peer is handed back', async () => {
+  db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.9:8333', NULL, 1, 1)`).run();
+  const added = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
+  mock.method(rpc, 'call', async () => { throw new Error('down'); });
+  await syncTrustedToAddnode([{ addednode: '198.51.100.9:8333' }]);
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, ['add 198.51.100.9:8333']);
 });

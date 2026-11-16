@@ -2185,3 +2185,25 @@ test('slot fill: a new country from "new" goes before a country again from "trie
   assert.equal(fill.currentTrial().address, nz);
   assert.equal(fill.currentTrial().note, 'New Zealand, a new country');
 });
+
+test('after many failed candidates in a row the 15-second check stops starting new ones; the ten-minute pass still does', async () => {
+  peerRotation.setEnabled(true);
+  peerRotation._resetFailStreak();
+  setPeers([coreOut()]);
+  const starts = [];
+  mock.method(fill, 'settle', async () => ({ confirmed: 0, reverted: 3, left: 0, waiting: 0, gone: [] }));
+  mock.method(fill, 'start', async () => { starts.push(1); return []; });
+  const quickRounds = Math.ceil(peerRotation.FAILS_BEFORE_SLOWING / 3);
+  for (let i = 0; i < quickRounds; i += 1) await peerRotation.tick({ quick: true });
+  assert.equal(starts.length, quickRounds - 1, 'the round that reaches the limit starts none');
+  await peerRotation.tick({ quick: true });
+  assert.equal(starts.length, quickRounds - 1, 'still slowed');
+  await peerRotation.tick();
+  assert.equal(starts.length, quickRounds, 'the ten-minute pass tries again');
+
+  // A candidate kept starts the count over.
+  fill.settle.mock.mockImplementation(async () => ({ confirmed: 1, reverted: 0, left: 0, waiting: 0, gone: [] }));
+  await peerRotation.tick({ quick: true });
+  assert.equal(starts.length, quickRounds + 1);
+  peerRotation._resetFailStreak();
+});

@@ -244,11 +244,29 @@ async function probePeer(rawInput) {
  * in this container it is the container, never Core, and nothing listens.
  */
 const OWN = "That is your own node, or an app on your Umbrel, not a peer.";
+// One spelling per IPv6 literal (2001:0db8:0::7 is 2001:db8::7), and an
+// IPv4-mapped one in either form back to dotted IPv4.
+function plainHost(raw) {
+  let host = String(raw || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (host.includes(':')) {
+    try {
+      host = new URL(`http://[${host}]/`).hostname.slice(1, -1);
+    } catch {
+      return host;
+    }
+    const mapped = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mapped) {
+      const [hi, lo] = mapped.slice(1).map((h) => parseInt(h, 16));
+      host = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+    }
+  }
+  return host;
+}
 function ownAddress(addr) {
-  const host = String(addr).replace(/^\[|\]$/g, '').toLowerCase();
-  const v4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? host : (host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/) || [])[1];
-  if (v4 && config.umbrelInternalNetworkCidr && ipv4InCidr(v4, config.umbrelInternalNetworkCidr)) return OWN;
-  const local = ((netInfo && netInfo.localaddresses) || []).map((a) => String(a.address || '').replace(/^\[|\]$/g, '').toLowerCase());
+  const host = plainHost(addr);
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) && config.umbrelInternalNetworkCidr
+    && ipv4InCidr(host, config.umbrelInternalNetworkCidr)) return OWN;
+  const local = ((netInfo && netInfo.localaddresses) || []).map((a) => plainHost(a.address));
   return local.includes(host) ? OWN : null;
 }
 
