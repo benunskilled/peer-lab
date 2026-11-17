@@ -1066,7 +1066,10 @@ function lastTryText(st) {
   // Plain text, as all of slotStatusText: escaped where it goes into the
   // page (nowRow, rotationEntryRow), once - escaped here too, the trial rows
   // showed "couldn&#39;t" (15.11.2026).
-  return ` The peer before${where ? `, in ${where},` : ''} ${whyText(l.reason)}.`;
+  // "An earlier peer": with up to three on trial, "the peer before" read as
+  // one of them - "The peer before, in Australia, couldn't be reached" right
+  // above a candidate in Australia still being tested (17.11.2026).
+  return ` An earlier peer${where ? ` in ${where}` : ''} ${whyText(l.reason)}.`;
 }
 // "8 of 8 slots used", then "Pick from 4,812 addresses" with a button per
 // region to pick it (15.11.2026; always shown since 17.11.2026). A region with none shows 0 on
@@ -1116,6 +1119,9 @@ function renderSlotBook() {
     : empty ? `Nothing in ${names(picked)} can be added right now, back to the usual pick.`
     : `The next free slots go to ${names(picked)}. Tap again to undo.`;
 }
+// The candidates on trial, oldest first as the server keeps them.
+const trialList = (st) => (st && st.trials && st.trials.length ? st.trials : st && st.trial ? [st.trial] : []);
+const newestTrial = (st) => trialList(st).at(-1) || {};
 function slotStatusText(st, now, trial = st && st.trial) {
   if (!st) return { state: 'new', head: 'Starting.', rest: 'Looking at your slots now.', short: 'on · starting' };
   const slots = st.slots || { used: 0, max: MAX_MANUAL_PEERS, offline: [] };
@@ -1131,8 +1137,8 @@ function slotStatusText(st, now, trial = st && st.trial) {
       return {
         state: 'trial',
         head: `Testing a new peer${where ? ` in ${where}` : ''}.`,
-        // Why the peer before went: under the oldest candidate only.
-        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${!st.trial || t.address === st.trial.address ? lastTryText(st) : ''}`,
+        // Why an earlier one went: under the newest candidate only, the top row.
+        rest: `${doing} Result in about ${minutes(Math.max(60000, t.decideBy - now))}.${t.address === newestTrial(st).address ? lastTryText(st) : ''}`,
         short: 'on · testing a peer',
       };
     }
@@ -1293,14 +1299,16 @@ function nowRow(now) {
   if (!s || !s.enabled) return '';
   const t = slotStatusText(s.status, now);
   const tries = triesHtml(s.status);
-  // One row per candidate on trial, the oldest first; the list of tries
-  // under the first.
+  // One row per candidate on trial, the newest first like the log under
+  // them (17.11.2026: oldest first above a log newest first read as out of
+  // order); the list of tries under the top row.
   if (s.status && s.status.state === 'trial' && s.status.trial) {
-    const list = s.status.trials && s.status.trials.length ? s.status.trials : [s.status.trial];
+    const list = trialList(s.status);
     return list.map((tr, i) => {
       const where = (s.trialsWhere && s.trialsWhere[i]) || (i === 0 ? s.trialWhere : null);
-      return rotationEntryRow({ action: 'trial', address: tr.address, at: tr.startedAt, where, note: slotStatusText(s.status, now, tr).rest }, i === 0 ? tries : '');
-    }).join('');
+      return { tr, where };
+    }).reverse().map(({ tr, where }, i) =>
+      rotationEntryRow({ action: 'trial', address: tr.address, at: tr.startedAt, where, note: slotStatusText(s.status, now, tr).rest }, i === 0 ? tries : '')).join('');
   }
   const pill = '<span class="pill rotation-now">Now</span>';
   const head = escapeHtml(t.head.replace(/\.$/, ''));

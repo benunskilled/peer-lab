@@ -259,7 +259,9 @@
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
           : deliveredEver.has(p.addr) ? "Has delivered a block first" : "";
-        fit(sub, p.addr, got);
+        // Behind a proxy the address is the proxy's: said in words instead.
+        const shownAddr = HIDDEN[p.network] ? HIDDEN[p.network].via : p.addr;
+        fit(sub, shownAddr, got);
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
@@ -269,8 +271,8 @@
         }
         {
           const a = document.createElement("span");
-          a.className = "addr-txt";
-          a.textContent = p.addr;
+          a.className = HIDDEN[p.network] ? "addr-txt via" : "addr-txt";
+          a.textContent = shownAddr;
           sub.appendChild(a);
         }
         text.append(b, sub);
@@ -289,7 +291,7 @@
           if (deliveredNow.has(p.addr)) land.append(" ", span("star", "\u2605"));
           const sub = span("pc-sub2");
           if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
-          sub.append(span("addr-txt", p.addr));
+          sub.append(span(HIDDEN[p.network] ? "addr-txt via" : "addr-txt", shownAddr));
           const what = span("pc-what");
           const testing = onTrial(p);
           const label = testing ? "Testing" : p.linking_lion ? "LinkingLion" : p.kind;

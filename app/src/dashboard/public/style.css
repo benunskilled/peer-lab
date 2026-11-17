@@ -496,6 +496,8 @@ table.peers.aligned { table-layout: fixed; }
    whatever is left over. */
 .peers td.peer small.sub { max-width: 320px; }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
+/* "through the Tor proxy" in place of an address: words, not an address. */
+.addr-txt.via { font: inherit; font-size: 13px; }
 /* The pill hangs left by its own padding, so its words start where the line under it does. */
 .peers .kind { margin-left: -9px; display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
 .peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
@@ -637,7 +639,7 @@ button.b-peer:hover { text-decoration-style: solid; }
 .block-wait { margin: 0; padding: 12px 16px; color: var(--muted); font-size: 14px; }
 @keyframes arrived { from { background-color: rgba(247, 147, 26, .16); } }
 /* Scrolling back up on a phone: the sections, a tap away. */
-.jump-bar { position: fixed; z-index: 30; left: 50%; top: 8px; transform: translate(-50%, calc(-100% - 16px)); display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(17, 24, 32, .92); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); transition: transform .2s ease; max-width: calc(100vw - 16px); }
+.jump-bar { position: fixed; z-index: 30; left: 50%; top: 8px; transform: translate(-50%, calc(-100% - 16px)); display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgb(17, 24, 32); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); transition: transform .2s ease; max-width: calc(100vw - 16px); }
 /* --jump-top: below the open inbound list's bar while that is pinned
    (3-render.js). Only in the shown state: hidden, the bar stays off-screen
    whatever it is, and does not flash over the bar as that pins. */

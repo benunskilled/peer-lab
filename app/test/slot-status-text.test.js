@@ -40,11 +40,11 @@ test('while testing, the top row also says why the peer before went', () => {
   };
   const t = text(st, at);
   assert.match(t.head, /Testing a new peer in Peru/);
-  assert.match(t.rest, /The peer before, in Venezuela, couldn't be reached\./);
+  assert.match(t.rest, /An earlier peer in Venezuela couldn't be reached\./);
   // Plain text, escaped once where it goes into the page: escaped here too,
   // the trial rows showed "couldn&#39;t" (15.11.2026).
   assert.doesNotMatch(t.rest, /&#/);
-  assert.doesNotMatch(text({ ...st, lastTry: undefined }, at).rest, /peer before/, 'nothing when nothing went');
+  assert.doesNotMatch(text({ ...st, lastTry: undefined }, at).rest, /earlier peer/, 'nothing when nothing went');
 });
 
 test('a peer before on an unknown reason or place still reads as a sentence', () => {
@@ -52,7 +52,21 @@ test('a peer before on an unknown reason or place still reads as a sentence', ()
   const at = 1_000_000_000_000;
   const st = { at, nextAt: at + 600000, state: 'looking', slots: { used: 7, max: 8, offline: [] }, look: { why: 'none_fit' },
     lastTry: { at, reason: 'something_new', country: null, region: null } };
-  assert.match(text(st, at).rest, /The peer before was not kept\.$/);
+  assert.match(text(st, at).rest, /An earlier peer was not kept\.$/);
+});
+
+// Up to three on trial, shown newest first: the earlier peer is said under the
+// newest only, the top row (17.11.2026: "the peer before, in Australia" stood
+// above a candidate in Australia still being tested).
+test('with several on trial, only the newest says why an earlier peer went', () => {
+  const text = slotStatusText();
+  const at = 1_000_000_000_000;
+  const old = { address: 'a', startedAt: at - 60000, phase: 'connecting', decideBy: at + 60000, country: 'PE' };
+  const fresh = { address: 'b', startedAt: at, phase: 'connecting', decideBy: at + 120000, country: 'VE' };
+  const st = { at, state: 'trial', slots: { used: 8, max: 8, offline: [] }, trial: old, trials: [old, fresh],
+    lastTry: { at: at - 1000, reason: 'no_connection', country: 'VE', region: 'South America' } };
+  assert.match(text(st, at, fresh).rest, /An earlier peer in Venezuela/);
+  assert.doesNotMatch(text(st, at, old).rest, /earlier peer/);
 });
 
 test('the status text is plain text: a place with & or an apostrophe is not escaped in it', () => {
