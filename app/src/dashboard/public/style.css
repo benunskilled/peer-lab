@@ -394,6 +394,8 @@ table.peers.aligned { table-layout: fixed; }
 /* A peer that has brought a block: its address in green. Only the address - whole green
    rows were a lot of colour for one bit. The orange of the newest block's deliverer stays a row. */
 .peers tr.delivered-ever .addr-txt { color: #56d364; }
+/* "through the Tor proxy" is no address: it stays grey. */
+.peers tr.delivered-ever .addr-txt.via { color: var(--faint); }
 /* The newest block's deliverer, while its star is up - the same two minutes. */
 .peers tr.delivered-now td { background: rgba(247,147,26,.13); }
 

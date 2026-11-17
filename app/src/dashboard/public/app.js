@@ -1790,6 +1790,8 @@ document.getElementById('pool-add-form').addEventListener('submit', async (e) =>
     });
     resultEl.textContent = 'added';
     label.value = ''; host.value = ''; port.value = '';
+    // The "✓ found" mark follows at once, not after the five-minute wait.
+    localPoolsAtMs = 0;
     refreshPools();
     poolResultTimer = setTimeout(() => { resultEl.textContent = ''; }, 5000);
   } catch (err) {
@@ -1862,6 +1864,9 @@ document.body.addEventListener('click', async (e) => {
     try {
       await api('/api/pools', { method: 'POST', body: JSON.stringify({ label: p.label, host: p.host, port: p.port }) });
       showToast(`Added ${p.label} to Stratum Race.`, 'success');
+      // As the form says it: DATUM sends no work until it has an address.
+      document.getElementById('pool-add-result').textContent = template === 'datum'
+        ? 'DATUM sends work only once a Bitcoin address is set in its Config tab.' : '';
     } catch (err) {
       showToast(`Could not add ${p.label}: ${err.message}`, 'error');
     }
@@ -1963,6 +1968,8 @@ document.body.addEventListener('click', async (e) => {
     if (action === 'delete-pool') {
       await api(`/api/pools/${id}`, { method: 'DELETE' });
       showToast('Pool removed.', 'success');
+      // A removed pool app is marked "✓ found" again at once.
+      localPoolsAtMs = 0;
     }
 
     // The Slot Fill log notes a hand-made change at once; without this it would

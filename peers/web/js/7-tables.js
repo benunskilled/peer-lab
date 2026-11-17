@@ -325,7 +325,7 @@
       const div = document.createElement("div");
       div.className = "leave";
       const a = document.createElement("span");
-      a.textContent = p.addr;
+      a.textContent = HIDDEN[p.network] ? HIDDEN[p.network].via : p.addr;
       div.append(a, " \u00b7 " + p.leaving);
       td.appendChild(div);
       tr.appendChild(td);

@@ -110,9 +110,11 @@ function pruneNeverFirstPeers({ days = config.neverFirstPeerRetentionDays, maxSt
         // once what is left fits. Before, the first peer was taken whole,
         // however many rows it had.
         if (!ids.length) {
-          db.instance.prepare(`DELETE FROM relay_observation WHERE rowid IN
-            (SELECT rowid FROM relay_observation WHERE peer_id = ? LIMIT ?)`).run(r.id, MAX_ROWS_PER_STEP);
-          return { removed: 0, more: true };
+          const gone = db.instance.prepare(`DELETE FROM relay_observation WHERE rowid IN
+            (SELECT rowid FROM relay_observation WHERE peer_id = ? LIMIT ?)`).run(r.id, MAX_ROWS_PER_STEP).changes;
+          // A count above the real rows would find nothing here: stop
+          // rather than spend every step on it.
+          return { removed: 0, more: gone > 0 };
         }
         break;
       }
