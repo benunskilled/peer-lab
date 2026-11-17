@@ -1068,8 +1068,8 @@ function lastTryText(st) {
   // showed "couldn&#39;t" (15.11.2026).
   return ` The peer before${where ? `, in ${where},` : ''} ${whyText(l.reason)}.`;
 }
-// "8 of 8 slots used · 4,812 addresses to pick from", and per region under
-// it, each a button to pick it (15.11.2026). A region with none shows 0 on
+// "8 of 8 slots used", then "Pick from 4,812 addresses" with a button per
+// region to pick it (15.11.2026; always shown since 17.11.2026). A region with none shows 0 on
 // its button; the line does not repeat it (16.11.2026).
 const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
@@ -1095,8 +1095,8 @@ function renderSlotBook() {
   const testing = onTrial ? ` \u00b7 ${onTrial} being tested` : '';
   const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
   const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
-  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing} \u00b7 ${n(b.total)} address${b.total === 1 ? '' : 'es'} to pick from`
-    + (picked.length ? ` \u00b7 your pick: ${names(picked)}` : '');
+  document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing}`;
+  document.getElementById('slot-book-pick').textContent = `Pick from ${n(b.total)} address${b.total === 1 ? '' : 'es'}`;
   // Each region a switch (15.11.2026): picked, the next free slots go there.
   // One with nothing to pick from cannot be picked, but stays to be unpicked.
   const html = buttons.map(([r, c]) => {

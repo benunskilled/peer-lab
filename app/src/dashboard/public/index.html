@@ -210,12 +210,14 @@
         </details>
       </div>
       <!-- What there is to pick from: Core's address book after Slot Fill's
-           own filters, per region on a tap. Only while Slot Fill is on. -->
-      <details class="how slot-book" id="slot-book" hidden>
-        <summary id="slot-book-sum"></summary>
+           own filters, per region on a tap. Only while Slot Fill is on.
+           Always open: folded away, the region choice went unseen (17.11.2026). -->
+      <div class="slot-book" id="slot-book" hidden>
+        <p class="slot-book-sum" id="slot-book-sum"></p>
+        <p class="slot-book-pick" id="slot-book-pick"></p>
         <p class="region-picks" id="slot-book-regions"></p>
         <p class="hint" id="slot-pick-note"></p>
-      </details>
+      </div>
       <h3>Log</h3>
       <div class="table-wrap">
         <table id="rotation-log-table" class="rotation-log-table">
