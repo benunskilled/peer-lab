@@ -21,6 +21,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"BTC RPC Proxy v0.8.1", "Other"},
 	{"BTC RPC Proxy (test)", "Other"},
 	{"/wuji-headers:0.1/", "Other light client"},
+	{"/pcoc-bari:0.6.8/", "Other light client"},
 	{"/Prometheus:30.4.1/", "Node (other)"},
 	{"/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/", "Wallet"},
 	{"/P2Pool:17.0/", "Pool node"},

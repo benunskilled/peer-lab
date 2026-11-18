@@ -5,7 +5,7 @@
 - Stratum Race: a pool app found on this Umbrel is marked "✓ found" in the row of local pools, and one tap adds it.
 - Slot Fill: the regions to pick from are always shown. Peers being tested are listed newest first.
 - Peers reached through Tor, I2P or Docker show that, instead of the proxy's own address.
-- Two more programs are named: miningcore-btc-solo (a solo pool) and DNN Node.
+- Three more programs are named: miningcore-btc-solo (a solo pool), DNN Node and pcoc Bari.
 - The jump bar is no longer see-through.
 
 ## 1.0.0 – 2026-11-16

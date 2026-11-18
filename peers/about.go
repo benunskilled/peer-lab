@@ -84,6 +84,8 @@ var aboutRules = []aboutRule{
 	// const ua = Buffer.from('/wuji-headers:0.1/') in indexer/bitcoin-p2p.mjs
 	// (MM-sheng/wuji, 15.11.2026).
 	{regexp.MustCompile(`^/wuji-headers:`), "WUJI's indexer: follows Bitcoin's block headers to build an index usable on Ethereum", "WUJI header client", ""},
+	// const USER_AGENT in sdk/rust/pcoc-gossip/src/wire.rs in groundinglab/pcoc.
+	{regexp.MustCompile(`^/pcoc-bari:`), "pcoc Bari, a timestamping service that follows Bitcoin's block headers", "pcoc Bari header client", ""},
 	// UA_NAME("Prometheus") in src/clientversion.cpp, version 30.4.1 in
 	// CMakeLists.txt (CryptoIceMLH/bitcoin-prometheus, 15.11.2026).
 	{regexp.MustCompile(`^/Prometheus:`), "BTC-Prometheus, a full node forked from Bitcoin Core", "BTC-Prometheus node", ""},
