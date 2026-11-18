@@ -65,7 +65,10 @@ var kindRules = []struct {
 	// on master, which is why it was once taken for someone else's).
 	// P2Pool's bitcoind connection says /P2Pool:x/ (p2pool/bitcoin/p2p.py), and
 	// a name that is itself a pool - /pydroid-pool:3/ - is one too.
-	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:`), true},
+	// miningcore-btc-solo is a solo pool built on Miningcore: AppInfo.cs in
+	// bugoao/miningcore-btc-solo sets P2pUserAgent "/miningcore-btc-solo:<v>/",
+	// P2p/P2pFastPeer.cs sends it (17.11.2026).
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:|^/miningcore-btc-solo:`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own. Bitcoin Purity

@@ -112,7 +112,7 @@ const KIND_RULES = [
   [/^\/Sat0shi:|^\/Satoshi[0-9X]+:|^Satoshi:/, null, 'whole'],
   // Mining pool software speaking p2p, or a node whose operator says in the
   // bracketed comment that it belongs to a pool. Relays.
-  [/ckpool|^\/ckp2p:|^\/CKCoinD:|\([^)]*pool[^)]*\)|^\/P2Pool:|^\/[^:/(]*pool[^:/(]*:/i, null, 'no-mempool'],
+  [/ckpool|^\/ckp2p:|^\/CKCoinD:|\([^)]*pool[^)]*\)|^\/P2Pool:|^\/[^:/(]*pool[^:/(]*:|^\/miningcore-btc-solo:/i, null, 'no-mempool'],
   // Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
   // Irium and VDS are forks and altcoins of their own. Bitcoin Purity, a hard
   // fork of Knots, says "/Satoshi:29.4/Purity:1.1.0/".

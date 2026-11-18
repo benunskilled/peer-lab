@@ -110,6 +110,8 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/CKCoinD:31.1.0/", "Pool node"},
 	{"/rust-bitcoin:0.18/bluematt-tokio-client:0.1/", "Crawler"},
 	{"/ckp2p:2.0/", "Pool node"},
+	{"/miningcore-btc-solo:1.1.1/", "Pool node"},
+	{"/btcwire:0.5.0/DNN-Node:0.1.0/", "Other"},
 	{"bloXroute Gateway 2.108.2", "Other"},
 	{"/RelayNetworkClient:42/", "Other"},
 	{"/Cornell-Falcon-Network:0.1.0/", "Other"},
