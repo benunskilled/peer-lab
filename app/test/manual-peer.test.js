@@ -361,6 +361,12 @@ test('adding a peer at capacity frees exactly one slot, and names what it droppe
     const logged = db.instance.prepare("SELECT * FROM rotation_log WHERE action = 'manual' AND address = ?").get(address);
     assert.equal(logged.replaced_address, '198.51.100.1:8333');
     assert.equal(logged.note, 'replaced one in an unknown region', 'documentation addresses belong to no region');
+    // The one that made room has a row of its own, under the add, by address.
+    const bumped = db.instance.prepare("SELECT * FROM rotation_log WHERE action = 'bumped'").all();
+    assert.equal(bumped.length, 1);
+    assert.equal(bumped[0].address, '198.51.100.1:8333');
+    assert.equal(bumped[0].note, 'made room for a peer added by hand');
+    assert.ok(bumped[0].id < logged.id, 'the add is the newest row');
   } finally {
     server.close();
   }

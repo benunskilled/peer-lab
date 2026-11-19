@@ -990,7 +990,7 @@ let picksSending = false;
 // innerHTML - into a class attribute AND the text - without escaping. Nothing
 // a Bitcoin peer controls can reach it today, which is exactly the kind of
 // reasoning that stops being true after a refactor.
-const ROTATION_ACTIONS = new Set(['promote', 'retire', 'manual', 'unmanual', 'disconnect', 'trial', 'rejected']);
+const ROTATION_ACTIONS = new Set(['promote', 'retire', 'bumped', 'manual', 'unmanual', 'disconnect', 'trial', 'rejected']);
 function rotationActionClass(action) {
   return ROTATION_ACTIONS.has(action) ? `rotation-${action}` : 'offline';
 }
@@ -1002,6 +1002,8 @@ function rotationActionLabel(action) {
   if (action === 'trial') return 'Testing';
   // Offline past its grace: the slot is free for the next candidate.
   if (action === 'retire') return 'Removed';
+  // Gave its slot to a peer added by hand while all eight were taken.
+  if (action === 'bumped') return 'Removed';
   if (action === 'manual') return 'Added by hand';
   if (action === 'unmanual') return 'Removed by hand';
   if (action === 'disconnect') return 'Disconnected by hand';

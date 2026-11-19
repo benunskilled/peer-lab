@@ -971,7 +971,7 @@ details.card.panel > *:not(summary) { margin-top: 14px; }
 .panel .pill.rotation-now { background: rgba(138,153,168,.15); color: var(--muted); }
 .panel .pill.rotation-trial { background: rgba(247,147,26,.15); color: var(--accent); }
 .panel .pill.rotation-manual { background: rgba(57,135,229,.15); color: #6aa8f0; }
-.panel .pill.rotation-retire { background: rgba(138,153,168,.15); color: var(--muted); }
+.panel .pill.rotation-retire, .panel .pill.rotation-bumped { background: rgba(138,153,168,.15); color: var(--muted); }
 .panel .pill.rotation-disconnect, .panel .pill.rotation-unmanual { background: rgba(138,153,168,.15); color: var(--muted); }
 .panel .pill.rotation-rejected { background: rgba(248,81,73,.15); color: var(--bad, #f85149); }
 /* The Add-a-Peer result line. "not reachable" is a perfectly good answer

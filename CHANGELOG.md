@@ -3,7 +3,7 @@
 ## 1.0.1 – 2026-11-23
 
 - Stratum Race: a pool app found on this Umbrel is marked "✓ found" in the row of local pools, and one tap adds it.
-- Slot Fill: the regions to pick from are always shown. Peers being tested are listed newest first.
+- Slot Fill: the regions to pick from are always shown. Peers being tested are listed newest first. A peer that gives up its slot to one added by hand gets its own line in the log.
 - Peers reached through Tor, I2P or Docker show that, instead of the proxy's own address.
 - Three more programs are named: miningcore-btc-solo (a solo pool), DNN Node and pcoc Bari.
 - A peer calling itself "/Satoshi:" without the closing "/" is shown as Disguised: Core always writes it.
