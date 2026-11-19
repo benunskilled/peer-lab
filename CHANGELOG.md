@@ -8,6 +8,7 @@
 - Three more programs are named: miningcore-btc-solo (a solo pool), DNN Node and pcoc Bari.
 - A peer calling itself "/Satoshi:" without the closing "/" is shown as Disguised: Core always writes it.
 - The jump bar is no longer see-through.
+- Kind pills line up on tablet-width cards.
 
 ## 1.0.0 – 2026-11-16
 
