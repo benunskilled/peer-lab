@@ -109,7 +109,7 @@ const KIND_RULES = [
   // Core's name misspelt ("/Sat0shi:", "/Satoshi2:"): Disguised in the peer list.
   // What it runs is unknown, so it is not struck - and it comes first, so the
   // rest of its agent is not read as a crawler or a wallet either.
-  [/^\/Sat0shi:|^\/Satoshi[0-9X]+:|^Satoshi:/, null, 'whole'],
+  [/^\/Sat0shi:|^\/Satoshi[0-9X]+:|^Satoshi:|^\/Satoshi:[^/]*$/, null, 'whole'],
   // Mining pool software speaking p2p, or a node whose operator says in the
   // bracketed comment that it belongs to a pool. Relays.
   [/ckpool|^\/ckp2p:|^\/CKCoinD:|\([^)]*pool[^)]*\)|^\/P2Pool:|^\/[^:/(]*pool[^:/(]*:|^\/miningcore-btc-solo:/i, null, 'no-mempool'],

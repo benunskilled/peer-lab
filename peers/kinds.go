@@ -49,10 +49,14 @@ var kindRules = []struct {
 	// Bitcoin Core's name, misspelt: "/Sat0shi:" with a zero, "/Satoshi2:",
 	// "/SatoshiX:", or "Satoshi:22.0.0" without the slashes Core always sends.
 	// Real Core writes exactly "/Satoshi:x.y.z/". On the node this was written
-	// for, "/Sat0shi:31.0.0/" alone came 475 times in a fortnight. First, so
+	// for, "/Sat0shi:31.0.0/" alone came 475 times in a fortnight. And
+	// "/Satoshi:0.21.0" without the closing slash: Core always adds it
+	// (FormatSubVersion in src/clientversion.cpp, ss << "/"). Once in 114,020
+	// "/Satoshi:" sessions on that node, 16.10.-19.11.2026, inbound, no
+	// services; every real Core and Knots there ended in "/". First, so
 	// nothing below reads it as Core. What it does is unknown, so it is not
 	// marked as unable to relay.
-	{"Disguised", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:`), true},
+	{"Disguised", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:|^/Satoshi:[^/]*$`), true},
 	// Mining pool software speaking the p2p protocol, or a node whose operator
 	// says in the comment part of the agent - the bit in brackets - that it
 	// belongs to a pool, e.g. "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/".
@@ -213,7 +217,7 @@ var kindRules = []struct {
 var coreNameWithSuffix = regexp.MustCompile(`^/(Satoshi[0-9X]+):`)
 
 // misspeltCore says how a name imitating Core's differs from it, for the
-// three spellings the Disguised rule catches, or "".
+// four spellings the Disguised rule catches, or "".
 func misspeltCore(subver string) string {
 	switch {
 	case strings.HasPrefix(subver, "/Sat0shi:"):
@@ -222,6 +226,8 @@ func misspeltCore(subver string) string {
 		return "Core calls itself /Satoshi:, this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
 	case strings.HasPrefix(subver, "Satoshi:"):
 		return "Core writes its name between slashes: /" + strings.Trim(subver, "/") + "/"
+	case strings.HasPrefix(subver, "/Satoshi:") && !strings.Contains(subver[1:], "/"):
+		return "Core always ends its name with \"/\": " + subver + "/"
 	}
 	return ""
 }
