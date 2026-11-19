@@ -55,6 +55,7 @@ func TestShortReasons(t *testing.T) {
 		{fakeAbout("/Sat0shi:25.0.0/", "", nil), "misspelt name"},
 		{fakeAbout("Satoshi:25.0.0", "", nil), "misspelt name"},
 		{fakeAbout("/Satoshi9:25.0.0/", "", nil), "misspelt name"},
+		{fakeAbout("/Satoshi:0.21.0", "", nil), "misspelt name"},
 	} {
 		if got := tellOf(c.about, false); got != c.want {
 			t.Errorf("tellOf(%q) = %q, want %q", c.about, got, c.want)

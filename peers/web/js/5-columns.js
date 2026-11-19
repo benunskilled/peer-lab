@@ -300,7 +300,14 @@
           if (testing) pill.title = TRIAL_TITLE;
           // The marks in a slot of their own, as in the table: every pill starts in one place, mark or none.
           const marks = span("hb-marks");
-          for (const [active, symbol] of [[p.hb_to, "\u26a1"], [p.hb_from, "\ud83d\udce1"], [isLocked(p), "\ud83d\udd12"]]) if (active) marks.append(span("hb", symbol));
+          for (const [active, symbol, title] of [[p.hb_to, "\u26a1", HB_TITLE], [p.hb_from, "\ud83d\udce1", HB_FROM_TITLE], [isLocked(p), "\ud83d\udd12", LOCKED_TITLE]]) {
+            if (!active) continue;
+            const mark = span("hb", symbol);
+            mark.title = title;
+            mark.setAttribute("role", "img");
+            mark.setAttribute("aria-label", title);
+            marks.append(mark);
+          }
           what.append(marks, pill);
           // Filled column by column (style.css): each pair is one column of the card.
           pc.append(land, sub, what, span("pc-net", p.operator || (p.tor_exit ? "Tor exit" : "")));

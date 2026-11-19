@@ -116,6 +116,7 @@ func shortReason(r, claimed string) string {
 		{"Sat0shi with a zero", "misspelt name"},
 		{"Core calls itself /Satoshi:", "misspelt name"},
 		{"Core writes its name between slashes", "misspelt name"},
+		{"Core always ends its name with", "misspelt name"},
 		{"poses as Libre Relay", "Libre Relay bit, no matching release"},
 		{"reached us at its own address", "gives its own address as ours"},
 	} {
