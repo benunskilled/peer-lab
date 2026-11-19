@@ -298,8 +298,10 @@
           const pill = span("kind " + (testing || p.offline ? "never" : p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first"),
             (p.no_relay && !testing ? "\u2298 " : "") + label);
           if (testing) pill.title = TRIAL_TITLE;
-          for (const [active, symbol] of [[p.hb_to, "\u26a1"], [p.hb_from, "\ud83d\udce1"], [isLocked(p), "\ud83d\udd12"]]) if (active) what.append(span("hb", symbol));
-          what.append(pill);
+          // The marks in a slot of their own, as in the table: every pill starts in one place, mark or none.
+          const marks = span("hb-marks");
+          for (const [active, symbol] of [[p.hb_to, "\u26a1"], [p.hb_from, "\ud83d\udce1"], [isLocked(p), "\ud83d\udd12"]]) if (active) marks.append(span("hb", symbol));
+          what.append(marks, pill);
           // Filled column by column (style.css): each pair is one column of the card.
           pc.append(land, sub, what, span("pc-net", p.operator || (p.tor_exit ? "Tor exit" : "")));
           // A wider card has room for what a table would have had to drop: how
