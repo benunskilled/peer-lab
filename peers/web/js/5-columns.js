@@ -34,6 +34,8 @@
     }
     return p.tell || p.label || probablyOf(p) || (p.about || "").split("\n")[0] || p.subver || "";
   };
+  // The card line on hover: the reason's whole sentence (p.why), a fork's or pruned's meaning.
+  const cardLineWhy = (p, text) => p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : p.why || "";
   const isPruned = (p) => p.kind.startsWith("Node") && !!p.services && p.services.includes("NETWORK_LIMITED") && !p.services.includes("NETWORK");
   const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
   function mbText(mb) {
@@ -310,7 +312,16 @@
           }
           what.append(marks, pill);
           // Filled column by column (style.css): each pair is one column of the card.
-          pc.append(land, sub, what, span("pc-net", p.operator || (p.tor_exit ? "Tor exit" : "")));
+          // Under the pill the provider; with a filter on, as on a phone card and in the
+          // table, what the pill does not say (cardLine): in "syncing" how much it took.
+          const net = span("pc-net", p.operator || (p.tor_exit ? "Tor exit" : ""));
+          if (state.group) {
+            const text = cardLine(p) || " ";
+            net.textContent = text;
+            if (p.sync_mb) net.replaceChildren(syncSpan(p));
+            else fit(net, text, cardLineWhy(p, text));
+          }
+          pc.append(land, sub, what, net);
           // A wider card has room for what a table would have had to drop: how
           // often the peer was first, then ping and time connected. Shown by
           // the card's width; all of it is in the opened row at any width.
@@ -421,8 +432,7 @@
           if (p.sync_mb) e.replaceChildren(syncSpan(p));
           // On hover: the whole line where it is cut, and why - the reason's
           // whole sentence (p.why), a fork's or pruned's meaning (fit).
-          const why = p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : p.why || "";
-          if (!p.sync_mb) fit(e, text, why);
+          if (!p.sync_mb) fit(e, text, cardLineWhy(p, text));
           // A second part stays only where it fits whole (fitTables).
           const two = text.split(" \u00b7 ");
           if (two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
