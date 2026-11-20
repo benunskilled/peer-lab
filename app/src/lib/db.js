@@ -61,7 +61,17 @@ CREATE TABLE IF NOT EXISTS peer_session (
   started_at INTEGER NOT NULL,
   ended_at INTEGER,
   min_ping_ms REAL,
-  last_ping_ms REAL
+  last_ping_ms REAL,
+  -- What the peer did, as Core counts it for this connection (20.11.2026):
+  -- recorded, not shown, so that a rule about peers that only listen can be
+  -- tested on data before it is written. See SESSION_COUNTERS below.
+  msg_recv TEXT,          -- getpeerinfo bytesrecv_per_msg as JSON: bytes, not messages
+  msg_sent TEXT,          -- bytessent_per_msg as JSON
+  last_tx INTEGER,        -- last_transaction: unix s a tx from this peer entered our mempool, 0 none
+  last_block INTEGER,     -- last_block: unix s this peer gave us a new block, 0 none
+  addr_processed INTEGER,
+  addr_rate_limited INTEGER,
+  counters_at INTEGER     -- when these were last written (ms); at most every few minutes
 );
 -- No standalone index on peer_session(peer_id): idx_peer_session_open below
 -- starts with the same column, so SQLite already uses it for a plain
@@ -384,9 +394,31 @@ function openOnce() {
   // makes every connection wait up to 10s and retry instead - the timeout
   // set at the top of this function.
   db.exec(SCHEMA);
+  addSessionCounters();
   seedDefaultPools();
   logger.info('database ready', { path: config.sqlitePath });
   return db;
+}
+
+// The session counters came after 1.0.1: CREATE TABLE IF NOT EXISTS leaves an
+// existing table as it is, so a database from before gets the columns here.
+// All four processes open the database at once; the one that loses the race
+// to add a column finds it there and moves on.
+const SESSION_COUNTERS = [
+  ['msg_recv', 'TEXT'], ['msg_sent', 'TEXT'], ['last_tx', 'INTEGER'], ['last_block', 'INTEGER'],
+  ['addr_processed', 'INTEGER'], ['addr_rate_limited', 'INTEGER'], ['counters_at', 'INTEGER'],
+];
+
+function addSessionCounters() {
+  const have = new Set(db.prepare('PRAGMA table_info(peer_session)').all().map((c) => c.name));
+  for (const [name, type] of SESSION_COUNTERS) {
+    if (have.has(name)) continue;
+    try {
+      db.exec(`ALTER TABLE peer_session ADD COLUMN ${name} ${type}`);
+    } catch (err) {
+      if (!/duplicate column/i.test(err.message)) throw err;
+    }
+  }
 }
 
 function seedDefaultPools() {
