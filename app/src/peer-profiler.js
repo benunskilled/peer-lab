@@ -82,6 +82,10 @@ function needsWrite(stored, next) {
 // long session shows what it did, rarely enough that ~400 peers do not mean
 // ~400 row writes every poll.
 const COUNTERS_EVERY_MS = 5 * 60 * 1000;
+// Each open session's latest getpeerinfo entry, written when the session
+// closes. In memory only: after a restart of this process a session that
+// closes before its next five-minute write keeps the reading before.
+const lastReading = new Map();
 
 function upsertSessions(peers, nowMs = Date.now()) {
   const database = db.instance;
@@ -100,6 +104,23 @@ function upsertSessions(peers, nowMs = Date.now()) {
     .all();
 
   const closeStmt = database.prepare(`UPDATE peer_session SET ended_at = ? WHERE id = ?`);
+  // What the peer did, kept per session for later counting (not shown). The
+  // byte counters move on every poll, so a row is not rewritten for them each
+  // time: every COUNTERS_EVERY_MS, and when a session is new. What happens in
+  // the last minutes before a disconnect can be missing; whether a peer ever
+  // sent an inv or a getdata over a long session is not.
+  const updateCounters = database.prepare(
+    `UPDATE peer_session
+     SET msg_recv = ?, msg_sent = ?, last_tx = ?, last_block = ?, addr_processed = ?, addr_rate_limited = ?, counters_at = ?
+     WHERE id = ?`,
+  );
+  const num = (v) => (typeof v === 'number' ? v : null);
+  const json = (v) => (v && typeof v === 'object' ? JSON.stringify(v) : null);
+  const writeCounters = (sessionId, peer) => updateCounters.run(
+    json(peer.bytesrecv_per_msg), json(peer.bytessent_per_msg), num(peer.last_transaction), num(peer.last_block),
+    num(peer.addr_processed), num(peer.addr_rate_limited), nowMs, sessionId,
+  );
+
   const openByAddress = new Map();
   // Same address in the snapshot is not the same session. Core hands every
   // connection its own transient peer id and reports `conntime` per session,
@@ -121,6 +142,13 @@ function upsertSessions(peers, nowMs = Date.now()) {
   const tx1 = database.transaction(() => {
     for (const s of openSessions) {
       const peer = peerByAddress.get(s.address);
+      if (!peer || !isSameSession(s, peer)) {
+        // The last reading this process saw, so a session shorter than
+        // COUNTERS_EVERY_MS keeps what it did rather than only its handshake.
+        const last = lastReading.get(s.id);
+        if (last) writeCounters(s.id, last);
+        lastReading.delete(s.id);
+      }
       if (!peer) {
         closeStmt.run(nowMs, s.id);
       } else if (!isSameSession(s, peer)) {
@@ -152,23 +180,6 @@ function upsertSessions(peers, nowMs = Date.now()) {
          synced_headers = COALESCE(?, synced_headers), hb_to = COALESCE(?, hb_to),
          hb_from = COALESCE(?, hb_from)
      WHERE id = ?`,
-  );
-
-  // What the peer did, kept per session for later counting (not shown). The
-  // byte counters move on every poll, so a row is not rewritten for them each
-  // time: every COUNTERS_EVERY_MS, and when a session is new. What happens in
-  // the last minutes before a disconnect can be missing; whether a peer ever
-  // sent an inv or a getdata over a long session is not.
-  const updateCounters = database.prepare(
-    `UPDATE peer_session
-     SET msg_recv = ?, msg_sent = ?, last_tx = ?, last_block = ?, addr_processed = ?, addr_rate_limited = ?, counters_at = ?
-     WHERE id = ?`,
-  );
-  const num = (v) => (typeof v === 'number' ? v : null);
-  const json = (v) => (v && typeof v === 'object' ? JSON.stringify(v) : null);
-  const writeCounters = (sessionId, peer) => updateCounters.run(
-    json(peer.bytesrecv_per_msg), json(peer.bytessent_per_msg), num(peer.last_transaction), num(peer.last_block),
-    num(peer.addr_processed), num(peer.addr_rate_limited), nowMs, sessionId,
   );
 
   const tx2 = database.transaction(() => {
@@ -226,6 +237,7 @@ function upsertSessions(peers, nowMs = Date.now()) {
             next.minPingMs, next.lastPingMs, next.services, next.relayTxes, next.syncedHeaders, next.hbTo, next.hbFrom, stored.id);
         }
         if (stored.counters_at == null || nowMs - stored.counters_at >= COUNTERS_EVERY_MS) writeCounters(stored.id, peer);
+        lastReading.set(stored.id, peer);
       } else {
         // conntime is Core's own unix-second connection start - more
         // accurate than "now" for a connection we're only just noticing.
@@ -233,6 +245,7 @@ function upsertSessions(peers, nowMs = Date.now()) {
         const { lastInsertRowid } = insertSession.run(peerRow.id, peer.id, direction, connectionType, network, peer.subver || null,
           startedAt, minPingMs, lastPingMs, services, relayTxes, syncedHeaders, hbTo, hbFrom);
         writeCounters(lastInsertRowid, peer);
+        lastReading.set(Number(lastInsertRowid), peer);
       }
     }
   });

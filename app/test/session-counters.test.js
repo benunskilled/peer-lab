@@ -105,3 +105,17 @@ test('a field Core leaves out stays empty, not zero', () => {
   assert.equal(r.addr_processed, null);
   assert.equal(r.msg_sent, null);
 });
+
+test('a session that ends before its next write keeps its last reading', () => {
+  db.instance.exec(`DELETE FROM peer_session WHERE peer_id != 1`);
+  const t0 = Date.now();
+  upsertSessions([corePeer({ id: 9 })], t0);
+  upsertSessions([corePeer({ id: 9, bytesrecv_per_msg: { version: 126, getdata: 61 } })], t0 + 30_000);
+  // Gone at the next poll, two minutes after it started.
+  upsertSessions([], t0 + 120_000);
+  const r = db.instance.prepare(
+    `SELECT ps.* FROM peer_session ps JOIN peer p ON p.id = ps.peer_id WHERE p.address = ? ORDER BY ps.id DESC`,
+  ).get(A);
+  assert.ok(r.ended_at != null);
+  assert.equal(JSON.parse(r.msg_recv).getdata, 61);
+});
