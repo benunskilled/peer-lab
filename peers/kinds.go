@@ -216,18 +216,29 @@ var kindRules = []struct {
 
 var coreNameWithSuffix = regexp.MustCompile(`^/(Satoshi[0-9X]+):`)
 
+// How each spelling misspeltCore catches begins its reason. tell.go gives
+// every one of them the same short form, from this list.
+const (
+	spelledZero    = "it writes Sat0shi with a zero"
+	spelledSuffix  = "Core calls itself /Satoshi:"
+	spelledSlashes = "Core writes its name between slashes"
+	spelledOpenEnd = "Core always ends its name with"
+)
+
+var misspellings = []string{spelledZero, spelledSuffix, spelledSlashes, spelledOpenEnd}
+
 // misspeltCore says how a name imitating Core's differs from it, for the
 // four spellings the Disguised rule catches, or "".
 func misspeltCore(subver string) string {
 	switch {
 	case strings.HasPrefix(subver, "/Sat0shi:"):
-		return "it writes Sat0shi with a zero"
+		return spelledZero
 	case coreNameWithSuffix.MatchString(subver):
-		return "Core calls itself /Satoshi:, this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
+		return spelledSuffix + ", this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
 	case strings.HasPrefix(subver, "Satoshi:"):
-		return "Core writes its name between slashes: /" + strings.Trim(subver, "/") + "/"
+		return spelledSlashes + ": /" + strings.Trim(subver, "/") + "/"
 	case strings.HasPrefix(subver, "/Satoshi:") && !strings.Contains(subver[1:], "/"):
-		return "Core always ends its name with \"/\": " + subver + "/"
+		return spelledOpenEnd + " \"/\": " + subver + "/"
 	}
 	return ""
 }

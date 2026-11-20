@@ -103,6 +103,11 @@ func shortReason(r, claimed string) string {
 		}
 		return "protocol " + m[1]
 	}
+	for _, m := range misspellings {
+		if strings.Contains(r, m) {
+			return "misspelt name"
+		}
+	}
 	for _, t := range []struct{ in, tell string }{
 		{"left out wtxidrelay", "no wtxidrelay"},
 		{"offers no services", "offers no services"},
@@ -113,10 +118,6 @@ func shortReason(r, claimed string) string {
 		{"speaks v2, which no wallet", "wallet offering v2"},
 		{"v2 connections, which that software never had", "v2, which it never had"},
 		{"which the Bitcore library does not offer", "more services than Bitcore"},
-		{"Sat0shi with a zero", "misspelt name"},
-		{"Core calls itself /Satoshi:", "misspelt name"},
-		{"Core writes its name between slashes", "misspelt name"},
-		{"Core always ends its name with", "misspelt name"},
 		{"poses as Libre Relay", "Libre Relay bit, no matching release"},
 		{"reached us at its own address", "gives its own address as ours"},
 	} {
