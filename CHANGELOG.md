@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.1 – 2026-11-23
+## 1.0.1 – 2026-11-20
 
 - Stratum Race: a pool app found on this Umbrel is marked "✓ found" in the row of local pools, and one tap adds it.
 - Slot Fill: the regions to pick from are always shown. Peers being tested are listed newest first. A peer that gives up its slot to one added by hand gets its own line in the log.
