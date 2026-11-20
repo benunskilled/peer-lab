@@ -316,7 +316,7 @@
           // table, what the pill does not say (cardLine): in "syncing" how much it took.
           const net = span("pc-net", p.operator || (p.tor_exit ? "Tor exit" : ""));
           if (state.group) {
-            const text = cardLine(p) || " ";
+            const text = cardLine(p) || "\u00a0";
             net.textContent = text;
             if (p.sync_mb) net.replaceChildren(syncSpan(p));
             else fit(net, text, cardLineWhy(p, text));
