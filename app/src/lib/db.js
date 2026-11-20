@@ -275,7 +275,7 @@ DROP TABLE IF EXISTS promoted_peer;
 CREATE TABLE IF NOT EXISTS rotation_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   at INTEGER NOT NULL,
-  action TEXT NOT NULL,             -- promote | retire | manual | unmanual | disconnect | rejected
+  action TEXT NOT NULL,             -- promote | retire | bumped | manual | unmanual | disconnect | rejected
   address TEXT NOT NULL,
   replaced_address TEXT,            -- the peer a manual add pushed out
   note TEXT

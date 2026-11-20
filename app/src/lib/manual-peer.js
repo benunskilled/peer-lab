@@ -170,6 +170,14 @@ async function manualAddPeer(rawInput, label, { kept = false } = {}) {
   // The peer is in by now: a busy database must not turn that into an error
   // the user would retry, displacing a second peer.
   try {
+    // The one that made room gets a row of its own, as every peer that loses
+    // a slot does (a retire names its address too). Its own action, not
+    // 'retire': the slot did not come free, it changed hands at once, and
+    // triesSinceFree must not count it as freed. Written first, so the add
+    // stands above it.
+    if (result.evicted) {
+      logAction({ action: 'bumped', address: result.evicted.address, note: 'made room for a peer added by hand' });
+    }
     logAction({
       action: 'manual',
       address: probed.address,

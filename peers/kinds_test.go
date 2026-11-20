@@ -58,6 +58,8 @@ func TestKindOf(t *testing.T) {
 		// seen from rented machines in five regions. It must not come out as
 		// Core. It was "Other" until the Fake kind existed to say what it is.
 		"/Sat0shi:31.0.0/":                  "Disguised",
+		"/Satoshi:0.21.0":                   "Disguised",
+		"/Satoshi:29.2.0/Knots:20250903/":   "Node (Knots)",
 		"/Satoshi2:0.18.3/":                 "Disguised",
 		"/SatoshiX:0.18.0/":                 "Disguised",
 		"Satoshi:22.0.0":                    "Disguised",

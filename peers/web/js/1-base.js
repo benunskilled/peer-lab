@@ -270,9 +270,12 @@
     tor_hidden: "Tor (address hidden)", i2p_hidden: "I2P (address hidden)",
   }[n] || n || "-");
   const HIDDEN = {
-    ipv6_hidden: { short: "IPv6", tip: "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." },
-    tor_hidden: { short: "Tor", tip: "Reached through the Tor proxy, which hides the peer's address." },
-    i2p_hidden: { short: "I2P", tip: "Reached through the I2P router, which hides the peer's address." },
+    // via: the row's second line in place of the address shown there, which
+    // is the proxy's own inside the Umbrel and the same for every such peer
+    // (17.11.2026: a list of the proxy's own address and port told a reader nothing).
+    ipv6_hidden: { short: "IPv6", via: "through Docker", tip: "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." },
+    tor_hidden: { short: "Tor", via: "through the Tor proxy", tip: "Reached through the Tor proxy, which hides the peer's address." },
+    i2p_hidden: { short: "I2P", via: "through the I2P router", tip: "Reached through the I2P router, which hides the peer's address." },
   };
   // The networks without a country have a sign of their own instead of a flag.
   const HIDDEN_FLAG = {

@@ -79,9 +79,8 @@ async function installed() {
 
 /**
  * Every known pool app with two flags: installed on this Umbrel, and already
- * among the user's pools (same host and port). The dashboard offers the
- * installed ones that are not added yet; the quick-fill buttons show all of
- * them either way, so a pool declined once can always be added later.
+ * among the user's pools (same host and port). The dashboard shows all of
+ * them as quick-fill buttons and marks the installed ones not added yet.
  */
 async function list(configuredPools) {
   const keys = await installed();

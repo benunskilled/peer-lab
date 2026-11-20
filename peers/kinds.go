@@ -49,10 +49,14 @@ var kindRules = []struct {
 	// Bitcoin Core's name, misspelt: "/Sat0shi:" with a zero, "/Satoshi2:",
 	// "/SatoshiX:", or "Satoshi:22.0.0" without the slashes Core always sends.
 	// Real Core writes exactly "/Satoshi:x.y.z/". On the node this was written
-	// for, "/Sat0shi:31.0.0/" alone came 475 times in a fortnight. First, so
+	// for, "/Sat0shi:31.0.0/" alone came 475 times in a fortnight. And
+	// "/Satoshi:0.21.0" without the closing slash: Core always adds it
+	// (FormatSubVersion in src/clientversion.cpp, ss << "/"). Once in 114,020
+	// "/Satoshi:" sessions on that node, 16.10.-19.11.2026, inbound, no
+	// services; every real Core and Knots there ended in "/". First, so
 	// nothing below reads it as Core. What it does is unknown, so it is not
 	// marked as unable to relay.
-	{"Disguised", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:`), true},
+	{"Disguised", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:|^/Satoshi:[^/]*$`), true},
 	// Mining pool software speaking the p2p protocol, or a node whose operator
 	// says in the comment part of the agent - the bit in brackets - that it
 	// belongs to a pool, e.g. "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/".
@@ -65,7 +69,10 @@ var kindRules = []struct {
 	// on master, which is why it was once taken for someone else's).
 	// P2Pool's bitcoind connection says /P2Pool:x/ (p2pool/bitcoin/p2p.py), and
 	// a name that is itself a pool - /pydroid-pool:3/ - is one too.
-	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:`), true},
+	// miningcore-btc-solo is a solo pool built on Miningcore: AppInfo.cs in
+	// bugoao/miningcore-btc-solo sets P2pUserAgent "/miningcore-btc-solo:<v>/",
+	// P2p/P2pFastPeer.cs sends it (17.11.2026).
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:|^/miningcore-btc-solo:`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own. Bitcoin Purity
@@ -166,7 +173,10 @@ var kindRules = []struct {
 	// (src/btclight.cpp in bitflash-network/bitflash). WUJI's indexer follows
 	// Bitcoin headers for an index on Ethereum, as "/wuji-headers:0.1/"
 	// (indexer/bitcoin-p2p.mjs in MM-sheng/wuji).
-	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:`), false},
+	// pcoc's Bari timestamping service follows mainnet headers only, never a
+	// block body: USER_AGENT "/pcoc-bari:<v>/" in sdk/rust/pcoc-gossip/src/wire.rs
+	// in groundinglab/pcoc (18.11.2026).
+	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:|^/pcoc-bari:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - the dashboard has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -207,7 +217,7 @@ var kindRules = []struct {
 var coreNameWithSuffix = regexp.MustCompile(`^/(Satoshi[0-9X]+):`)
 
 // misspeltCore says how a name imitating Core's differs from it, for the
-// three spellings the Disguised rule catches, or "".
+// four spellings the Disguised rule catches, or "".
 func misspeltCore(subver string) string {
 	switch {
 	case strings.HasPrefix(subver, "/Sat0shi:"):
@@ -216,6 +226,8 @@ func misspeltCore(subver string) string {
 		return "Core calls itself /Satoshi:, this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
 	case strings.HasPrefix(subver, "Satoshi:"):
 		return "Core writes its name between slashes: /" + strings.Trim(subver, "/") + "/"
+	case strings.HasPrefix(subver, "/Satoshi:") && !strings.Contains(subver[1:], "/"):
+		return "Core always ends its name with \"/\": " + subver + "/"
 	}
 	return ""
 }

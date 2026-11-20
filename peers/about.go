@@ -84,6 +84,8 @@ var aboutRules = []aboutRule{
 	// const ua = Buffer.from('/wuji-headers:0.1/') in indexer/bitcoin-p2p.mjs
 	// (MM-sheng/wuji, 15.11.2026).
 	{regexp.MustCompile(`^/wuji-headers:`), "WUJI's indexer: follows Bitcoin's block headers to build an index usable on Ethereum", "WUJI header client", ""},
+	// const USER_AGENT in sdk/rust/pcoc-gossip/src/wire.rs in groundinglab/pcoc.
+	{regexp.MustCompile(`^/pcoc-bari:`), "pcoc Bari, a timestamping service that follows Bitcoin's block headers", "pcoc Bari header client", ""},
 	// UA_NAME("Prometheus") in src/clientversion.cpp, version 30.4.1 in
 	// CMakeLists.txt (CryptoIceMLH/bitcoin-prometheus, 15.11.2026).
 	{regexp.MustCompile(`^/Prometheus:`), "BTC-Prometheus, a full node forked from Bitcoin Core", "BTC-Prometheus node", ""},
@@ -294,6 +296,11 @@ var aboutRules = []aboutRule{
 	// dongcarl/dnsseed-rust; TheBlueMatt/dnsseed-rust is gone).
 	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder", "dnsseed-rust crawler", ""},
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions", "ckp2p block relay", ""},
+	// AppInfo.cs and P2p/P2pFastPeer.cs in bugoao/miningcore-btc-solo.
+	{regexp.MustCompile(`^/miningcore-btc-solo:`), "miningcore-btc-solo, a solo mining pool built on Miningcore", "miningcore-btc-solo pool", ""},
+	// internal/bitcoin/p2p_client.go in Freakoverse/dnn-node: UserAgentName
+	// "DNN-Node" on btcd's peer package, which puts /btcwire:<v>/ before it.
+	{regexp.MustCompile(`^/btcwire:[^/]*/DNN-Node:`), "DNN Node, a Nostr relay and naming service anchored to Bitcoin", "DNN Node", ""},
 	// Relay networks with a name of their own: bloXroute's gateway builds
 	// "bloXroute Gateway <version>" (bxgateway, 2022); Matt Corallo's
 	// RelayNode adapters send /RelayNetworkClient:42/, /RelayNetworkServer:42/
