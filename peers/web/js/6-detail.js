@@ -81,7 +81,9 @@
     if (isPruned(p)) flags.push(["pruned", PRUNED_WHY, "", true]);
     // The fee rate below which it wants no transactions announced. A peer that
     // takes none at all sends the highest there is: "no tx" says that already.
-    if (p.min_fee != null && p.min_fee < 1000)
+    // Not on a block-relay-only link: no transactions go over it at all, so
+    // a fee floor for them says nothing (21.11.2026).
+    if (p.min_fee != null && p.min_fee < 1000 && p.type !== "block-relay-only")
       flags.push([(p.min_fee < 10 ? p.min_fee.toFixed(1).replace(/\.0$/, "") : Math.round(p.min_fee)) + " sat/vB", "Min fee: cheaper transactions are not sent to it", "", true]);
     if (p.app) flags.push(["Umbrel app", p.app, "", true]);
     for (const [word, why, cls] of flags) {
