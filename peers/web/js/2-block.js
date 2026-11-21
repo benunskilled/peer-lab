@@ -181,7 +181,7 @@
   function shareOfBlock(b) {
     if (!b.block_size || b.recon_missing_bytes == null) return "";
     const p = (100 * b.recon_missing_bytes) / b.block_size;
-    return ", " + (p < 1 ? "under 1\u00a0%" : Math.round(p) + "\u00a0%") + " of the block";
+    return ", " + (p < 1 ? "under 1%" : Math.round(p) + "%") + " of the block";
   }
 
   function renderRecon(box, b, routeView) {
@@ -225,7 +225,7 @@
       }[b.recon] || "Not measured for this block";
     } else {
       const w = last;
-      const pct = (n) => Math.round((100 * n) / w.blocks) + "\u00a0%";
+      const pct = (n) => Math.round((100 * n) / w.blocks) + "%";
       const parts = [`${pct(w.mempool)} rebuilt from what your node had`];
       if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
       if (w.full) parts.push(`${pct(w.full)} downloaded in full`);

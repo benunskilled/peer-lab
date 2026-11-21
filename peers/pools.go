@@ -150,7 +150,7 @@ func relayOf(addr string) (poolNode, bool) {
 // so it does not match. On one node three of them, all on Amazon in
 // Europe, came daily from 16.10.2026, sent blocks and no transactions, and
 // were never first in 3,192 blocks.
-const viaBitpeerAbout = "Claims: Bitcoin Core 0.19.0.1\nProbably: ViaBTC's own relay software (bitpeer) – it says Bitcoin Core 0.19.0.1, but offers only WITNESS"
+const viaBitpeerAbout = "Claims: Bitcoin Core 0.19.0.1\nProbably: ViaBTC's own relay software (bitpeer) - it says Bitcoin Core 0.19.0.1, but offers only WITNESS"
 
 func isViaBitpeer(subver string, version int, services []string) bool {
 	return subver == "/Satoshi:0.19.0.1/" && version == 70015 && len(services) == 1 && services[0] == "WITNESS"
