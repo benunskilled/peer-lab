@@ -536,7 +536,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			labelled = p.About
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
-		// claims nothing, so it stays "No user agent" and only the about says
+		// claims nothing, so it stays "No name" and only the about says
 		// who it probably is.
 		if isLinkingLion(r.Addr) || r.mockLinkingLion {
 			p.LinkingLion = true

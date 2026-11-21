@@ -110,7 +110,7 @@ func TestIndexerBehindAProxyIsNotYourOwn(t *testing.T) {
 }
 
 // A name of nothing but slashes says nothing, as no name at all: LinkingLion
-// with it stays "No user agent", and a research host has no claim to quote.
+// with it stays "No name", and a research host has no claim to quote.
 func TestEmptyNameClaimsNothing(t *testing.T) {
 	got := convertAt([]rawPeer{{Addr: "143.20.137.7:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "//", Version: 70016, ServicesNames: []string{}}}, time.Now())[0]

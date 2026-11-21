@@ -49,7 +49,7 @@ function goBareKinds() {
   return new Set([...m[1].matchAll(/"([^"]+)":\s*true/g)].map((x) => x[1]));
 }
 
-// A name with nothing in it, read from kinds.go: Go calls it "No user agent"
+// A name with nothing in it, read from kinds.go: Go calls it "No name"
 // before any rule is asked.
 function goEmptyName() {
   const m = fs.readFileSync(KINDS_GO, 'utf8').match(/var emptyName = regexp\.MustCompile\(`([^`]*)`\)/);

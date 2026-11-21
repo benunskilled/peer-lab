@@ -58,7 +58,7 @@
   // The mix under a heading counts what is in the table - and each count is
   // the way to those peers. Clicking "5 Pool node" shows exactly those five,
   // here and on the map; clicking it again puts everyone back.
-  const KIND_ORDER = ["Nodes", "Wallets", "Watchers", "Disguised", "No user agent", "Other"];
+  const KIND_ORDER = ["Nodes", "Wallets", "Watchers", "Disguised", "No name", "Other"];
   function renderKindMix(el, peers) {
     const n = new Map();
     // Altcoins are in the "other chain" chip beside these, not a group of their own.
