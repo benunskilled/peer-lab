@@ -1775,7 +1775,9 @@ document.getElementById('manual-test-button').addEventListener('click', async ()
   } catch (err) {
     // Refused before any test (a Tor name, a proxied network): "not reachable" would claim something nobody checked.
     const untested = /cannot be tested|doesn't use|can't tell|your own node/.test(err.message);
-    manualAddResult(`${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
+    // A typo is said as one, not as "not reachable" (21.11.2026).
+    const invalid = /not a valid|is not a name that exists|not a valid port/.test(err.message);
+    manualAddResult(invalid ? err.message : `${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
   } finally {
     manualAddBusy(false);
   }

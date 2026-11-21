@@ -34,6 +34,12 @@ const check = async (address) => { seen.push(address); return realCheck(from); }
 check.describe = (address) => realCheck.describe(address);
 
 test.before(async () => {
+  // No network in the tests: names resolve unless they end in .invalid
+  // (RFC 6761), which never does - as the pool form and the probe now check.
+  require('dns').promises.lookup = async (host) => {
+    if (/\.invalid$/i.test(host)) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+    return { address: '192.0.2.1', family: 4 };
+  };
   db.open();
   setWriteSourceForTest(check);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
