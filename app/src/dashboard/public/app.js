@@ -1533,13 +1533,25 @@ function trafficChartSvg(days, W) {
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
 }
 
+// The periods as far as there is data: with eight days recorded, "Last 30
+// days" said the same as "Last 7 days" (21.11.2026). A period longer than
+// the record is named by its start instead, and only once.
+function trafficPeriods(t) {
+  const since = new Date(`${t.since}T00:00:00Z`);
+  const recorded = Math.floor((Date.now() - since.getTime()) / 86400000) + 1;
+  const sinceLabel = `Since ${since.getUTCDate()} ${since.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })}`;
+  if (recorded < 7) return [['Today', t.today], [sinceLabel, t.month]];
+  if (recorded < 30) return [['Today', t.today], ['Last 7 days', t.week], [sinceLabel, t.month]];
+  return [['Today', t.today], ['Last 7 days', t.week], ['Last 30 days', t.month]];
+}
+
 async function refreshTraffic() {
   const t = await api('/api/traffic');
   // The arrows carry the colours of the bars, so they are the legend too.
   const arrows = (v) => `<span class="up">↑ ${escapeHtml(fmtBytes(v.sent))}</span><span class="down">↓ ${escapeHtml(fmtBytes(v.recv))}</span>`;
   document.getElementById('traffic-sum').textContent = t.since ? `today ↑ ${fmtBytes(t.today.sent)} ↓ ${fmtBytes(t.today.recv)}` : '';
   document.getElementById('traffic-totals').innerHTML = t.since
-    ? [['Today', t.today], ['Last 7 days', t.week], ['Last 30 days', t.month]]
+    ? trafficPeriods(t)
       .map(([l, v]) => `<div class="t"><div class="l">${l}</div><div class="v">${arrows(v)}</div></div>`)
       .join('')
     : '<p class="hint">Nothing recorded yet - the first numbers appear within an hour of the app starting.</p>';
