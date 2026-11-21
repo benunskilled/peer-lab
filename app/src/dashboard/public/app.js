@@ -1145,7 +1145,21 @@ function slotStatusText(st, now, trial = st && st.trial) {
       };
     }
     case 'full': {
-      const off = slots.offline || [];
+      // The pass that wrote this can be ten minutes old; the manual list is
+      // not. A slot freed since (a removal by hand) or a peer back online
+      // shows at once, so the line agrees with the tile and the slot count
+      // beside it (21.11.2026: three places said three things for a while).
+      // (Guarded: the tests run this function on its own, without the page.)
+      const ranking = typeof lastPeerRanking !== 'undefined' ? lastPeerRanking : null;
+      const gone = typeof justGone !== 'undefined' ? justGone : new Map();
+      const usedNow = ranking ? ranking.filter((p) => p.trusted && !gone.has(p.address)).length : slots.used;
+      if (usedNow < slots.max) {
+        return { state: 'full', head: `${usedNow} of ${slots.max} slots in use.`, rest: 'Slot Fill fills the free one at its next pass.', short: 'on · a slot is free' };
+      }
+      const off = (slots.offline || []).filter((o) => {
+        const row = ranking && ranking.find((p) => p.address === o.address);
+        return !row || (row.trusted && !row.live && !gone.has(o.address));
+      });
       // freesInMs is from the pass that wrote the status, up to ten minutes ago.
       const since = st.at ? Math.max(0, now - st.at) : 0;
       const peerIn = (o) => (o.where ? `Your peer in ${o.where}` : 'One peer');

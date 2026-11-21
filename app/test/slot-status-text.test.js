@@ -8,14 +8,14 @@ const vm = require('vm');
 
 // app.js is a browser script; the status line is lifted out of the real file
 // and run as it is written there.
-function slotStatusText() {
+function slotStatusText(extra = '') {
   const src = fs.readFileSync(path.join(__dirname, '../src/dashboard/public/app.js'), 'utf8');
   const start = src.indexOf('const minutes = ');
   const fnStart = src.indexOf('function slotStatusText', start);
   assert.ok(start > 0 && fnStart > 0, 'app.js must still define minutes and slotStatusText');
   const end = src.indexOf('\n}', fnStart) + 2;
   const prelude = "const MAX_MANUAL_PEERS = 8; const escapeHtml = (s) => String(s).replace(/[&<>\\x22']/g, (c) => `&#${c.charCodeAt(0)};`); const countryName = (cc) => ({ VE: 'Venezuela', PE: 'Peru' })[cc] || cc;";
-  return vm.runInNewContext(`${prelude}\n${src.slice(start, end)}\nslotStatusText;`);
+  return vm.runInNewContext(`${prelude}\n${extra}\n${src.slice(start, end)}\nslotStatusText;`);
 }
 
 // The page draws the line again every half minute from the status the last
@@ -74,4 +74,22 @@ test('the status text is plain text: a place with & or an apostrophe is not esca
   const at = 1_000_000_000_000;
   const st = { at, state: 'full', slots: { used: 8, max: 8, offline: [{ where: "Côte d'Ivoire & Co", freesInMs: 30 * 60 * 1000 }] } };
   assert.match(text(st, at).rest, /Côte d'Ivoire & Co/);
+});
+
+// The status is from the last pass, up to ten minutes old; the manual list is
+// fresh. A slot freed since (removed by hand) shows at once, and a peer the
+// pass saw offline but that is back is not called offline (21.11.2026: the
+// tile, the slot count and this line said three different things).
+test('a slot freed since the last pass shows at once', () => {
+  const text = slotStatusText(`const lastPeerRanking = Array.from({ length: 7 }, (_, i) => ({ address: 'a' + i, trusted: true, live: true })); const justGone = new Map();`);
+  const st = { at: 1, state: 'full', slots: { used: 8, max: 8, offline: [] } };
+  assert.equal(text(st, 2).head, '7 of 8 slots in use.');
+});
+
+test('a peer the last pass saw offline but that is back is not called offline', () => {
+  const text = slotStatusText(`const lastPeerRanking = Array.from({ length: 8 }, (_, i) => ({ address: 'a' + i, trusted: true, live: true })); const justGone = new Map();`);
+  const st = { at: 1, state: 'full', slots: { used: 8, max: 8, offline: [{ address: 'a3', where: 'South America', freesInMs: 3e6 }] } };
+  const t = text(st, 2);
+  assert.equal(t.head, 'All 8 slots are in use.');
+  assert.doesNotMatch(t.rest, /offline/);
 });

@@ -283,7 +283,9 @@
   }
   // The dashboard has new numbers, or has just acted on a peer.
   window.addEventListener("peerlab:ranking", () => { if (state.data && !awaitingRanking) renderWhenFree(); });
-  window.addEventListener("peerlab:acted", () => setTimeout(refresh, 1200));
+  // A removal or disconnect leaves the list and the tiles at once (the list
+  // drops what the dashboard marks gone); the fresh answer follows.
+  window.addEventListener("peerlab:acted", () => { if (state.data) renderWhenFree(); setTimeout(refresh, 1200); });
   function renderWhenFree() {
     if (busy() && (!heldSince || Date.now() - heldSince < HOLD_MAX_MS)) {
       if (!heldSince) heldSince = Date.now();
