@@ -1421,6 +1421,18 @@ details.card.panel > *:not(summary) { margin-top: 14px; }
 :is(.panel, .pd-actions) button.link::after { content: ""; position: absolute; inset: -12px -8px; }
 :is(.panel, .pd-actions) .keep-star::after { content: ""; position: absolute; inset: -12px -4px -12px -10px; }
 .panel table button.secondary::after { content: ""; position: absolute; inset: -8px -2px; }
+/* The same for the other small controls (21.11.2026: under 32 px on a phone). Grown up and down only, so
+   buttons side by side do not take each other's taps. */
+.map-card .map-legend .legend-pick, .b-peer, .rt-switch > button, .region-pick, .panel button.secondary,
+.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .pool-fold > summary, .footer-source { position: relative; }
+.map-card .map-legend .legend-pick::after { content: ""; position: absolute; inset: -8px 0; }
+.b-peer::after { content: ""; position: absolute; inset: -6px 0; }
+.rt-switch > button::after { content: ""; position: absolute; inset: -5px 0; }
+.region-pick::after { content: ""; position: absolute; inset: -5px 0; }
+.panel button.secondary:not(table button)::after { content: ""; position: absolute; inset: -4px 0; }
+#zoomIn::after, #zoomOut::after, #zoomReset::after { content: ""; position: absolute; inset: -3px; }
+.pool-fold > summary::after { content: ""; position: absolute; inset: -8px 0; }
+.footer-source::after { content: ""; position: absolute; inset: -9px 0; }
 /* Buttons change state softly. */
 :is(.panel, .pd-actions) button.secondary, :is(.panel, .pd-actions) .action-slot { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
 /* What the storage card opens fades in. */
