@@ -94,7 +94,7 @@ On my node, with about 400 peers, Peer Lab uses about 230 MB of RAM across its f
 
 ## Install
 
-1. Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store) on Umbrel.
+1. Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/peer-lab-store) on Umbrel.
 2. Install **Peer Lab**. It requires the official **Bitcoin Node** app.
 3. Open it from Umbrel or at `<your-umbrel>:8797`.
 
