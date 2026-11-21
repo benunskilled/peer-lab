@@ -6,7 +6,7 @@
   const TOR_EXIT_TITLE = "Tor exit: location and operator are the exit's, not the peer's";
   // Core reports both directions independently.
   const HB_TITLE = "One of Core's three high-bandwidth peers: it may send a new block without being asked first, which gives it a head start of at least one ping.";
-  const HB_FROM_TITLE = "This peer has picked your node as one of its three high-bandwidth peers: your node sends it new blocks without being asked first.";
+  const HB_FROM_TITLE = "This peer asked your node to send it new blocks without being asked first (it picked you as a high-bandwidth peer).";
   // A manual peer locked in the dashboard keeps its slot even while offline:
   // the padlock stands in its row, where the legend and the Manual head
   // ("6 locked") promise it, not only in the opened detail.

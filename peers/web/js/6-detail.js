@@ -71,7 +71,7 @@
     // is on a chain of its own, so those flags are folded into it, and "no tx"
     // stays out when the server says the line above already tells it.
     if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
-    if (p.fork) flags.push([p.fork, p.fork_why + (p.no_relay ? " - it can never deliver one of your blocks first." : "")]);
+    if (p.fork) flags.push([p.fork, p.fork_why + (p.no_relay ? " - then it cannot deliver one of your blocks first." : "")]);
     else if (p.no_relay) flags.push(["never first", neverNote(p)]);
     if (p.no_services && !p.no_relay) flags.push(["no services", NO_SERVICES_WHY]);
     // A reason of its own (blocks-only connection, blocksonly=1) still stands.

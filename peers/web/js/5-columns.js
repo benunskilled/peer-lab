@@ -215,7 +215,7 @@
   const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
     : p.region || (p.cc ? regionName(p.cc) : netLabel(p.network));
   const neverNote = (p) => !p.no_relay ? ""
-    : p.fork ? "On a chain of its own, not yours - it can never deliver one of your blocks first."
+    : p.fork ? "Probably on a chain of its own, not yours - then it cannot deliver one of your blocks first."
     : p.no_services ? "Offers no services, so your node never asks it for blocks - it will not deliver one first."
     : "Software that does not pass blocks on - this peer can never deliver one first.";
   const line = (cls, text) => {

@@ -120,9 +120,9 @@ func forkOf(services []string, kind string, synced *int64, tip int64) (string, s
 	}
 	switch {
 	case has[blake2bService]:
-		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is on a chain of its own, not yours"
+		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is probably on a chain of its own, not yours"
 	case has[reducedDataService]:
-		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
+		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which probably put it on a chain of its own, not yours"
 	}
 	return "", ""
 }

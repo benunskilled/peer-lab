@@ -886,12 +886,12 @@ function neverFirstReason(p) {
   // disguise that may well pass them on, whatever its name says, and the
   // chain is the one it found.
   if (p.kind) {
-    if (p.fork) return `it is on a chain of its own (${p.fork}), not yours`;
+    if (p.fork) return `it is probably on a chain of its own (${p.fork}), not yours`;
     return p.noRelay ? own || 'its software passes no blocks on' : null;
   }
   // Without it - not connected, or the peers service is down - by name and
   // service bits, as recorded.
-  const chain = otherChainShown(p) ? `it is on a chain of its own (${otherChainShown(p)}), not yours` : null;
+  const chain = otherChainShown(p) ? `it is probably on a chain of its own (${otherChainShown(p)}), not yours` : null;
   return own || chain;
 }
 
