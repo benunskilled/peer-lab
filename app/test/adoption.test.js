@@ -55,6 +55,31 @@ test('adoption stops at the manual-peer limit and leaves the rest alone', async 
   assert.equal(result.addedNodes.length, 4);
 });
 
+test('a slot taken by the other process during the round is not overbooked', async () => {
+  // `known` is read before Core is asked to drop a peer removed earlier; while
+  // that RPC runs, Slot Fill (the other process) fills the last slot. The
+  // adoption after it must count again, or the set holds three of two.
+  db.instance
+    .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.1:8333', NULL, 0, 1)`)
+    .run();
+  db.instance
+    .prepare(`INSERT INTO meta (key, value) VALUES ('pending_addnode_removal', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(JSON.stringify({ '198.51.100.20:8333': Date.now() }));
+  mock.method(rpc, 'getAddedNodeInfo', async () => [
+    { addednode: '198.51.100.20:8333' },
+    { addednode: '198.51.100.21:8333' },
+  ]);
+  mock.method(rpc, 'addNode', async () => {
+    db.instance
+      .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.2:8333', NULL, 0, 2)`)
+      .run();
+  });
+  const result = await adoptExternalManualPeers();
+  assert.equal(result.adopted, 0);
+  assert.equal(rows().length, 2, 'never more rows than MAX_MANUAL_PEERS');
+});
+
 test('the same node in another spelling is not adopted a second time', async () => {
   // Core echoes an addnode in the spelling it was given; the app had stored it
   // in another. Compared as strings they were two peers, and the echo became a

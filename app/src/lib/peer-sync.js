@@ -312,7 +312,19 @@ async function adoptExternalManualPeers() {
       skipped.push(addednode);
       continue;
     }
-    insert.run(addednode, now);
+    // Counted again with the insert, under the write lock: `known` was read
+    // before the RPCs above, and in the meantime Slot Fill or an add by hand
+    // in the other process can have taken the last slot. The snapshot alone
+    // let both rows in - "9 of 8" (21.11.2026), as addTrustedPeer once did.
+    const fits = db.instance.transaction(() => {
+      if (countTrusted() >= config.maxManualPeers) return false;
+      insert.run(addednode, now);
+      return true;
+    }).immediate();
+    if (!fits) {
+      skipped.push(addednode);
+      continue;
+    }
     known.add(keyOf(addednode));
     // Same reason as in addTrustedPeer: a manual peer with no `peer` row is
     // invisible to peerRanking(), so no Slot Fill pass can ever see it while it
