@@ -673,11 +673,14 @@
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
+      // Places counted in the list as it stands: the stored rank keeps the
+      // number of a pool deleted since, and the list skipped it (21.11.2026).
+      let place = 0;
       for (const e of b.stratum.entries) {
         const tr = document.createElement("tr");
         const rank = document.createElement("td");
         rank.className = "num miss";
-        rank.textContent = e.rank ? e.rank + "." : "\u2013";
+        rank.textContent = e.rank ? ++place + "." : "\u2013";
         const label = document.createElement("td");
         label.textContent = e.label;
         if (e.own) {
