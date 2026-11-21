@@ -15,7 +15,7 @@ process.env.MAX_MANUAL_PEERS = '2';
 
 const db = require('../src/lib/db');
 const rpc = require('../src/lib/rpc');
-const { adoptExternalManualPeers, syncTrustedToAddnode } = require('../src/lib/peer-sync');
+const { adoptExternalManualPeers, syncTrustedToAddnode, removeTrustedPeer } = require('../src/lib/peer-sync');
 
 test.before(() => {
   db.open();
@@ -78,6 +78,29 @@ test('a slot taken by the other process during the round is not overbooked', asy
   const result = await adoptExternalManualPeers();
   assert.equal(result.adopted, 0);
   assert.equal(rows().length, 2, 'never more rows than MAX_MANUAL_PEERS');
+});
+
+test('a removal cut off before Core is told is finished by the next sync, not adopted back', async () => {
+  // The row goes, then Core is asked: if the app stops in between, Core still
+  // holds the addnode. The lasting mark is written with the delete, so the
+  // next round removes it from Core instead of taking it back padlocked.
+  db.instance
+    .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.30:8333', NULL, 0, 1)`)
+    .run();
+  let release;
+  const calls = [];
+  mock.method(rpc, 'addNode', (addr, cmd) => { calls.push(cmd); return cmd === 'remove' && calls.length === 1 ? new Promise((r) => { release = r; }) : Promise.resolve(); });
+  const removing = removeTrustedPeer('198.51.100.30:8333', { disconnect: false });
+  // The app "stops" here: the row is gone, Core was not told yet.
+  assert.equal(rows().length, 0);
+  const mark = db.instance.prepare("SELECT value FROM meta WHERE key = 'pending_addnode_removal'").get();
+  assert.ok(mark && JSON.parse(mark.value)['198.51.100.30:8333'], 'the lasting mark is written before Core is asked');
+  mock.method(rpc, 'getAddedNodeInfo', async () => [{ addednode: '198.51.100.30:8333' }]);
+  const result = await adoptExternalManualPeers();
+  assert.equal(result.adopted, 0);
+  assert.equal(rows().length, 0, 'not adopted back');
+  release();
+  await removing;
 });
 
 test('the same node in another spelling is not adopted a second time', async () => {
