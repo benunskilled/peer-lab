@@ -404,12 +404,20 @@
   // Core's template time is kept in whole milliseconds, the pool's job to the
   // fraction, and with small templates the job is ready the same moment:
   // rounding alone can put the job before the template it was built from.
-  // It cannot be, so the template waits for it, and the job stretch - the
+  // Within that much the template waits for it, and the job stretch - the
   // one that says how many transactions the template carried - stays.
+  // Further apart, the template is this app's own call to Core, which the
+  // pool never waited for: moved, it showed 4 ms for a measured 64
+  // (21.11.2026). Then it is left out, and the stretch from Core to the job
+  // is drawn as measured.
+  const TEMPLATE_ROUNDING_MS = 2;
   function byTime(stops) {
     const tpl = stops.find((s) => s.kind === "tpl");
     const own = stops.find((s) => s.kind === "own");
-    if (tpl && own && own.t < tpl.t) tpl.t = own.t;
+    if (tpl && own && own.t < tpl.t) {
+      if (tpl.t - own.t <= TEMPLATE_ROUNDING_MS) tpl.t = own.t;
+      else stops.splice(stops.indexOf(tpl), 1);
+    }
     return stops.sort((x, y) => x.t - y.t);
   }
 
