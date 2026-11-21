@@ -250,7 +250,10 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 
 /* ---- map card: map, then "Not on the map" folded under it ---- */
 .map-card { display: flex; flex-direction: column; overflow: hidden; }
-.map-wrap { position: relative; flex: 1 1 auto; min-width: 0; touch-action: none; }
+/* One finger scrolls the page past the map at the world view; two fingers zoom it (pinch reaches the
+   script, the page itself does not zoom). Zoomed in, a finger moves the map. */
+.map-wrap { position: relative; flex: 1 1 auto; min-width: 0; touch-action: pan-y; }
+.map-wrap.zoomed { touch-action: none; }
 #map { display: block; width: 100%; height: auto; cursor: grab; user-select: none; }
 #map.dragging { cursor: grabbing; }
 .land { fill: var(--land); stroke: var(--land-edge); stroke-width: 0.6; }

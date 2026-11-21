@@ -150,7 +150,9 @@
     // on top and stay clickable. The one that delivered the block last of
     // all, so a star is never hidden under a neighbouring country.
     const order = (b) => (b.delivered ? 3 : RANK[leadGroup(b)]);
+    placeOfKey.clear();
     for (const b of [...bs].sort((x, y) => order(x) - order(y))) {
+      placeOfKey.set(b.key, b);
       const r = radius(b.total);
       const g = document.createElementNS(NS, "g");
       const selected = state.place && state.place.key === b.key;
@@ -224,7 +226,7 @@
       g.addEventListener("pointerleave", hideTip);
       g.addEventListener("focus", () => showTip(b, null, g));
       g.addEventListener("blur", hideTip);
-      g.addEventListener("click", (e) => { e.stopPropagation(); togglePlace(b); });
+      g.addEventListener("click", (e) => { e.stopPropagation(); togglePlace(nearestPlace(e, b)); });
       g.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePlace(b); }
       });
@@ -512,6 +514,12 @@
     if (!state.world) return;
     clampView();
     const { k, x, y } = state.view;
+    // On a touch screen one finger scrolls the page past the map while it is
+    // at the world view; two fingers zoom it. Zoomed in, a finger moves the
+    // map (style.css .map-wrap.zoomed) (21.11.2026: a swipe that began on the
+    // map did not scroll the page at all).
+    const wrap = $("map").closest(".map-wrap");
+    if (wrap) wrap.classList.toggle("zoomed", k > 1.001);
     for (const id of ["countries", "links", "fx"]) $(id).setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
     // Dots at the world view, country shapes once zoomed in towards regions.
     $("map").style.setProperty("--dots", String(Math.max(0, Math.min(1, (REGION_ZOOM + 0.5 - k) / 1.5))));
@@ -537,6 +545,25 @@
     v.y = sy - (sy - v.y) * f;
     v.k = nk;
     applyView();
+  }
+  // Where markers overlap (Europe on a phone), a tap lands on whichever glow
+  // lies on top, often a neighbour's: tapping Germany picked Czechia
+  // (21.11.2026). Of the markers under the finger, the one whose dot is
+  // nearest wins. A keyboard "click" has no point and keeps its own marker.
+  const placeOfKey = new Map();
+  function nearestPlace(e, own) {
+    if (!e.detail || (!e.clientX && !e.clientY)) return own;
+    const under = new Set(document.elementsFromPoint(e.clientX, e.clientY)
+      .map((n) => n.closest && n.closest(".marker")).filter(Boolean));
+    let best = own, bestD = Infinity;
+    for (const g of under) {
+      const dot = g.querySelector(".core");
+      if (!dot || !placeOfKey.has(g.dataset.key)) continue;
+      const r = dot.getBoundingClientRect();
+      const d = Math.hypot(r.left + r.width / 2 - e.clientX, r.top + r.height / 2 - e.clientY);
+      if (d < bestD) { bestD = d; best = placeOfKey.get(g.dataset.key); }
+    }
+    return best;
   }
   function setupPanZoom() {
     const svg = $("map");
