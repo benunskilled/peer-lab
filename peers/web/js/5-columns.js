@@ -468,7 +468,7 @@
         td.textContent = fmtPing(p.min_ping_ms);
       },
     },
-    { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => (p.offline ? "offline" + (p.offline_ms ? " " + ago(p.offline_ms / 1000) : "") : ago(Date.now() / 1000 - p.conntime)) },
+    { key: "conntime", label: "Connected", cls: "num", shownReversed: true, val: (p) => p.conntime, show: (p) => (p.offline ? "offline" + (p.offline_ms ? " " + ago(p.offline_ms / 1000) : "") : ago(Date.now() / 1000 - p.conntime)) },
   ];
   // How often a peer was first: "43/1693", blocks delivered first out of the
   // blocks it was connected for, counted for as long as it has been known. The
@@ -478,6 +478,8 @@
   const FIRST_TITLE = "Blocks this peer delivered first, out of the blocks it was connected for. The list is ordered by it.";
   const FIRST_COL = {
     key: "first", label: "First/Blocks", cls: "num", title: FIRST_TITLE,
+    // Sorted by the negated count: the smallest value is the most blocks first.
+    shownReversed: true,
     val: (p) => { const r = rankOf(p); return r && r.eligible ? -(r.first * 1e7) + r.eligible : Infinity; },
     cell: (td, p) => {
       const r = rankOf(p);

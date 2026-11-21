@@ -272,7 +272,10 @@
       const th = document.createElement("th");
       th.scope = "col";
       th.className = "k-" + c.key + (c.cls ? " " + c.cls : "");
-      if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
+      // As the column reads, not as its value sorts: First/Blocks sorts by the
+      // negated count and Connected by its start time, so either way round
+      // the order a reader sees is the other one (21.11.2026).
+      if (c.key === col.key) th.setAttribute("aria-sort", (s.dir > 0) !== Boolean(c.shownReversed) ? "ascending" : "descending");
       const b = document.createElement("button");
       b.textContent = c.label;
       b.dataset.focusKey = "sort " + g + " " + c.key;
