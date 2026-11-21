@@ -458,7 +458,11 @@
       },
     },
     {
-      key: "ping", label: "Ping", cls: "num", val: (p) => (p.min_ping_ms == null ? Infinity : p.min_ping_ms),
+      key: "ping", label: "Ping", cls: "num",
+      // The lowest Core measured on this connection, the line's own delay: what it is now can be far
+      // higher while the peer is busy (21.11.2026: a syncing peer showed 15 s here, 253 s right now).
+      title: "The lowest ping Core has measured on this connection",
+      val: (p) => (p.min_ping_ms == null ? Infinity : p.min_ping_ms),
       cell: (td, p) => {
         if (p.min_ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
         td.textContent = fmtPing(p.min_ping_ms);
