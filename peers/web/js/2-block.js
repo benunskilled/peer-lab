@@ -85,11 +85,14 @@
     // The same answer above the tabs, under who mined it (21.11.2026): with
     // the block card in a tab of its own it was out of sight.
     const hero = document.getElementById("block-brought");
-    if (hero) {
+    // Drawn anew only when the answer changed, not on every refresh.
+    const where = !firsts.length ? "" : lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
+      : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
+    const heroKey = JSON.stringify([where, lead && lead.addr, b.first_hb]);
+    if (hero && hero.dataset.drawn !== heroKey) {
+      hero.dataset.drawn = heroKey;
       hero.textContent = "";
       if (firsts.length) {
-        const where = lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
-          : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
         hero.append("brought by ");
         if (lead) {
           const go = document.createElement("button");
