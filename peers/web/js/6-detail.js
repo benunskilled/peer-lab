@@ -122,7 +122,17 @@
     if (p.offline) facts.appendChild(pdFact("Offline", p.offline_ms ? "for " + ago(p.offline_ms / 1000) : "now"));
     const r = rankOf(p);
     if (r && r.eligible) {
-      facts.appendChild(pdFact("First / blocks", r.first + " / " + r.eligible));
+      // The same bar as under the pill and in the table, and what it is
+      // measured against - on a phone nothing else says it (22.11.2026).
+      const fact = pdFact("First / blocks", r.first + " of " + r.eligible);
+      const bar = firstBar(p);
+      if (bar) {
+        const value = fact.lastChild;
+        const line = pdEl("span", "pd-first-line");
+        line.append(bar, r.first + " of " + r.eligible);
+        value.replaceChildren(line, pdEl("span", "pd-first-note", `Full bar: the peer that was first most often (${bestFirst()})`));
+      }
+      facts.appendChild(fact);
     }
     if (r && r.sessionsCount) facts.appendChild(pdFact("Sessions", String(r.sessionsCount)));
     facts.appendChild(pdFact("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type),
