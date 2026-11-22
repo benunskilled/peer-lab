@@ -775,11 +775,11 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* A wide card: under "46 of 100", in the gap between its two lines - clear of the digits. */
 .cards.cards .pc > .pc-first { position: relative; overflow: visible; }
 .peers .pc .pc-first > .first-bar { position: absolute; right: 0; bottom: -3px; width: 64px; }
-/* A phone card: under the pill, as wide as the pill (--pill-w, 7-tables.js). Nowhere else in the kind cell. */
+/* A phone card: a short bar under the end of the pill. Nowhere else in the kind cell. */
 .peers .kind-head > .first-bar { display: none; }
-.cards.cards table tr td.k-kind .kind-head > .first-bar { display: block; position: absolute; right: 0; top: calc(100% + 3px); width: var(--pill-w, 72px); }
-/* The address line under it gives way, so the bar runs under nothing. */
-.cards.cards table tr:has(.kind-head > .first-bar) td.k-peer .who-text > small { padding-right: calc(var(--pill-w, 72px) + 12px); }
+.cards.cards table tr td.k-kind .kind-head > .first-bar { display: block; position: absolute; right: 6px; top: calc(100% + 3px); width: 40px; }
+/* The address line under it ends 8px short of the bar, and only where it would reach it (--addr-max, 7-tables.js). */
+.cards.cards table tr td.k-peer .who-text > small { max-width: var(--addr-max, none); }
 .scroll.scroll[data-drops="3"] .k-first, .scroll.scroll[data-drops="4"] .k-first,
 .cards.cards table tr td.k-first { display: none; }
 /* The buttons for a peer, under the three blocks of its panel, at the right. */

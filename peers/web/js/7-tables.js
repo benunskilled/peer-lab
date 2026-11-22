@@ -529,10 +529,18 @@
       const head = row.querySelector(".kind-head");
       if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
       else row.style.removeProperty("--kind-space");
-      // The First/Blocks bar under the pill is as wide as the pill.
-      const pill = cards && head && head.querySelector(".kind");
-      if (pill) row.style.setProperty("--pill-w", Math.round(pill.getBoundingClientRect().width) + "px");
-      else row.style.removeProperty("--pill-w");
+      // The First/Blocks bar under the pill: the address line beneath gives
+      // way only as far as it would run into the bar, 8px short of it.
+      // A width it may not pass, not padding: a line as wide as its text
+      // only grew by the padding and still ran into the bar.
+      row.style.removeProperty("--addr-max");
+      const bar = cards && head && head.querySelector(".first-bar");
+      const addr = bar && row.querySelector("td.k-peer .who-text > small");
+      if (addr) {
+        const box = addr.getBoundingClientRect();
+        const stop = bar.getBoundingClientRect().left - 8;
+        if (Math.min(box.left + addr.scrollWidth, box.right) > stop) row.style.setProperty("--addr-max", Math.floor(stop - box.left) + "px");
+      }
     }
   }
   const overflows = (wraps) => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
