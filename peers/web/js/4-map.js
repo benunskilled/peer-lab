@@ -649,6 +649,9 @@
       clearTimeout(routeResize);
       routeResize = setTimeout(() => { if (state.data) renderBlockCard(); }, 150);
     });
+    // Drawn while its tab was hidden, the route had no width and fell back to
+    // the list: laid out again when the tab opens (app.js showTab).
+    window.addEventListener("peerlab:tab", (e) => { if (e.detail === "block" && state.data) renderBlockCard(); });
   }
 
 

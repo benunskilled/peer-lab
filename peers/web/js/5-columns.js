@@ -326,7 +326,7 @@
           // often the peer was first, then ping and time connected. Shown by
           // the card's width; all of it is in the opened row at any width.
           const r = rankOf(p);
-          const n = span("pc-x pc-first", r && r.eligible ? r.first + "/" + r.eligible : "\u2013");
+          const n = span("pc-x pc-first", r && r.eligible ? r.first + " of " + r.eligible : "\u2013");
           const s = span("pc-x pc-sub", "first/blocks");
           if (r && r.eligible) n.title = s.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
           pc.append(n, s);
@@ -484,9 +484,20 @@
     cell: (td, p) => {
       const r = rankOf(p);
       if (!r || !r.eligible) { td.textContent = "\u2013"; td.classList.add("dim"); return; }
+      // "46 of 100" with a thin bar for the share (21.11.2026: "46/100" had
+      // to be known to be read). The bar is the share of the blocks it was
+      // there for, so a peer with few blocks is not drawn small for that.
       const b = document.createElement("b");
-      b.textContent = r.first + "/" + r.eligible;
-      td.append(b);
+      b.textContent = r.first;
+      const of = document.createElement("span");
+      of.className = "first-of";
+      of.textContent = " of " + r.eligible;
+      const bar = document.createElement("span");
+      bar.className = "first-bar";
+      const fill = document.createElement("i");
+      fill.style.width = r.first ? Math.max(3, Math.min(100, (100 * r.first) / r.eligible)).toFixed(1) + "%" : "0";
+      bar.appendChild(fill);
+      td.append(b, of, bar);
       td.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
     },
   };

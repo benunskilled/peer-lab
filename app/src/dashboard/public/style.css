@@ -766,6 +766,11 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* First/Blocks: the count in the row's own weight. It outlasts ping and connected on a narrowing table and
    goes with the net; never on a phone card. */
 .peers td.k-first { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* "46 of 100" over a thin bar for the share (21.11.2026). The bar sits on the cell's second line, where the
+   other columns have their grey line, so a row is no taller. */
+.peers td.k-first .first-of { color: var(--muted); font-weight: 400; font-size: 12px; }
+.peers td.k-first .first-bar { display: block; width: 72px; height: 3px; margin: 6px 0 0 auto; border-radius: 2px; background: #1f2a35; overflow: hidden; }
+.peers td.k-first .first-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
 .scroll.scroll[data-drops="3"] .k-first, .scroll.scroll[data-drops="4"] .k-first,
 .cards.cards table tr td.k-first { display: none; }
 /* The buttons for a peer, under the three blocks of its panel, at the right. */

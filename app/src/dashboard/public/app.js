@@ -2438,8 +2438,10 @@ function showTab(name, { remember = true } = {}) {
     try { localStorage.setItem(TAB_KEY, name); } catch { /* private window */ }
     if (location.hash.slice(1) !== name) history.replaceState(null, '', `#${name}`);
   }
-  // The map and the traffic chart size themselves to their box, which was 0 wide while hidden.
+  // The map and the traffic chart size themselves to their box, which was 0 wide while hidden;
+  // the block route is laid out again on its own event.
   window.dispatchEvent(new Event('resize'));
+  window.dispatchEvent(new CustomEvent('peerlab:tab', { detail: name }));
 }
 window.peerLabShowTab = (name) => { if (document.body.dataset.activeTab !== name) showTab(name); };
 function tabStates() {

@@ -82,6 +82,28 @@
       const v = row("Brought by", shown);
       if (b.first_hb === 1) v.append(" ", span("hb", "\u26a1", HB_TITLE));
     }
+    // The same answer above the tabs, under who mined it (21.11.2026): with
+    // the block card in a tab of its own it was out of sight.
+    const hero = document.getElementById("block-brought");
+    if (hero) {
+      hero.textContent = "";
+      if (firsts.length) {
+        const where = lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
+          : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
+        hero.append("brought by ");
+        if (lead) {
+          const go = document.createElement("button");
+          go.type = "button";
+          go.className = "b-peer";
+          go.textContent = where;
+          go.title = "Show this peer";
+          go.addEventListener("click", () => revealPeer(lead.addr));
+          hero.append(go);
+        } else hero.append(where);
+        if (b.first_hb === 1) hero.append(" ", span("hb", "\u26a1", HB_TITLE));
+      }
+      hero.hidden = !firsts.length;
+    }
 
     const entries = ((b.stratum && b.stratum.entries) || []).filter((e) => !e.miss && e.latency_ms != null)
       .sort((x, y) => x.latency_ms - y.latency_ms);
@@ -671,7 +693,8 @@
     const h2 = document.createElement("summary");
     race.className = "pool-fold";
     h2.textContent = `Pools \u00b7 relative to the fastest${n ? " \u00b7 " + n : ""}`;
-    race.open = state.poolsOpen != null ? state.poolsOpen : n <= 4;
+    // In its own tab since 21.11.2026 there is room: open unless the reader folded it.
+    race.open = state.poolsOpen != null ? state.poolsOpen : true;
     race.addEventListener("toggle", () => { state.poolsOpen = race.open; });
     race.appendChild(h2);
     if (!b.stratum || !(b.stratum.entries || []).length) {

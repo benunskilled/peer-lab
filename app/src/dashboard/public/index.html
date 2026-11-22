@@ -33,6 +33,9 @@
                and takes no room: not every miner is on a list, and not every
                coinbase carries a name. -->
           <div class="hero-sub" id="block-pool" hidden></div>
+          <!-- Who brought it here first, from the Block activity tab: the
+               answer most come for, so it stays in sight above the tabs. -->
+          <div class="hero-sub" id="block-brought" hidden></div>
         </div>
         <div class="stat-grid" id="live-stats"></div>
       </div>
@@ -75,7 +78,7 @@
       <div class="block-summary" id="blockSummary" hidden></div>
       <div class="block-route" id="blockRoute" hidden></div>
       <div class="block-recon" id="blockRecon" hidden></div>
-      <details class="block-more" id="blockMore">
+      <details class="block-more" id="blockMore" open>
         <summary id="blockMoreLabel"></summary>
         <div class="block-body" id="blockBody"></div>
       </details>
