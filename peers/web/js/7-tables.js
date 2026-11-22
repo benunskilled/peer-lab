@@ -529,12 +529,12 @@
       const head = row.querySelector(".kind-head");
       if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
       else row.style.removeProperty("--kind-space");
-      // The First/Blocks bar under the pill: the address line beneath gives
-      // way only as far as it would run into the bar, 8px short of it.
+      // "82× first" under the pill: the address line beneath gives way only
+      // as far as it would run into it, 8px short of it.
       // A width it may not pass, not padding: a line as wide as its text
-      // only grew by the padding and still ran into the bar.
+      // only grew by the padding and still ran into it.
       row.style.removeProperty("--addr-max");
-      const bar = cards && head && head.querySelector(".first-bar");
+      const bar = cards && head && head.querySelector(".kind-first");
       const addr = bar && row.querySelector("td.k-peer .who-text > small");
       if (addr) {
         const box = addr.getBoundingClientRect();
