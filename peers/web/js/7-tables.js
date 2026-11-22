@@ -529,6 +529,10 @@
       const head = row.querySelector(".kind-head");
       if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
       else row.style.removeProperty("--kind-space");
+      // The First/Blocks bar under the pill is as wide as the pill.
+      const pill = cards && head && head.querySelector(".kind");
+      if (pill) row.style.setProperty("--pill-w", Math.round(pill.getBoundingClientRect().width) + "px");
+      else row.style.removeProperty("--pill-w");
     }
   }
   const overflows = (wraps) => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);

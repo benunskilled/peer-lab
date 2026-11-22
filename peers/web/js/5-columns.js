@@ -225,6 +225,35 @@
     return e;
   };
 
+  // First/Blocks as a bar (22.11.2026): full for the peer that was first most
+  // often, among all peers on the page, the others against it - shares of
+  // the blocks themselves stay small (15 % at best) and read as empty bars.
+  // None for a peer never first: an empty track on most rows looked like
+  // something still loading. Worked out once per drawing of the page.
+  let bestFirstNow = null;
+  function bestFirst() {
+    if (bestFirstNow == null) {
+      bestFirstNow = 0;
+      for (const q of (state.data && state.data.peers) || []) {
+        const r = rankOf(q);
+        if (r && r.first > bestFirstNow) bestFirstNow = r.first;
+      }
+      queueMicrotask(() => { bestFirstNow = null; });
+    }
+    return bestFirstNow;
+  }
+  function firstBar(p) {
+    const r = rankOf(p), best = bestFirst();
+    if (!r || !r.first || !best) return null;
+    const bar = document.createElement("span");
+    bar.className = "first-bar";
+    const fill = document.createElement("i");
+    fill.style.width = Math.max(4, Math.min(100, (100 * r.first) / best)).toFixed(1) + "%"; // CSSOM, which the CSP allows
+    bar.appendChild(fill);
+    bar.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for. A full bar: the peer that was first most often (${best}).`;
+    return bar;
+  }
+
   const COLS = [
     {
       // Where it is on top, the country and the address under it. Sorted by
@@ -329,6 +358,8 @@
           const n = span("pc-x pc-first", r && r.eligible ? r.first + " of " + r.eligible : "\u2013");
           const s = span("pc-x pc-sub", "first/blocks");
           if (r && r.eligible) n.title = s.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+          const nBar = firstBar(p);
+          if (nBar) n.append(nBar);
           pc.append(n, s);
           pc.append(span("pc-y pc-ping", p.min_ping_ms == null ? "\u2013" : fmtPing(p.min_ping_ms)),
             span("pc-y pc-sub", p.offline ? "offline" : p.conntime ? ago(Date.now() / 1000 - p.conntime) : ""));
@@ -405,6 +436,9 @@
           pill.append(ico, " ");
         }
         pill.append(label);
+        // On a phone card, where First/Blocks has no column, its bar under the pill.
+        const kindBar = firstBar(p);
+        if (kindBar) head.append(kindBar);
         fit(pill, label, [testing ? TRIAL_TITLE : "", p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
@@ -484,20 +518,16 @@
     cell: (td, p) => {
       const r = rankOf(p);
       if (!r || !r.eligible) { td.textContent = "\u2013"; td.classList.add("dim"); return; }
-      // "46 of 100" with a thin bar for the share (21.11.2026: "46/100" had
-      // to be known to be read). The bar is the share of the blocks it was
-      // there for, so a peer with few blocks is not drawn small for that.
+      // "46 of 100" (21.11.2026: "46/100" had to be known to be read), and
+      // under it the bar against the best peer (firstBar).
       const b = document.createElement("b");
       b.textContent = r.first;
       const of = document.createElement("span");
       of.className = "first-of";
       of.textContent = " of " + r.eligible;
-      const bar = document.createElement("span");
-      bar.className = "first-bar";
-      const fill = document.createElement("i");
-      fill.style.width = r.first ? Math.max(3, Math.min(100, (100 * r.first) / r.eligible)).toFixed(1) + "%" : "0";
-      bar.appendChild(fill);
-      td.append(b, of, bar);
+      td.append(b, of);
+      const bar = firstBar(p);
+      if (bar) td.append(bar);
       td.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
     },
   };
