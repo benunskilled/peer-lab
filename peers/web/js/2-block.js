@@ -82,31 +82,6 @@
       const v = row("Brought by", shown);
       if (b.first_hb === 1) v.append(" ", span("hb", "\u26a1", HB_TITLE));
     }
-    // The same answer at the top, under who mined it (21.11.2026): the
-    // block card's own line is under "Details".
-    const hero = document.getElementById("block-brought");
-    // Drawn anew only when the answer changed, not on every refresh.
-    const where = !firsts.length ? "" : lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
-      : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
-    const heroKey = JSON.stringify([where, lead && lead.addr, b.first_hb]);
-    if (hero && hero.dataset.drawn !== heroKey) {
-      hero.dataset.drawn = heroKey;
-      hero.textContent = "";
-      if (firsts.length) {
-        hero.append("brought by ");
-        if (lead) {
-          const go = document.createElement("button");
-          go.type = "button";
-          go.className = "b-peer";
-          go.textContent = where;
-          go.title = "Show this peer";
-          go.addEventListener("click", () => revealPeer(lead.addr));
-          hero.append(go);
-        } else hero.append(where);
-        if (b.first_hb === 1) hero.append(" ", span("hb", "\u26a1", HB_TITLE));
-      }
-      hero.hidden = !firsts.length;
-    }
 
     const entries = ((b.stratum && b.stratum.entries) || []).filter((e) => !e.miss && e.latency_ms != null)
       .sort((x, y) => x.latency_ms - y.latency_ms);
