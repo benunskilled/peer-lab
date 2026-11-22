@@ -1,6 +1,7 @@
 'use strict';
 
 const net = require('net');
+const dns = require('dns').promises;
 const crypto = require('crypto');
 const config = require('./config');
 const peerSync = require('./peer-sync');
@@ -208,12 +209,32 @@ async function manualAddPeer(rawInput, label, { kept = false } = {}) {
  * "add this peer" are different questions, and only one of them should have
  * consequences.
  */
+// "999.1.1.1" or "2001:zz::1" is no IP at all; a name that is neither Tor nor
+// I2P has to resolve. "" when the address can be tested.
+async function invalidAddress(addr) {
+  const bare = addr.replace(/^\[|\]$/g, '');
+  if (net.isIP(bare)) return '';
+  if (/^[\d.]+$/.test(bare) || bare.includes(':')) return `${addr} is not a valid IP address`;
+  if (/\.(onion|i2p)$/i.test(bare)) return '';
+  try {
+    await dns.lookup(bare);
+    return '';
+  } catch {
+    return `${addr} is not a name that exists`;
+  }
+}
+
 async function probePeer(rawInput) {
   const host = (typeof rawInput === 'string' ? rawInput : '').trim();
   if (!looksLikeHost(host)) {
-    return { ok: false, error: 'invalid host/IP' };
+    return { ok: false, error: 'not a valid address' };
   }
   const { addr, port: explicitPort } = resolveHostPort(host);
+  // Wrong before any test: an IP with a number out of range, or a name that
+  // does not exist. Both used to come back as "no node answering", which
+  // reads like the network, not like a typo (21.11.2026).
+  const invalid = await invalidAddress(addr);
+  if (invalid) return { ok: false, error: invalid };
   const route = await routeOf(addr);
   if (route && route.refuse) return { ok: false, error: route.refuse };
   const own = ownAddress(addr);

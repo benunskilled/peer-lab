@@ -82,6 +82,28 @@
       const v = row("Brought by", shown);
       if (b.first_hb === 1) v.append(" ", span("hb", "\u26a1", HB_TITLE));
     }
+    // The same answer above the tabs, under who mined it (21.11.2026): with
+    // the block card in a tab of its own it was out of sight.
+    const hero = document.getElementById("block-brought");
+    if (hero) {
+      hero.textContent = "";
+      if (firsts.length) {
+        const where = lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
+          : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
+        hero.append("brought by ");
+        if (lead) {
+          const go = document.createElement("button");
+          go.type = "button";
+          go.className = "b-peer";
+          go.textContent = where;
+          go.title = "Show this peer";
+          go.addEventListener("click", () => revealPeer(lead.addr));
+          hero.append(go);
+        } else hero.append(where);
+        if (b.first_hb === 1) hero.append(" ", span("hb", "\u26a1", HB_TITLE));
+      }
+      hero.hidden = !firsts.length;
+    }
 
     const entries = ((b.stratum && b.stratum.entries) || []).filter((e) => !e.miss && e.latency_ms != null)
       .sort((x, y) => x.latency_ms - y.latency_ms);
@@ -181,7 +203,7 @@
   function shareOfBlock(b) {
     if (!b.block_size || b.recon_missing_bytes == null) return "";
     const p = (100 * b.recon_missing_bytes) / b.block_size;
-    return ", " + (p < 1 ? "under 1\u00a0%" : Math.round(p) + "\u00a0%") + " of the block";
+    return ", " + (p < 1 ? "under 1%" : Math.round(p) + "%") + " of the block";
   }
 
   function renderRecon(box, b, routeView) {
@@ -225,7 +247,7 @@
       }[b.recon] || "Not measured for this block";
     } else {
       const w = last;
-      const pct = (n) => Math.round((100 * n) / w.blocks) + "\u00a0%";
+      const pct = (n) => Math.round((100 * n) / w.blocks) + "%";
       const parts = [`${pct(w.mempool)} rebuilt from what your node had`];
       if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
       if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
@@ -404,12 +426,20 @@
   // Core's template time is kept in whole milliseconds, the pool's job to the
   // fraction, and with small templates the job is ready the same moment:
   // rounding alone can put the job before the template it was built from.
-  // It cannot be, so the template waits for it, and the job stretch - the
+  // Within that much the template waits for it, and the job stretch - the
   // one that says how many transactions the template carried - stays.
+  // Further apart, the template is this app's own call to Core, which the
+  // pool never waited for: moved, it showed 4 ms for a measured 64
+  // (21.11.2026). Then it is left out, and the stretch from Core to the job
+  // is drawn as measured.
+  const TEMPLATE_ROUNDING_MS = 2;
   function byTime(stops) {
     const tpl = stops.find((s) => s.kind === "tpl");
     const own = stops.find((s) => s.kind === "own");
-    if (tpl && own && own.t < tpl.t) tpl.t = own.t;
+    if (tpl && own && own.t < tpl.t) {
+      if (tpl.t - own.t <= TEMPLATE_ROUNDING_MS) tpl.t = own.t;
+      else stops.splice(stops.indexOf(tpl), 1);
+    }
     return stops.sort((x, y) => x.t - y.t);
   }
 
@@ -506,11 +536,33 @@
     const W = box.clientWidth - 12;
     // The last label is centred on its dot like the others, so the dot keeps
     // room for half of it - at the edge it looked squeezed.
-    const left = ROUTE_STUB, right = W - 60;
+    // The first stop's label is centred on its dot, the miner's starts at
+    // the edge: the dot stands far enough in that the two never touch - a
+    // close peer pushed its address into the miner's name (22.11.2026).
+    const half = labelWidth(box, stops[0]) / 2;
+    const minerW = Math.min(200, textWidth(box, "600 14px", miner));
+    const left = Math.max(ROUTE_STUB, 6 + minerW + LABEL_GAP + half), right = W - 60;
 
     const need = segNeeds(box, stops);
     if (need.slice(1).reduce((x, y) => x + y, 0) > right - left) routeDown(box, stops, miner, median);
-    else routeAcross(box, stops, miner, placeStops(stops, left, right, need));
+    else routeAcross(box, stops, miner, placeStops(stops, left, right, need), half);
+  }
+
+  // How wide a stop's label is on the wide route, as the CSS draws it: the
+  // name and every line under it, each at most 200px.
+  const LABEL_GAP = 14;
+  function textWidth(box, font, text) {
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = font + " " + getComputedStyle(box).fontFamily;
+    return measureCtx.measureText(text).width;
+  }
+  function labelWidth(box, s) {
+    const mono = s.kind === "peer" && !s.plain;
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = "600 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const name = mono ? measureCtx.measureText(s.name).width : textWidth(box, "600 14px", s.name);
+    const lines = s.sub.map((line) => textWidth(box, "12px", line));
+    return Math.max(...[name, ...lines].map((w) => Math.min(200, w)));
   }
 
   // The switch between this block's route and the typical one.
@@ -593,7 +645,7 @@
   }
 
   // Wide: the stops along one line, at the places xs (placeStops).
-  function routeAcross(box, stops, miner, xs) {
+  function routeAcross(box, stops, miner, xs, half) {
     const rt = document.createElement("div");
     rt.className = "rt";
     box.appendChild(rt);
@@ -620,7 +672,7 @@
     // A raw coinbase text can be long; it stops short of the first stop's
     // label instead of running underneath it.
     const minerLab = el("rt-lab pool first", 0, [fit(txt("b", miner), miner), txt("small", "mined it")]);
-    minerLab.style.maxWidth = (xs[0] - 50) + "px";
+    minerLab.style.maxWidth = (xs[0] - half - LABEL_GAP - 6) + "px";
 
     stops.forEach((s, i) => {
       el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
@@ -663,7 +715,8 @@
     const h2 = document.createElement("summary");
     race.className = "pool-fold";
     h2.textContent = `Pools \u00b7 relative to the fastest${n ? " \u00b7 " + n : ""}`;
-    race.open = state.poolsOpen != null ? state.poolsOpen : n <= 4;
+    // In its own tab since 21.11.2026 there is room: open unless the reader folded it.
+    race.open = state.poolsOpen != null ? state.poolsOpen : true;
     race.addEventListener("toggle", () => { state.poolsOpen = race.open; });
     race.appendChild(h2);
     if (!b.stratum || !(b.stratum.entries || []).length) {
@@ -673,11 +726,14 @@
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
+      // Places counted in the list as it stands: the stored rank keeps the
+      // number of a pool deleted since, and the list skipped it (21.11.2026).
+      let place = 0;
       for (const e of b.stratum.entries) {
         const tr = document.createElement("tr");
         const rank = document.createElement("td");
         rank.className = "num miss";
-        rank.textContent = e.rank ? e.rank + "." : "\u2013";
+        rank.textContent = e.rank ? ++place + "." : "\u2013";
         const label = document.createElement("td");
         label.textContent = e.label;
         if (e.own) {

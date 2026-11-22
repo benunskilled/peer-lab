@@ -709,7 +709,7 @@ type aboutRule = struct {
 // "(neutrino)", does not describe a Core node as a census or a wallet -
 // the kind reads the bare name the same way (readsBareName, 13.11.2026).
 func ruleOf(subver string) (aboutRule, bool) {
-	// No name, no sentence: the kind says "No user agent" too (classify).
+	// No name, no sentence: the kind says "No name" too (classify).
 	if emptyName.MatchString(subver) {
 		return aboutRule{}, false
 	}

@@ -279,7 +279,7 @@ var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
 // 21,830 sessions in a fortnight, from 2,516 addresses, typically gone after
 // 16 seconds: connections that only checked the port, or that are still
 // being set up when the page asks.
-const noAgentKind = "No user agent"
+const noAgentKind = "No name"
 
 // kindOf returns the family name, noAgentKind for a peer that sent no user
 // agent at all, and "Other" for one whose agent matches nothing here - which

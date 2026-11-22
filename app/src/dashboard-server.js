@@ -1,5 +1,7 @@
 'use strict';
 
+const net = require('net');
+
 /**
  * Dashboard - HTTP API + static frontend. Read-only status/ranking data
  * comes straight from SQLite (written by the other three processes);
@@ -965,6 +967,16 @@ const routes = {
     // single typo in this form. See lib/validate.js.
     const parsed = validatePool(body);
     if (!parsed.ok) return sendJson(res, 400, { error: parsed.error });
+    // A host that does not exist would only ever show dashes, with nothing to
+    // say why (21.11.2026: "qa-unreachable.invalid" was taken). An IP is
+    // taken as it is: whether a pool answers there is the race's to show.
+    if (!net.isIP(parsed.value.host)) {
+      try {
+        await require('dns').promises.lookup(parsed.value.host);
+      } catch {
+        return sendJson(res, 400, { error: `${parsed.value.host} is not a name that exists` });
+      }
+    }
     // Every pool is a socket held open and a row per block; without a limit
     // the form could open them until the app ran out of either.
     if (db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n >= MAX_POOLS) {

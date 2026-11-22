@@ -26,7 +26,7 @@ func TestLinkingLion(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("got %d peers, want 2", len(got))
 	}
-	// with a borrowed name: Disguised; without any name: still "No user agent"
+	// with a borrowed name: Disguised; without any name: still "No name"
 	if got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, linkingLionAbout) {
 		t.Errorf("%s: kind %q about %q", got[0].Addr, got[0].Kind, got[0].About)
 	}

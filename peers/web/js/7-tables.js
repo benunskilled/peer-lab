@@ -106,18 +106,19 @@
   }
 
   // "Brought by" in a block's details leads here: the peer's row, open, in
-  // view and lit up once, whatever hid it - a filter, a folded card or the
+  // view and lit up once, whatever hid it - a filter, another tab or the
   // inbound top ten. The open row is a history entry like any other, so
   // swiping back closes it. False when the peer is gone.
   function revealPeer(addr) {
     const p = state.data.peers.find((x) => x.addr === addr);
     if (!p) return false;
+    // The peer list is a tab of its own: open it first (app.js showTab).
+    if (window.peerLabShowTab) window.peerLabShowTab("peers");
     const g = p.group;
     const key = g + " " + addr;
     if (!groupPeers(g).peers.some((x) => x.addr === addr)) {
       state.group = state.kind = state.sub = state.label = state.place = null;
     }
-    if (folded.delete("group-" + g)) store.set(FOLD_KEY, JSON.stringify([...folded]));
     state.openRows.clear();
     state.openRows.add(key);
     const find = () => document.querySelector(`#tables tr[data-anchor="${CSS.escape(key)}"]`);
@@ -162,7 +163,6 @@
     const sw = document.createElement("span");
     sw.className = "swatch s-" + g;
     h.append(sw, LABEL[g]);
-    foldable(card, h, "group-" + g);
     // The count beside the name - it picks nothing, so it is not among the
     // chips below. Those are the mix of kinds, counted before this group's
     // own kind filter, so a group the filter emptied still offers the way
@@ -272,7 +272,10 @@
       const th = document.createElement("th");
       th.scope = "col";
       th.className = "k-" + c.key + (c.cls ? " " + c.cls : "");
-      if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
+      // As the column reads, not as its value sorts: First/Blocks sorts by the
+      // negated count and Connected by its start time, so either way round
+      // the order a reader sees is the other one (21.11.2026).
+      if (c.key === col.key) th.setAttribute("aria-sort", (s.dir > 0) !== Boolean(c.shownReversed) ? "ascending" : "descending");
       const b = document.createElement("button");
       b.textContent = c.label;
       b.dataset.focusKey = "sort " + g + " " + c.key;
