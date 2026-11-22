@@ -2132,16 +2132,17 @@ test('slot fill: a peer it added and the list later calls Disguised goes; locked
   for (const a of [locked, byHand, fine]) db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(a);
 });
 
-test('slot fill: switched off, its log goes; what it holds against stays', () => {
+test('slot fill: switched off, its log stays, and what it holds against', () => {
   const { logAction } = require('../src/lib/peer-rotation/log');
   logAction({ action: 'promote', address: '203.0.113.60:8333' });
   fill.markTried('198.18.7.40:8333', false, Date.now(), { reason: 'disguised' });
   peerRotation.setEnabled(true);
   assert.ok(logRows().length > 0, 'switching on keeps it');
 
+  const before = logRows().length;
   peerRotation.setEnabled(false);
 
-  assert.equal(logRows().length, 0);
+  assert.equal(logRows().length, before);
   assert.ok(db.instance.prepare('SELECT 1 FROM slot_fill_tried WHERE address = ?').get('198.18.7.40:8333'));
 });
 
