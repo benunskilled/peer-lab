@@ -536,11 +536,33 @@
     const W = box.clientWidth - 12;
     // The last label is centred on its dot like the others, so the dot keeps
     // room for half of it - at the edge it looked squeezed.
-    const left = ROUTE_STUB, right = W - 60;
+    // The first stop's label is centred on its dot, the miner's starts at
+    // the edge: the dot stands far enough in that the two never touch - a
+    // close peer pushed its address into the miner's name (22.11.2026).
+    const half = labelWidth(box, stops[0]) / 2;
+    const minerW = Math.min(200, textWidth(box, "600 14px", miner));
+    const left = Math.max(ROUTE_STUB, 6 + minerW + LABEL_GAP + half), right = W - 60;
 
     const need = segNeeds(box, stops);
     if (need.slice(1).reduce((x, y) => x + y, 0) > right - left) routeDown(box, stops, miner, median);
-    else routeAcross(box, stops, miner, placeStops(stops, left, right, need));
+    else routeAcross(box, stops, miner, placeStops(stops, left, right, need), half);
+  }
+
+  // How wide a stop's label is on the wide route, as the CSS draws it: the
+  // name and every line under it, each at most 200px.
+  const LABEL_GAP = 14;
+  function textWidth(box, font, text) {
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = font + " " + getComputedStyle(box).fontFamily;
+    return measureCtx.measureText(text).width;
+  }
+  function labelWidth(box, s) {
+    const mono = s.kind === "peer" && !s.plain;
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = "600 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const name = mono ? measureCtx.measureText(s.name).width : textWidth(box, "600 14px", s.name);
+    const lines = s.sub.map((line) => textWidth(box, "12px", line));
+    return Math.max(...[name, ...lines].map((w) => Math.min(200, w)));
   }
 
   // The switch between this block's route and the typical one.
@@ -623,7 +645,7 @@
   }
 
   // Wide: the stops along one line, at the places xs (placeStops).
-  function routeAcross(box, stops, miner, xs) {
+  function routeAcross(box, stops, miner, xs, half) {
     const rt = document.createElement("div");
     rt.className = "rt";
     box.appendChild(rt);
@@ -650,7 +672,7 @@
     // A raw coinbase text can be long; it stops short of the first stop's
     // label instead of running underneath it.
     const minerLab = el("rt-lab pool first", 0, [fit(txt("b", miner), miner), txt("small", "mined it")]);
-    minerLab.style.maxWidth = (xs[0] - 50) + "px";
+    minerLab.style.maxWidth = (xs[0] - half - LABEL_GAP - 6) + "px";
 
     stops.forEach((s, i) => {
       el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
