@@ -112,6 +112,8 @@
   function revealPeer(addr) {
     const p = state.data.peers.find((x) => x.addr === addr);
     if (!p) return false;
+    // The peer list is a tab of its own: open it first (app.js showTab).
+    if (window.peerLabShowTab) window.peerLabShowTab("peers");
     const g = p.group;
     const key = g + " " + addr;
     if (!groupPeers(g).peers.some((x) => x.addr === addr)) {

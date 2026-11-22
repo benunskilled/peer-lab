@@ -2417,3 +2417,68 @@ document.addEventListener('keydown', (e) => {
   const storage = document.getElementById('storage-card');
   if (storage && storage.open) { storage.open = false; e.preventDefault(); }
 });
+
+// Tabs (21.11.2026). Every section carries data-tab; the one chosen shows,
+// the others are left out of the page (.tab-off). Remembered across visits,
+// and the address says it (#slot), so a link or a reload lands there too.
+// Code that brings something into view in another tab - "brought by", the
+// jump bar - opens that tab first (window.peerLabShowTab).
+const TAB_KEY = 'peerlab.tab';
+const TABS = ['peers', 'block', 'slot', 'stratum', 'data'];
+function showTab(name, { remember = true } = {}) {
+  if (!TABS.includes(name)) name = 'peers';
+  for (const el of document.querySelectorAll('[data-tab]:not([role="tab"])')) el.classList.toggle('tab-off', el.dataset.tab !== name);
+  for (const b of document.querySelectorAll('#tabs [role="tab"]')) {
+    const on = b.dataset.tab === name;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+  }
+  document.body.dataset.activeTab = name;
+  if (remember) {
+    try { localStorage.setItem(TAB_KEY, name); } catch { /* private window */ }
+    if (location.hash.slice(1) !== name) history.replaceState(null, '', `#${name}`);
+  }
+  // The map and the traffic chart size themselves to their box, which was 0 wide while hidden.
+  window.dispatchEvent(new Event('resize'));
+}
+window.peerLabShowTab = (name) => { if (document.body.dataset.activeTab !== name) showTab(name); };
+function tabStates() {
+  const put = (id, on) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = on ? 'On' : 'Off';
+    el.classList.toggle('on', on);
+  };
+  const rot = document.getElementById('rotation-toggle');
+  const str = document.getElementById('stratum-toggle');
+  if (rot) put('tab-slot-state', rot.checked);
+  if (str) put('tab-stratum-state', str.checked);
+}
+(() => {
+  const nav = document.getElementById('tabs');
+  if (!nav) return;
+  nav.addEventListener('click', (e) => {
+    const b = e.target.closest('[role="tab"]');
+    if (b) showTab(b.dataset.tab);
+  });
+  // Arrow keys move between tabs, as a tab list does.
+  nav.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = TABS.indexOf(document.body.dataset.activeTab);
+    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(next);
+    document.getElementById(`tab-${next}`).focus();
+    e.preventDefault();
+  });
+  let first = location.hash.slice(1);
+  if (!TABS.includes(first)) { try { first = localStorage.getItem(TAB_KEY) || 'peers'; } catch { first = 'peers'; } }
+  showTab(first, { remember: false });
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
+  // On and off as the switches stand, which the page sets from the server.
+  for (const id of ['rotation-toggle', 'stratum-toggle']) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', tabStates);
+  }
+  tabStates();
+  setInterval(tabStates, 2000);
+})();
