@@ -109,10 +109,10 @@ function setEnabled(enabled) {
   put.run(META_KEY, enabled ? '1' : '0');
   // Unique per switching on, even two in the same millisecond.
   if (enabled) put.run(ON_AT_KEY, `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  // Switched off, its log goes with it (15.11.2026): switched on again it
-  // starts empty, as the list of tries does. What it held against candidates
-  // (slot_fill_tried) stays, or the same bad ones would come straight back.
-  if (!enabled) db.instance.prepare('DELETE FROM rotation_log').run();
+  // Switched off, its log stays (22.11.2026; until then it went with it): what
+  // Slot Fill did is still worth reading, and it is kept short anyway (log.js).
+  // What it held against candidates (slot_fill_tried) stays too, or the same
+  // bad ones would come straight back.
   // What a pass saw before the switch is not what Slot Fill is doing now.
   db.instance.prepare('DELETE FROM meta WHERE key = ?').run(STATUS_KEY);
   db.instance.prepare("DELETE FROM meta WHERE key = 'slot_fill_last_try'").run();

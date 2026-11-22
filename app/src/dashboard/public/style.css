@@ -63,23 +63,10 @@ body {
 
 /* ---- one block, all three roles ---- */
 .block-card { padding: 0; }
-.block-summary, .block-more > summary {
+.block-summary {
   padding: 12px 16px; display: flex; flex-wrap: wrap;
   align-items: baseline; gap: 4px 10px; font-size: 14px; color: var(--muted);
 }
-.block-more > summary { cursor: pointer; }
-.block-more > summary::-webkit-details-marker { display: none; }
-/* A drawn chevron: the old 11px glyph read as a dot. */
-.block-more > summary::before {
-  content: ""; flex: none; align-self: center; width: 6px; height: 6px; margin: 0 4px 0 2px;
-  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
-  transform: rotate(-45deg); transition: transform .15s ease;
-}
-.block-more > summary:hover::before { border-color: var(--text); }
-.block-more[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
-/* Under a route the fold is only the full pool list, so it reads as a small
-   link rather than as the card's headline. */
-.block-more.minor > summary { padding: 0 16px 12px; font-size: 13px; }
 
 /* ---- the route: to scale from the first job, see renderRoute ---- */
 .block-route { padding: 0 16px 10px; }
@@ -732,7 +719,7 @@ body { padding-bottom: var(--bars-h, 0px); }
 .bottom-bars { position: fixed; z-index: 40; left: 0; right: 0; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px; pointer-events: none; }
 .bottom-bars > .banner { pointer-events: auto; width: 100%; max-width: 720px; box-sizing: border-box; box-shadow: 0 6px 20px rgba(0, 0, 0, .45); }
 /* A folded card opens with a tap anywhere on it. */
-.card.folded, .block-card:has(> .block-more:not([open]):not([hidden])) { cursor: pointer; }
+.card.folded { cursor: pointer; }
 
 /* The open inbound list keeps its name and the way back at the top. */
 .stick { position: sticky; top: 0; z-index: 6; height: 0; }
@@ -871,12 +858,8 @@ body { padding-bottom: var(--bars-h, 0px); }
    its name could not be read as belonging to it. */
 .block-more .block-body { max-width: 560px; }
 
-/* The pool list folds like every <details>: its title in the small caps of
-   the other headings in Details, a chevron in front. */
-.pool-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
-.pool-fold > summary::-webkit-details-marker { display: none; }
-.pool-fold > summary::before { content: ""; flex: none; width: 5px; height: 5px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s ease; }
-.pool-fold[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
+/* The pool list's title, in small caps like the other headings on the card. */
+.block-body h3.pool-head { margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 
 /* ======== Panels: the hero tiles, the banners and the cards under the peer list ======== */
 
@@ -1397,14 +1380,13 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* The same for the other small controls (21.11.2026: under 32 px on a phone). Grown up and down only, so
    buttons side by side do not take each other's taps. */
 .map-card .map-legend .legend-pick, .b-peer, .rt-switch > button, .region-pick, .panel button.secondary,
-.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .pool-fold > summary, .footer-source { position: relative; }
+.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .footer-source { position: relative; }
 .map-card .map-legend .legend-pick::after { content: ""; position: absolute; inset: -8px 0; }
 .b-peer::after { content: ""; position: absolute; inset: -6px 0; }
 .rt-switch > button::after { content: ""; position: absolute; inset: -5px 0; }
 .region-pick::after { content: ""; position: absolute; inset: -5px 0; }
 .panel button.secondary:not(table button)::after { content: ""; position: absolute; inset: -4px 0; }
 #zoomIn::after, #zoomOut::after, #zoomReset::after { content: ""; position: absolute; inset: -3px; }
-.pool-fold > summary::after { content: ""; position: absolute; inset: -8px 0; }
 .footer-source::after { content: ""; position: absolute; inset: -9px 0; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } }
 /* Buttons change state softly. */

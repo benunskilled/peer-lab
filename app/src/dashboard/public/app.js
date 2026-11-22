@@ -345,9 +345,22 @@ function drawTiles({ inbound, outbound, manual }) {
     ['Outbound', outbound, 'outbound'],
     ['Manual', manual, 'manual', used > manual ? `${used}/${MAX_MANUAL_PEERS} slots used` : `of ${MAX_MANUAL_PEERS}`],
   ];
-  document.getElementById('live-stats').innerHTML = stats
-    .map(([label, n, k, sub]) => `<div class="stat${k ? ' s-' + k : ''}"><div class="l">${label}</div><div class="n">${n}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`)
-    .join('');
+  // The tiles are built once; after that only a number or line that changed
+  // is written. Built anew every ten seconds, an iPhone could show it
+  // (22.11.2026).
+  const grid = document.getElementById('live-stats');
+  if (grid.children.length !== stats.length) {
+    grid.innerHTML = stats
+      .map(([label, , k]) => `<div class="stat${k ? ' s-' + k : ''}"><div class="l">${label}</div><div class="n"></div><div class="s" hidden></div></div>`)
+      .join('');
+  }
+  stats.forEach(([, n, , sub], i) => {
+    const tile = grid.children[i];
+    const num = tile.querySelector('.n'), line = tile.querySelector('.s');
+    if (num.textContent !== String(n)) num.textContent = String(n);
+    if (line.textContent !== (sub || '')) line.textContent = sub || '';
+    if (line.hidden !== !sub) line.hidden = !sub;
+  });
 }
 
 // Shared by the status poll and the live block event, so whichever learns of
@@ -378,7 +391,8 @@ function setBlockHeight(height, { at = Date.now(), fromCore = false } = {}) {
   heightAt = at;
 
   heightEl.classList.remove('waiting');
-  heightEl.textContent = height.toLocaleString('en-US');
+  const shown = height.toLocaleString('en-US');
+  if (heightEl.textContent !== shown) heightEl.textContent = shown;
   if (lastKnownHeight != null && height > lastKnownHeight) {
     heightEl.classList.remove('bump');
     void heightEl.offsetWidth; // restart the animation
@@ -398,6 +412,10 @@ function setBlockPool(race) {
   const known = race && race.pool;
   const raw = race && !known && race.poolTag ? race.poolTag : null;
   const unknown = race && !known && !raw && race.poolSource === 'none';
+  // The same answer again leaves the line as it is.
+  const key = JSON.stringify([known && (race.poolName || race.pool), raw, unknown]);
+  if (el.dataset.drawn === key && (known || raw || unknown)) return;
+  el.dataset.drawn = key;
   el.classList.toggle('raw', Boolean(raw));
   el.textContent = '';
   if (known || raw || unknown) {
@@ -2381,9 +2399,32 @@ document.addEventListener('keydown', (e) => {
 // jump bar - opens that tab first (window.peerLabShowTab).
 const TAB_KEY = 'peerlab.tab';
 const TABS = ['peers', 'block', 'slot', 'stratum', 'data'];
+// A switch keeps the tab bar where it stood on the screen. Far down a long tab,
+// a shorter one pulled the page up under the finger (22.11.2026, phone): so
+// the page keeps a screen's room below the bar, and a bar scrolled out of
+// sight comes back to the top of the screen.
+function keepTabBar(change) {
+  const bar = document.getElementById('tabs');
+  const main = bar.closest('main');
+  const before = bar.getBoundingClientRect().top;
+  change();
+  main.style.minHeight = '';
+  const pageTop = (el) => el.getBoundingClientRect().top + window.scrollY;
+  const barTop = pageTop(bar);
+  const need = barTop - pageTop(main) + window.innerHeight;
+  if (main.offsetHeight < need) main.style.minHeight = `${Math.ceil(need)}px`;
+  window.scrollTo(0, barTop - Math.max(0, before));
+}
 function showTab(name, { remember = true } = {}) {
   if (!TABS.includes(name)) name = 'peers';
-  for (const el of document.querySelectorAll('[data-tab]:not([role="tab"])')) el.classList.toggle('tab-off', el.dataset.tab !== name);
+  keepTabBar(() => {
+    for (const el of document.querySelectorAll('[data-tab]:not([role="tab"])')) el.classList.toggle('tab-off', el.dataset.tab !== name);
+    // The map and the traffic chart size themselves to their box, which was 0 wide while hidden;
+    // the block route is laid out again on its own event. Both before the bar is put back:
+    // drawing the block card moved the page again (WebKit).
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new CustomEvent('peerlab:tab', { detail: name }));
+  });
   for (const b of document.querySelectorAll('#tabs [role="tab"]')) {
     const on = b.dataset.tab === name;
     b.setAttribute('aria-selected', String(on));
@@ -2394,10 +2435,6 @@ function showTab(name, { remember = true } = {}) {
     try { localStorage.setItem(TAB_KEY, name); } catch { /* private window */ }
     if (location.hash.slice(1) !== name) history.replaceState(null, '', `#${name}`);
   }
-  // The map and the traffic chart size themselves to their box, which was 0 wide while hidden;
-  // the block route is laid out again on its own event.
-  window.dispatchEvent(new Event('resize'));
-  window.dispatchEvent(new CustomEvent('peerlab:tab', { detail: name }));
 }
 window.peerLabShowTab = (name) => { if (document.body.dataset.activeTab !== name) showTab(name); };
 function tabStates() {
