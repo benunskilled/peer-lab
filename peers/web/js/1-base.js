@@ -82,8 +82,8 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
   };
 
-  // The legend folds to its title on a tap, and stays folded on this device.
-  // The other cards stay open: each tab is short enough (22.11.2026).
+  // Every card folds to its title on a tap, and stays folded on this device:
+  // open unless the reader closed it (28.10.2026).
   const FOLD_KEY = "peerlab.folded";
   const folded = new Set((() => { try { return JSON.parse(store.get(FOLD_KEY)) || []; } catch { return []; } })());
   // The dashboard's foldable, with this script's store and fitting.
@@ -98,8 +98,10 @@
         for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
         fitTables();
       },
+      onOpening: id === "map" ? () => window.dispatchEvent(new Event("resize")) : null,
     });
   }
+  foldable($("mapCard"), $("mapHead"), "map");
   // The legend: folded the first time, on every width (14.11.2026: open, it
   // stood between the map and the tables on every visit); after that it stays
   // as the reader left it. A new key, so a page that met the old rule (open on

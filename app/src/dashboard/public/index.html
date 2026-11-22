@@ -33,14 +33,11 @@
                and takes no room: not every miner is on a list, and not every
                coinbase carries a name. -->
           <div class="hero-sub" id="block-pool" hidden></div>
-          <!-- Who brought it here first, from the Block activity tab: the
-               answer most come for, so it stays in sight above the tabs. -->
           <div class="hero-sub" id="block-brought" hidden></div>
         </div>
         <div class="stat-grid" id="live-stats"></div>
       </div>
     </section>
-
 
     <p class="banner banner-demo" id="demo" hidden>Demo data - this page is not connected to a node.</p>
     <!-- Fixed at the foot of the screen: up in the page, a reader down in the
@@ -53,17 +50,6 @@
       </div>
     </div>
 
-    <!-- Sections as tabs (21.11.2026: the page was long and much of it is
-         rarely needed). Above them, always: the block height and the counts.
-         The choice is remembered; a link into another tab opens that tab. -->
-    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
-      <button type="button" role="tab" data-tab="peers" id="tab-peers"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5l3.7 3.7M17.5 6.5l-3.7 3.7M6.5 17.5l3.7-3.7M17.5 17.5l-3.7-3.7"/></svg><span>Peers</span></button>
-      <button type="button" role="tab" data-tab="block" id="tab-block"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span class="long">Block activity</span><span class="short">Blocks</span></button>
-      <button type="button" role="tab" data-tab="slot" id="tab-slot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Slot Fill</span><span class="tab-state" id="tab-slot-state"></span></button>
-      <button type="button" role="tab" data-tab="stratum" id="tab-stratum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg><span class="long">Stratum Race</span><span class="short">Race</span><span class="tab-state" id="tab-stratum-state"></span></button>
-      <button type="button" role="tab" data-tab="data" id="tab-data"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>Data</span></button>
-    </nav>
-
     <!-- One block, in the three roles that must not be confused: who mined
          it, which of your peers brought it here first, and which pool turned
          it into fresh work first. Only there once a block has been seen.
@@ -72,23 +58,24 @@
          open and only the full pool list folds away. Without one, the card is
          a single line that opens onto who delivered it: then the summary is
          the fold's own label and #blockSummary stays hidden. -->
-    <section class="card block-card" id="blockCard" data-tab="block" hidden>
+    <section class="card block-card" id="blockCard" hidden>
       <!-- A fresh install until its first block: what comes here, and that it comes. -->
       <p class="block-wait" id="blockWait" hidden>Waiting for the next block. Peer Lab notes who mined it and which peer brought it to you.</p>
       <div class="block-summary" id="blockSummary" hidden></div>
       <div class="block-route" id="blockRoute" hidden></div>
       <div class="block-recon" id="blockRecon" hidden></div>
-      <!-- Route, compact block and pools, always shown: the tab has room
-           (22.11.2026; until then they folded under "Details"). -->
-      <div class="block-more" id="blockMore">
+      <details class="block-more" id="blockMore">
+        <summary id="blockMoreLabel"></summary>
         <div class="block-body" id="blockBody"></div>
-      </div>
+      </details>
     </section>
 
-    <section class="card map-card" id="mapCard" data-tab="peers">
+    <section class="card map-card" id="mapCard">
       <!-- The active filters stand in the map's head: right above the map that
-           sets one, above the lists they filter. Up above the block card, a tap on the map put them out
-           of sight; under a tall map, too. -->
+           sets one, above the lists they filter, and there with the map
+           folded too. Up above the block card, a tap on the map put them out
+           of sight; under a tall map, too. head-extra keeps them out of the
+           fold button (foldTitle). -->
       <h2 class="map-head" id="mapHead">Map<span class="filters head-extra" role="group" aria-label="Active filters">
           <span class="place-filter" id="placeFilter" hidden>
             Showing <b id="placeFilterName"></b>
@@ -148,7 +135,7 @@
 
     <!-- What the marks in the peer list mean, between the map and the list:
          folded the first time, then it stays as the reader leaves it. -->
-    <section class="card key-card" id="keyCard" data-tab="peers">
+    <section class="card key-card" id="keyCard">
       <h2 class="key-head" id="keyHead">What's ⚡ 📡 ★ ⊘ 🔒</h2>
       <ul class="key-list">
           <!-- Two columns on a wide screen, filled row by row: pairs share a row
@@ -166,7 +153,7 @@
       </ul>
     </section>
 
-    <div class="tables" id="tables" data-tab="peers" aria-busy="true"><section class="card group-card skeleton-card"><div class="group-head"><h2>Inbound</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section><section class="card group-card skeleton-card"><div class="group-head"><h2>Outbound</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section><section class="card group-card skeleton-card"><div class="group-head"><h2>Manual</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section></div>
+    <div class="tables" id="tables" aria-busy="true"><section class="card group-card skeleton-card"><div class="group-head"><h2>Inbound</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section><section class="card group-card skeleton-card"><div class="group-head"><h2>Outbound</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section><section class="card group-card skeleton-card"><div class="group-head"><h2>Manual</h2></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div><div class="sk-row"><i></i><i></i></div></section></div>
 
     <!--
       Its own section, under the peer list and next to Slot Fill: the two ways
@@ -176,7 +163,7 @@
       Test answers "is anything listening there, and on which port" and changes
       nothing at all - no row, no addnode, no disconnected session.
     -->
-    <section class="card panel" data-tab="peers">
+    <section class="card panel">
       <h2>Add a Peer</h2>
       <p class="panel-note">
         <strong>Add &amp; Keep</strong> makes a peer manual and locks it: once it has connected, it keeps its
@@ -197,8 +184,8 @@
       <div id="manual-add-result" class="hint"></div>
     </section>
 
-    <section class="card panel spaced" id="slot-fill" data-tab="slot">
-      <h2>Slot Fill</h2>
+    <section class="card panel spaced" id="slot-fill">
+      <h2>Slot Fill <span class="hint fold-sum" id="rotation-sum"></span></h2>
       <div class="inline-form">
         <label class="switch-label" for="rotation-toggle">
           <input type="checkbox" id="rotation-toggle" />
@@ -213,7 +200,7 @@
       -->
       <div class="rotation-hint">
         <p>Fills free manual slots around the world: other countries, other providers.</p>
-        <details class="how" open>
+        <details class="how">
           <summary>How it works</summary>
           <ul>
             <li>A free slot goes to a peer from a new country, taken from Core's address book.</li>
@@ -251,8 +238,8 @@
       </div>
     </section>
 
-    <section class="card panel" id="stratum-race" data-tab="stratum">
-      <h2>Stratum Race</h2>
+    <section class="card panel" id="stratum-race">
+      <h2>Stratum Race <span class="hint fold-sum" id="stratum-sum"></span></h2>
       <div class="inline-form">
         <label class="switch-label" for="stratum-toggle">
           <input type="checkbox" id="stratum-toggle" />
@@ -324,18 +311,17 @@
     </section>
 
     <!-- What the node sends and receives, per UTC day. -->
-    <section class="card panel spaced" id="traffic-card" data-tab="data">
-      <h2>Traffic</h2>
+    <section class="card panel spaced" id="traffic-card">
+      <h2>Traffic <span class="hint fold-sum" id="traffic-sum"></span></h2>
       <div id="traffic-totals" class="traffic-totals"></div>
       <div id="traffic-chart" class="traffic-chart" role="img" aria-label="Traffic per day, last 30 days"></div>
       <p class="hint">Updated hourly from Core's byte counters.</p>
     </section>
 
-    <!-- Last in the Data tab, open since the tabs (22.11.2026): nothing here
-         is part of daily use, and both buttons ask before they destroy data
-         that cannot be recovered. -->
-    <section class="card panel spaced" id="storage-card" data-tab="data">
-      <h2>Data <span id="storage-total" class="hint"></span></h2>
+    <!-- Closed by default and last on the page: nothing here is part of daily
+         use, and both buttons destroy data that cannot be recovered. -->
+    <details class="card panel" id="storage-card">
+      <summary><h2>Data <span id="storage-total" class="hint"></span></h2></summary>
 
       <div class="reset-group">
         <h3>Peer measurement data <span id="reset-peers-size" class="hint"></span></h3>
@@ -360,7 +346,7 @@
           <button type="button" id="reset-pools-no" class="secondary">Cancel</button>
         </div>
       </div>
-    </section>
+    </details>
 
   </main>
 

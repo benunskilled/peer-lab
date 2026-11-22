@@ -41,10 +41,10 @@ async function browserSmoke(base, peers) {
       await page.click('#keyCard', { position: { x: 300, y: 20 } });
       await page.waitForTimeout(700);
       assert.equal(await folded(), false, `${width}px: and a tap on the folded card opens it`);
-      // The Data tab: its card is open and fills its numbers when the tab opens.
-      await page.click('#tab-data');
-      await page.waitForFunction(() => document.getElementById('storage-total').textContent.trim() !== '', null, { timeout: 10000 });
-      assert.equal(await page.$eval('#tables', (t) => t.classList.contains('tab-off')), true, `${width}px: the other tabs' cards are left out`);
+      await page.click('#storage-card > summary');
+      await page.waitForTimeout(700);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.$eval('#storage-card', (d) => d.open), false, `${width}px: Esc closes Data`);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       assert.ok(overflow <= 0, `${width}px: nothing slides sideways (${overflow}px)`);
       await page.close();

@@ -105,12 +105,15 @@
       jumpBar.appendChild(b);
     };
     go("\u2191 Top", null);
-    // The three lists, while their tab is open. Slot Fill, Stratum Race and
-    // Traffic are tabs of their own since 21.11.2026: the tab bar is their way in.
     for (const g of GROUPS) {
       const c = document.getElementById("group-" + g);
       // Short, so the bar fits a phone without sliding sideways.
-      if (c && !c.closest(".tab-off")) go({ inbound: "In", outbound: "Out", manual: "Manual" }[g], c);
+      if (c) go({ inbound: "In", outbound: "Out", manual: "Manual" }[g], c);
+    }
+    // The cards under the list, where the page has them.
+    for (const [label, id] of [["Slot Fill", "slot-fill"], ["Stratum", "stratum-race"], ["Traffic", "traffic-card"]]) {
+      const c = document.getElementById(id);
+      if (c) go(label, c);
     }
   }
   // On a phone the bar comes down from the top, where the open inbound list
