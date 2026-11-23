@@ -176,7 +176,7 @@ var kindRules = []struct {
 	// pcoc's Bari timestamping service follows mainnet headers only, never a
 	// block body: USER_AGENT "/pcoc-bari:<v>/" in sdk/rust/pcoc-gossip/src/wire.rs
 	// in groundinglab/pcoc (18.11.2026).
-	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:|^/pcoc-bari:`), false},
+	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pycoinnet/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:|^/pcoc-bari:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - the dashboard has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},

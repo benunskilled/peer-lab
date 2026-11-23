@@ -39,7 +39,7 @@ func TestHemiUnnamedGetsItsLine(t *testing.T) {
 	if got.Kind != noAgentKind {
 		t.Fatalf("kind %q, want %q", got.Kind, noAgentKind)
 	}
-	if !strings.HasPrefix(got.About, hemiUnnamedAbout+"\n") || got.Label != "Probably Hemi's code" {
+	if !strings.HasPrefix(got.About, hemiUnnamedAbout+"\n") || got.Label != "Probably Hemi's hVM" {
 		t.Errorf("about %q, label %q", got.About, got.Label)
 	}
 }

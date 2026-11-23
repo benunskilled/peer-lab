@@ -24,7 +24,7 @@ func TestOtherAbouts(t *testing.T) {
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "Probably KIT Karlsruhe's Bitcoin network monitoring"},
 		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
 		{"/GlobalNodeMap:2.1/", 70016, "Named like a node map; nothing public says whose"},
-		{"/pycoinnet/", 70016, "Named like pycoinnet"},
+		{"/pycoinnet/", 70016, "spruned, a Bitcoin client"},
 		{"/Notoshi/", 70016, "pycoinnet, Richard Kiss's Python library"},
 		{"/btcwire:0.5.0/bitfyn:0.1.0/", 70016, "bitfyn, a desktop wallet"},
 		{"/bitcoinj:0.14.7/PeerMonitor:1.0/", 70016, "Koyn's header tool"},

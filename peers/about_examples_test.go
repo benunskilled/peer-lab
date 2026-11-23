@@ -54,7 +54,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/tbcd:2.1.0-dev/", "Node (other)"},
 	{"/btcwire:0.5.0/hemi-soak:1.0/", "Other"},
 	{"/Satoshi:31.1.0/KnotsSHA256:20261018/", "Node (Knots)"},
-	{"/pycoinnet/", "Other"},
+	{"/pycoinnet/", "Other light client"},
 	{"/blueberry:2026.08.17/", "Wallet"},
 	{"/Satoshi:28.1.0(FutureBit-Apollo-Node)/", "Node (Core)"},
 	{"/Satoshi:31.0.0(Samourai Dojo 1.29.3)/", "Node (Core)"},

@@ -147,8 +147,11 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`UASF-Segwit:`), "The BIP148 UASF client of 2017, which enforced SegWit", "BIP148 UASF (2017)", ""},
 	{regexp.MustCompile(`\(2x\)`), "btc1, the SegWit2x client of 2017; its fork was called off", "btc1 SegWit2x (2017)", ""},
 	{regexp.MustCompile(`/KnotsSHA256:`), "Knots (SHA256), paulscode's build of Knots that stays on the SHA256 chain", "Knots (SHA256), paulscode", ""},
-	// github.com/richardkiss/pycoinnet; where it sends this name was not found.
-	{regexp.MustCompile(`^/pycoinnet/`), "Named like pycoinnet, Richard Kiss's Python library for the Bitcoin protocol", "Named like pycoinnet", ""},
+	// spruned's copy of pycoinnet: subversion=b"/pycoinnet/" in
+	// spruned/dependencies/pycoinnet/version.py L81, used unchanged by
+	// spruned/daemon/bitcoin_p2p/p2p_connection.py L114 (mempoolco/spruned,
+	// checked 23.11.2026). pycoinnet itself says "/Notoshi/" (below).
+	{regexp.MustCompile(`^/pycoinnet/`), "spruned, a Bitcoin client without a blockchain of its own: it fetches any block from peers when asked", "spruned (no own chain)", ""},
 	// APP_NAME "blueberry", APP_VERSION "2026.08.17" (peers/.../net/UserAgent.kt
 	// in BlueWallet/Blueberry.kmp), sent as "/${name}:${version}/"
 	// (session/VersionHandshake.kt in GladosBlueWallet/bip324.kmp).
@@ -188,8 +191,9 @@ var aboutRules = []aboutRule{
 	// format!("/LionSeed:{}/", ...) (src/crawl.rs in LionThunderFingers/LionSeed),
 	// "serves only verified fork nodes" by its description.
 	{regexp.MustCompile(`(?i)^/LionSeed:`), "LionSeed, a DNS seeder that lists only the nodes of one fork", "LionSeed DNS seeder", ""},
-	// gnoban itself works over its own node's RPC and sends no name
-	// (gnoban.py in caesrcd/gnoban), so a peer saying it only borrows it.
+	// gnoban connects to peers itself, but under python-bitcoinlib's name: its
+	// BitcoinMsgver() keeps the library's subversion (gnoban.py L640-669 in
+	// caesrcd/gnoban, 23.11.2026), so a peer saying "gnoban" only borrows it.
 	{regexp.MustCompile(`(?i)^/gnoban:`), "Named like gnoban, a tool that scores nodes and bans the ones its operator does not want", "Named like gnoban", ""},
 	// "libbtc 0.1", no slashes (src/net.c in libbtc/libbtc).
 	{regexp.MustCompile(`^libbtc `), "libbtc, a small C library for Bitcoin wallets and tools", "libbtc C library", ""},
@@ -504,7 +508,7 @@ var aboutRules = []aboutRule{
 	// src/handshake/handshake.ts in OriginalEveres/bitcoin-node-scanner;
 	// bitcoin_probe.py in dutenrapha/bitcoin-topology-discovery; crawl_btcd.go
 	// in p2pobservatory/bitcoin-crawler L35 ("/crawler:0.1/", checked
-	// 15.11.2026; a name others may use too, hence "Probably"); src/main/kotlin/crawler.kt in
+	// 15.11.2026; no other sender found, 23.11.2026); src/main/kotlin/crawler.kt in
 	// bitcoinj/httpseed; netmine.cfg in jameslitton/coinscope (University of
 	// Maryland); setting.properties in Crepepepe/JBS (Chung-Ang University;
 	// Judgegao/Bitcoin-Node-Scanner reuses it); Main.java in vs-uulm/CoinView
@@ -519,7 +523,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/new-p2p-crawler:`), "new-p2p-crawler, Daniela Brozzoni's crawler of reachable nodes", "new-p2p-crawler", ""},
 	{regexp.MustCompile(`^/bitcoin-node-scanner:`), "bitcoin-node-scanner, a crawler that asks nodes for addresses", "bitcoin-node-scanner", ""},
 	{regexp.MustCompile(`^/topology-probe:`), "A topology crawler (bitcoin-topology-discovery) that asks nodes for addresses", "Topology crawler", ""},
-	{regexp.MustCompile(`^/crawler:0\.1/$`), "Probably the crawler of P2P Observatory (IMDEA Networks)", "Probably P2P Observatory", ""},
+	{regexp.MustCompile(`^/crawler:0\.1/$`), "The crawler of P2P Observatory (IMDEA Networks)", "P2P Observatory crawler", ""},
 	{regexp.MustCompile(`^/Coinscope-GH:`), "CoinScope, a University of Maryland study of Bitcoin's network", "CoinScope (UMD study)", ""},
 	{regexp.MustCompile(`^/JBS:`), "JBS, a Bitcoin node scanner from university studies", "JBS research scanner", ""},
 	{regexp.MustCompile(`^/txecho:`), "TxEcho, a payment monitor that watches nodes for transactions and blocks", "TxEcho payment monitor", ""},
@@ -762,11 +766,15 @@ func noAgentLine(recv map[string]int64, connTime int64, now time.Time) (line, sh
 // built on it sets no name: "/%v:%v/" with the component empty, the version
 // Major.Minor.Patch-dev+ the first nine characters of the commit, and Core
 // drops the "+" (rawpeer.go, version.go in github.com/hemilabs/heminetwork).
-// The commits seen (539f4e33c, 923cba97a, c1771608d) are not in Hemi's public
-// repository, so it is "probably".
+// version.go takes the commit from the build of the main program: two of the
+// three seen are commits of Hemi's op-geth (539f4e33c of 01.09.2026,
+// c1771608d of 05.10.2026 in hemilabs/op-geth), the hVM node that builds in
+// heminetwork/service/tbc (core/blockchain_hvm_migration.go) and sets no
+// component; 923cba97a is in neither repository (checked 23.11.2026). Any
+// other program on tbc without a name looks the same, so it is "probably".
 var hemiUnnamed = regexp.MustCompile(`^/:[0-9]+\.[0-9]+\.[0-9]+-dev\+?[0-9a-f]{9}/$`)
 
-const hemiUnnamedAbout = "Probably a program on Hemi's Bitcoin code (tbc) that left its own name empty"
+const hemiUnnamedAbout = "Probably Hemi's hVM node: its op-geth with Hemi's Bitcoin code (tbc) built in, which leaves the name empty"
 
 // noAgentAbout is noAgentLine's sentence alone.
 func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {

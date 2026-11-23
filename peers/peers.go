@@ -453,11 +453,11 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
-			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "Probably ViaBTC's relay"
+			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "ViaBTC's relay (bitpeer)"
 			labelled = p.About
 			p.PoolProof = "Found by 0xB10C, b10c.me"
 		case purityByBits(r.Subver, r.ServicesNames):
-			p.Kind, p.About, p.Label, p.NoRelay = "Other chain", purityByBitsAbout, "Probably Purity", true
+			p.Kind, p.About, p.Label, p.NoRelay = "Other chain", purityByBitsAbout, "Purity, bare Core name", true
 			labelled = p.About
 		case libreKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
@@ -528,7 +528,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if p.Kind == noAgentKind && r.Version > 0 {
 			p.About, p.Label = noAgentLine(r.BytesRecvPerMsg, r.ConnTime, now)
 			if hemiUnnamed.MatchString(r.Subver) {
-				p.About, p.Label = hemiUnnamedAbout+"\n"+p.About, "Probably Hemi's code"
+				p.About, p.Label = hemiUnnamedAbout+"\n"+p.About, "Probably Hemi's hVM"
 			}
 			labelled = p.About
 		} else if p.Kind == noAgentKind {

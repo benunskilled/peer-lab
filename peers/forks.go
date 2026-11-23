@@ -98,7 +98,11 @@ func purityByBits(subver string, services []string) bool {
 		slices.Contains(services, purityService) && slices.Contains(services, reducedDataService)
 }
 
-const purityByBitsAbout = "Probably Bitcoin Purity under a bare Core name: only Purity offers service bit 25, here beside BIP110's bit 27"
+// Checked 23.11.2026: -uaspoof=1 calls FormatSubVersion with base_name_only
+// (src/init.cpp L1895-1899), which leaves "Purity:" out (src/clientversion.cpp
+// L77-79); the bits stay (g_local_services, src/init.cpp L1033; bit 25 and 27
+// in src/protocol.h L351, L356).
+const purityByBitsAbout = "Bitcoin Purity under a bare Core name (its -uaspoof=1): only Purity offers service bit 25, here beside BIP110's bit 27"
 
 // forkOf is the flag and its hover text for a peer offering one of those
 // bits, or "", "". A peer whose headers reach this node's tip follows this
