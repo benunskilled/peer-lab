@@ -1042,6 +1042,7 @@ async function refreshRotation() {
   if (seq !== rotationSeq || rotationToggleEpoch !== epochAtRequest) return;
   const toggle = document.getElementById('rotation-toggle');
   if (toggle) toggle.checked = Boolean(data.enabled);
+  foldSums();
 
   // Picks tapped since this was asked for are the page's, not this answer's.
   const picked = picksAtRequest === picksEpoch ? data.picked || [] : (lastSlotStatus && lastSlotStatus.picked) || [];
@@ -1224,6 +1225,7 @@ function renderSlotStatus() {
       renderRotationLog(lastRotationLog);
     }
   }
+  foldSums();
 }
 setInterval(renderSlotStatus, 30 * 1000);
 
@@ -1415,6 +1417,7 @@ function applyStratumEnabled(enabled) {
   // Disabling the box while its own answer is out drops its focus (WebKit,
   // Chrome), so that is asked too.
   if (document.activeElement !== toggle && !toggle.disabled) toggle.checked = enabled;
+  foldSums();
   const body = document.getElementById('stratum-body');
   if (body) body.hidden = !enabled;
   const noMiner = document.getElementById('pool-no-miner');
@@ -1446,6 +1449,7 @@ function renderPools(pools) {
   const tbody = document.querySelector('#pool-table tbody');
   if (!pools.length) {
     tbody.innerHTML = '<tr><td colspan="10" class="hint">No pools yet.</td></tr>';
+    foldSums();
     return;
   }
   tbody.innerHTML = pools.map((p) => `
@@ -1465,6 +1469,7 @@ function renderPools(pools) {
     </tr>
   `).join('');
   markOpenRow();
+  foldSums();
 }
 
 // The legend and the explanations fold shut again with a tap anywhere on
@@ -1562,6 +1567,7 @@ async function refreshTraffic() {
   const t = await api('/api/traffic');
   // The arrows carry the colours of the bars, so they are the legend too.
   const arrows = (v) => `<span class="up">↑ ${escapeHtml(fmtBytes(v.sent))}</span><span class="down">↓ ${escapeHtml(fmtBytes(v.recv))}</span>`;
+  document.getElementById('traffic-sum').textContent = t.since ? `today ↑ ${fmtBytes(t.today.sent)} ↓ ${fmtBytes(t.today.recv)}` : '';
   document.getElementById('traffic-totals').innerHTML = t.since
     ? trafficPeriods(t)
       .map(([l, v]) => `<div class="t"><div class="l">${l}</div><div class="v">${arrows(v)}</div></div>`)
@@ -1598,6 +1604,7 @@ async function refreshAll() {
   // the rejection, nothing was logged, and the tables simply kept showing
   // whatever they had - hours-old numbers presented exactly like fresh ones.
   const failed = results.filter((r) => r.status === 'rejected');
+  foldSums();
   reportRefreshHealth(failed.map((r) => r.reason));
 }
 
@@ -1694,6 +1701,39 @@ function foldable({ card, title, id, folded, save, onShow, onOpened, onOpening }
   title.addEventListener('click', flip);
   foldsOnTap(card, flip);
   show();
+}
+
+// Every card folds to its title on a tap and stays so on this device: open
+// unless the reader closed it (28.10.2026). Storage keeps its own <details>.
+const FOLD_KEY = 'peerlab.panelsFolded';
+const folded = (() => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); } })();
+for (const card of document.querySelectorAll('main > section.panel')) {
+  const title = card.querySelector(':scope > h2');
+  if (!title) continue;
+  foldable({
+    card, title, id: card.id || title.firstChild.textContent.trim(), folded,
+    save: () => { try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])); } catch { /* private window */ } },
+    onShow: foldSums,
+    // The traffic chart measures its width.
+    onOpening: () => window.dispatchEvent(new Event('resize')),
+  });
+}
+{
+  const storage = document.getElementById('storage-card');
+  foldsOnTap(storage, () => foldInPlace({ anchor: storage.querySelector(':scope > summary'), box: storage,
+    open: !storage.open, set: (open) => { storage.open = open; } }));
+}
+
+// A folded card still says the one thing worth knowing about it, beside its
+// title: the switches and how many pools race. Traffic writes its own.
+function foldSums() {
+  const rot = document.getElementById('rotation-toggle');
+  // Folded, the card says what Slot Fill is doing in a few words.
+  document.getElementById('rotation-sum').textContent = !rot.checked ? 'off'
+    : lastSlotStatus && lastSlotStatus.enabled ? slotStatusText(lastSlotStatus.status, Date.now()).short : 'on';
+  const pools = document.querySelectorAll('#pool-table input[data-action="toggle-pool"]:checked').length;
+  document.getElementById('stratum-sum').textContent = document.getElementById('stratum-toggle').checked
+    ? `on · ${pools} ${pools === 1 ? 'pool' : 'pools'}` : 'off';
 }
 
 // Add and Test share the same input and the same result line, and both take
@@ -2028,6 +2068,7 @@ document.body.addEventListener('change', async (e) => {
     return;
   }
 
+  if (e.target.id === 'stratum-toggle' || e.target.id === 'rotation-toggle' || e.target.dataset.action === 'toggle-pool') foldSums();
   // Each switch takes no second click while its answer is out: two POSTs
   // finishing in the wrong order left the box and the server apart.
   if (e.target.id === 'stratum-toggle') {
@@ -2282,7 +2323,7 @@ function startEventStream() {
 /**
  * Storage panel. Its numbers come from their own endpoint because getting them
  * exactly means walking every page of the database - too expensive to poll, so
- * it is fetched when the Data tab is opened and again after a reset.
+ * it is fetched when the panel is opened and again after a reset.
  */
 async function refreshStorage() {
   let s;
@@ -2349,7 +2390,9 @@ document.addEventListener('click', (e) => {
   const details = summary.parentElement;
   foldInPlace({ anchor: summary, box: details, open: !details.open, set: (open) => { details.open = open; } });
 });
-window.addEventListener('peerlab:tab', (e) => { if (e.detail === 'data') refreshStorage(); });
+document.getElementById('storage-card').addEventListener('toggle', (e) => {
+  if (e.target.open) refreshStorage();
+});
 wireReset('peers');
 wireReset('pools');
 
@@ -2369,7 +2412,7 @@ startEventStream();
 
 // Esc closes what a click opened, one thing per press, as in a desktop app:
 // the reset question, an open pool row, what the peer list has open (a
-// peer's panel, then its filters). The one handler on
+// peer's panel, then its filters), then the storage card. The one handler on
 // the page, so one press never closes two things.
 const escapeSteps = [];
 document.addEventListener('keydown', (e) => {
@@ -2390,90 +2433,5 @@ document.addEventListener('keydown', (e) => {
     if (step()) { e.preventDefault(); return; }
   }
   const storage = document.getElementById('storage-card');
+  if (storage && storage.open) { storage.open = false; e.preventDefault(); }
 });
-
-// Tabs (21.11.2026). Every section carries data-tab; the one chosen shows,
-// the others are left out of the page (.tab-off). Remembered across visits,
-// and the address says it (#slot), so a link or a reload lands there too.
-// Code that brings something into view in another tab - "brought by", the
-// jump bar - opens that tab first (window.peerLabShowTab).
-const TAB_KEY = 'peerlab.tab';
-const TABS = ['peers', 'block', 'slot', 'stratum', 'data'];
-// A switch keeps the tab bar where it stood on the screen. Far down a long tab,
-// a shorter one pulled the page up under the finger (22.11.2026, phone): so
-// the page keeps a screen's room below the bar, and a bar scrolled out of
-// sight comes back to the top of the screen.
-function keepTabBar(change) {
-  const bar = document.getElementById('tabs');
-  const main = bar.closest('main');
-  const before = bar.getBoundingClientRect().top;
-  change();
-  main.style.minHeight = '';
-  const pageTop = (el) => el.getBoundingClientRect().top + window.scrollY;
-  const barTop = pageTop(bar);
-  const need = barTop - pageTop(main) + window.innerHeight;
-  if (main.offsetHeight < need) main.style.minHeight = `${Math.ceil(need)}px`;
-  window.scrollTo(0, barTop - Math.max(0, before));
-}
-function showTab(name, { remember = true } = {}) {
-  if (!TABS.includes(name)) name = 'peers';
-  keepTabBar(() => {
-    for (const el of document.querySelectorAll('[data-tab]:not([role="tab"])')) el.classList.toggle('tab-off', el.dataset.tab !== name);
-    // The map and the traffic chart size themselves to their box, which was 0 wide while hidden;
-    // the block route is laid out again on its own event. Both before the bar is put back:
-    // drawing the block card moved the page again (WebKit).
-    window.dispatchEvent(new Event('resize'));
-    window.dispatchEvent(new CustomEvent('peerlab:tab', { detail: name }));
-  });
-  for (const b of document.querySelectorAll('#tabs [role="tab"]')) {
-    const on = b.dataset.tab === name;
-    b.setAttribute('aria-selected', String(on));
-    b.tabIndex = on ? 0 : -1;
-  }
-  document.body.dataset.activeTab = name;
-  if (remember) {
-    try { localStorage.setItem(TAB_KEY, name); } catch { /* private window */ }
-    if (location.hash.slice(1) !== name) history.replaceState(null, '', `#${name}`);
-  }
-}
-window.peerLabShowTab = (name) => { if (document.body.dataset.activeTab !== name) showTab(name); };
-function tabStates() {
-  const put = (id, on) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = on ? 'On' : 'Off';
-    el.classList.toggle('on', on);
-  };
-  const rot = document.getElementById('rotation-toggle');
-  const str = document.getElementById('stratum-toggle');
-  if (rot) put('tab-slot-state', rot.checked);
-  if (str) put('tab-stratum-state', str.checked);
-}
-(() => {
-  const nav = document.getElementById('tabs');
-  if (!nav) return;
-  nav.addEventListener('click', (e) => {
-    const b = e.target.closest('[role="tab"]');
-    if (b) showTab(b.dataset.tab);
-  });
-  // Arrow keys move between tabs, as a tab list does.
-  nav.addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    const i = TABS.indexOf(document.body.dataset.activeTab);
-    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
-    showTab(next);
-    document.getElementById(`tab-${next}`).focus();
-    e.preventDefault();
-  });
-  let first = location.hash.slice(1);
-  if (!TABS.includes(first)) { try { first = localStorage.getItem(TAB_KEY) || 'peers'; } catch { first = 'peers'; } }
-  showTab(first, { remember: false });
-  window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
-  // On and off as the switches stand, which the page sets from the server.
-  for (const id of ['rotation-toggle', 'stratum-toggle']) {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', tabStates);
-  }
-  tabStates();
-  setInterval(tabStates, 2000);
-})();

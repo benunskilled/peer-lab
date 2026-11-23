@@ -82,31 +82,6 @@
       const v = row("Brought by", shown);
       if (b.first_hb === 1) v.append(" ", span("hb", "\u26a1", HB_TITLE));
     }
-    // The same answer above the tabs, under who mined it (21.11.2026): with
-    // the block card in a tab of its own it was out of sight.
-    const hero = document.getElementById("block-brought");
-    // Drawn anew only when the answer changed, not on every refresh.
-    const where = !firsts.length ? "" : lead ? (HIDDEN_FLAG[lead.network] ? HIDDEN_FLAG[lead.network] + " " + netLabel(lead.network)
-      : lead.cc ? flagOf(lead.cc) + " " + regionName(lead.cc) : netLabel(lead.network)) : "a peer no longer connected";
-    const heroKey = JSON.stringify([where, lead && lead.addr, b.first_hb]);
-    if (hero && hero.dataset.drawn !== heroKey) {
-      hero.dataset.drawn = heroKey;
-      hero.textContent = "";
-      if (firsts.length) {
-        hero.append("brought by ");
-        if (lead) {
-          const go = document.createElement("button");
-          go.type = "button";
-          go.className = "b-peer";
-          go.textContent = where;
-          go.title = "Show this peer";
-          go.addEventListener("click", () => revealPeer(lead.addr));
-          hero.append(go);
-        } else hero.append(where);
-        if (b.first_hb === 1) hero.append(" ", span("hb", "\u26a1", HB_TITLE));
-      }
-      hero.hidden = !firsts.length;
-    }
 
     const entries = ((b.stratum && b.stratum.entries) || []).filter((e) => !e.miss && e.latency_ms != null)
       .sort((x, y) => x.latency_ms - y.latency_ms);
@@ -167,13 +142,15 @@
     if (verdictBox) verdictBox.hidden = false;
     $("blockMore").hidden = false;
     const more = $("blockMore");
-    // The route and the compact block line go above the pool list.
+    // The route and the compact block line belong to the details.
     for (const id of ["blockRoute", "blockRecon"]) if ($(id).parentElement !== more) more.insertBefore($(id), $("blockBody"));
     $("blockSummary").hidden = false;
     fillSummary($("blockSummary"), b);
     let verdict = $("blockVerdict");
     if (!verdict) { verdict = document.createElement("div"); verdict.id = "blockVerdict"; verdict.className = "b-verdict"; $("blockSummary").after(verdict); }
     renderVerdict(verdict, b);
+    more.classList.add("minor");
+    $("blockMoreLabel").textContent = "Details";
     const own = routeStops(b), typical = medianStops(b);
     const view = state.routeView === "median" && typical ? "median" : "block";
     const stops = own || typical ? (view === "median" ? typical : own || typical) : null;
@@ -708,13 +685,16 @@
     body.textContent = "";
 
     // --- who turned it into work ---------------------------------------
-    // Always shown since the tabs (22.11.2026): the block's tab has room.
+    // The list folds (12.11.2026): with every public pool in it
+    // it is long. Open by default up to four pools, folded above that, and
+    // kept as the reader set it while the page refreshes.
     const n = ((b.stratum && b.stratum.entries) || []).length;
-    const race = document.createElement("div");
-    const h2 = document.createElement("h3");
-    race.className = "pool-list";
-    h2.className = "pool-head";
+    const race = document.createElement("details");
+    const h2 = document.createElement("summary");
+    race.className = "pool-fold";
     h2.textContent = `Pools \u00b7 relative to the fastest${n ? " \u00b7 " + n : ""}`;
+    race.open = state.poolsOpen != null ? state.poolsOpen : n <= 4;
+    race.addEventListener("toggle", () => { state.poolsOpen = race.open; });
     race.appendChild(h2);
     if (!b.stratum || !(b.stratum.entries || []).length) {
       const p = document.createElement("p");
@@ -750,4 +730,51 @@
     body.appendChild(race);
   }
 
+  // Every <details> folds in place: its summary stays, its text rolls out
+  // below and back up.
+  document.addEventListener("click", (ev) => {
+    const summary = ev.target.closest && ev.target.closest("details > summary");
+    // The panels under the peer list fold by the other script: two handlers
+    // on one fold opened it and shut it again (12.11.2026).
+    if (!summary || summary.closest(".panel") || ev.target.closest("a, button, input")) return;
+    ev.preventDefault();
+    const box = summary.parentElement;
+    foldInPlace({ anchor: summary, box, open: !box.open, set: (open) => { box.open = open; } });
+  });
+
+  // The block card opens its details, and folds them shut again, with a tap
+  // anywhere on it, like every other card - not only on "Details": on a
+  // phone that has scrolled away by the time the reader is done, and it
+  // comes back into view.
+  {
+    const card = $("blockCard"), box = $("blockMore");
+    card.addEventListener("click", (ev) => {
+      if (!card.contains(ev.target) || ev.target.closest("summary, a, button, input, select, textarea, label")) return;
+      if (!$("blockWait").hidden) return; // nothing to open before the first block
+      if (String(window.getSelection()).length > 0) return;
+      // Inside an open fold of its own (Pools): that one shuts, as a tap in
+      // any other fold does. It shut the whole Details instead, and left
+      // Pools open inside it (14.11.2026).
+      const inner = ev.target.closest("details");
+      if (inner && inner !== box && box.contains(inner) && inner.open) {
+        const own = inner.querySelector(":scope > summary");
+        foldInPlace({ anchor: own, box: inner, open: false, set: (open) => { inner.open = open; } });
+        return;
+      }
+      const summary = box.querySelector(":scope > summary");
+      if (!box.open) {
+        foldInPlace({ anchor: summary, box, open: true, set: (open) => { box.open = open; } });
+        return;
+      }
+      // Its title on screen: it rolls up into it, in place. Scrolled away:
+      // shut at once, and the title comes back to the top of the screen.
+      if (summary.getBoundingClientRect().top >= 0) {
+        foldInPlace({ anchor: summary, box, open: false, set: (open) => { box.open = open; } });
+        return;
+      }
+      box.open = false;
+      const top = card.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy(0, top - 8);
+    });
+  }
 

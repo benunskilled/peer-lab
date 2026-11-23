@@ -225,6 +225,18 @@
     return e;
   };
 
+  // How often a peer was first, on a phone card under its pill (22.11.2026):
+  // "82× first", which needs no key - a bar against the best peer did.
+  // Nothing for a peer never first.
+  function firstCount(p) {
+    const r = rankOf(p);
+    if (!r || !r.first) return null;
+    const e = document.createElement("span");
+    e.className = "kind-first";
+    e.textContent = r.first.toLocaleString("en-US") + "\u00d7 first";
+    e.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+    return e;
+  }
   const COLS = [
     {
       // Where it is on top, the country and the address under it. Sorted by
@@ -405,6 +417,9 @@
           pill.append(ico, " ");
         }
         pill.append(label);
+        // On a phone card, where First/Blocks has no column: how often, under the pill.
+        const count = firstCount(p);
+        if (count) head.append(count);
         fit(pill, label, [testing ? TRIAL_TITLE : "", p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
@@ -484,20 +499,13 @@
     cell: (td, p) => {
       const r = rankOf(p);
       if (!r || !r.eligible) { td.textContent = "\u2013"; td.classList.add("dim"); return; }
-      // "46 of 100" with a thin bar for the share (21.11.2026: "46/100" had
-      // to be known to be read). The bar is the share of the blocks it was
-      // there for, so a peer with few blocks is not drawn small for that.
+      // "46 of 100" (21.11.2026: "46/100" had to be known to be read).
       const b = document.createElement("b");
       b.textContent = r.first;
       const of = document.createElement("span");
       of.className = "first-of";
       of.textContent = " of " + r.eligible;
-      const bar = document.createElement("span");
-      bar.className = "first-bar";
-      const fill = document.createElement("i");
-      fill.style.width = r.first ? Math.max(3, Math.min(100, (100 * r.first) / r.eligible)).toFixed(1) + "%" : "0";
-      bar.appendChild(fill);
-      td.append(b, of, bar);
+      td.append(b, of);
       td.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
     },
   };

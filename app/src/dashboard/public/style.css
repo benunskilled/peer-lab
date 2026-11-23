@@ -63,10 +63,23 @@ body {
 
 /* ---- one block, all three roles ---- */
 .block-card { padding: 0; }
-.block-summary {
+.block-summary, .block-more > summary {
   padding: 12px 16px; display: flex; flex-wrap: wrap;
   align-items: baseline; gap: 4px 10px; font-size: 14px; color: var(--muted);
 }
+.block-more > summary { cursor: pointer; }
+.block-more > summary::-webkit-details-marker { display: none; }
+/* A drawn chevron: the old 11px glyph read as a dot. */
+.block-more > summary::before {
+  content: ""; flex: none; align-self: center; width: 6px; height: 6px; margin: 0 4px 0 2px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg); transition: transform .15s ease;
+}
+.block-more > summary:hover::before { border-color: var(--text); }
+.block-more[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
+/* Under a route the fold is only the full pool list, so it reads as a small
+   link rather than as the card's headline. */
+.block-more.minor > summary { padding: 0 16px 12px; font-size: 13px; }
 
 /* ---- the route: to scale from the first job, see renderRoute ---- */
 .block-route { padding: 0 16px 10px; }
@@ -453,7 +466,7 @@ table.peers.aligned { table-layout: fixed; }
 .kinds.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 /* Under the name in every group, also where a short list would fit beside it
    (Manual). Folded, the count alone stands beside the name. */
-.group-card .group-head > .kinds.chips:not(.head-count) { flex-basis: 100%; }
+.group-card:not(.folded) .group-head > .kinds.chips:not(.head-count) { flex-basis: 100%; }
 .chips .chip { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; line-height: 1.5; }
 .chips .chip i { font-style: normal; color: var(--text); font-weight: 600; margin-right: 3px; }
 .kinds.chips .kind-pick { cursor: pointer; font: inherit; font-size: 12px; }
@@ -691,9 +704,9 @@ button.b-peer:hover { text-decoration-style: solid; }
 .cards.cards table tr td.k-kind > small.card-line.unfiltered { display: none; }
 .cards.cards table tr td.k-kind > small.card-line { display: block; max-width: none; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* The legend folds to its title on a tap and stays so on this device. The
-   other cards stay open since the tabs (22.11.2026). The chevron: down while
-   open, right while folded. */
+/* Every card folds to its title on a tap and stays so on this device; open
+   unless the reader closed it (28.10.2026). The chevron is the same as
+   Storage's: down while open, right while folded. */
 .fold-title { cursor: pointer; user-select: none; -webkit-user-select: none; }
 .fold-title::before {
   content: ""; flex: none; width: 6px; height: 6px; margin: 0 2px 0 1px;
@@ -708,6 +721,9 @@ button.b-peer:hover { text-decoration-style: solid; }
    enough to undo the panels' button look. */
 .fold-title > button.fold-btn { all: unset; display: inline-flex; align-items: center; flex-wrap: inherit; gap: inherit; min-width: 0; }
 .fold-title > button.fold-btn:hover { filter: none; }
+.group-card.folded { padding-bottom: 14px; }
+.group-card.folded > :not(.group-head),
+.group-card.folded .group-head > :not(h2, .head-count) { display: none; }
 .map-head { flex: 1 1 100%; margin: 0; padding: 12px 16px; font-size: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
 /* The filters in the map's head, right-aligned, in the body's type. */
 .map-head { flex-wrap: wrap; }
@@ -718,8 +734,10 @@ button.b-peer:hover { text-decoration-style: solid; }
 body { padding-bottom: var(--bars-h, 0px); }
 .bottom-bars { position: fixed; z-index: 40; left: 0; right: 0; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px; pointer-events: none; }
 .bottom-bars > .banner { pointer-events: auto; width: 100%; max-width: 720px; box-sizing: border-box; box-shadow: 0 6px 20px rgba(0, 0, 0, .45); }
+.map-card.folded > :not(.map-head) { display: none; }
 /* A folded card opens with a tap anywhere on it. */
-.card.folded { cursor: pointer; }
+.card.folded, details.card.panel:not([open]), .block-card:has(> .block-more:not([open]):not([hidden])) { cursor: pointer; }
+.map-card.folded .map-head { border-bottom: 0; }
 
 /* The open inbound list keeps its name and the way back at the top. */
 .stick { position: sticky; top: 0; z-index: 6; height: 0; }
@@ -748,11 +766,13 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* First/Blocks: the count in the row's own weight. It outlasts ping and connected on a narrowing table and
    goes with the net; never on a phone card. */
 .peers td.k-first { white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* "46 of 100" over a thin bar for the share (21.11.2026). The bar sits on the cell's second line, where the
-   other columns have their grey line, so a row is no taller. */
+/* "46 of 100" (21.11.2026). */
 .peers td.k-first .first-of { color: var(--muted); font-weight: 400; font-size: 12px; }
-.peers td.k-first .first-bar { display: block; width: 72px; height: 3px; margin: 6px 0 0 auto; border-radius: 2px; background: #1f2a35; overflow: hidden; }
-.peers td.k-first .first-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+/* A phone card: "82× first" under the end of the pill, on the address line's baseline (22.11.2026). Nowhere else in the kind cell. */
+.peers .kind-head > .kind-first { display: none; }
+.cards.cards table tr td.k-kind .kind-head > .kind-first { display: block; position: absolute; right: 0; top: calc(100% - 1.5px); font-size: 12px; line-height: 1.3; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The address line under it ends 8px short of it, and only where it would reach it (--addr-max, 7-tables.js). */
+.cards.cards table tr td.k-peer .who-text > small { max-width: var(--addr-max, none); }
 .scroll.scroll[data-drops="3"] .k-first, .scroll.scroll[data-drops="4"] .k-first,
 .cards.cards table tr td.k-first { display: none; }
 /* The buttons for a peer, under the three blocks of its panel, at the right. */
@@ -818,6 +838,7 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* The count chip makes this head 34px, so 2px less around it: its middle line
    is the same as every other head. */
 .group-card { padding-top: 14px; }
+.group-card.folded { padding-bottom: 14px; }
 .group-head { min-height: 30px; }
 
 /* The legend box. */
@@ -858,8 +879,12 @@ body { padding-bottom: var(--bars-h, 0px); }
    its name could not be read as belonging to it. */
 .block-more .block-body { max-width: 560px; }
 
-/* The pool list's title, in small caps like the other headings on the card. */
-.block-body h3.pool-head { margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+/* The pool list folds like every <details>: its title in the small caps of
+   the other headings in Details, a chevron in front. */
+.pool-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 10px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.pool-fold > summary::-webkit-details-marker { display: none; }
+.pool-fold > summary::before { content: ""; flex: none; width: 5px; height: 5px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s ease; }
+.pool-fold[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
 
 /* ======== Panels: the hero tiles, the banners and the cards under the peer list ======== */
 
@@ -876,7 +901,33 @@ body { padding-bottom: var(--bars-h, 0px); }
   font-size: 15px;
   color: var(--text);
 }
-/* Slot Fill, Traffic and Data: 14px between title and every part. */
+/* Data: a <details>, closed by default. The arrow is drawn as a
+   chevron: an 11px glyph read as a dot. */
+details.card.panel summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+details.card.panel summary::-webkit-details-marker { display: none; }
+details.card.panel summary h2 { margin: 0; flex: 1; }
+details.card.panel summary::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform .15s ease;
+}
+details.card.panel summary:hover::before { border-color: var(--text); }
+details.card.panel[open] summary::before { transform: translateY(-2px) rotate(45deg); }
+details.card.panel > *:not(summary) { margin-top: 14px; }
+/* Slot Fill and Traffic do not fold, and keep the spacing of the panels
+   that do. */
 .card.panel.spaced > h2 { margin-bottom: 0; }
 .card.panel.spaced > *:not(h2) { margin-top: 14px; }
 .hero-card .stat-grid {
@@ -1341,7 +1392,7 @@ body { padding-bottom: var(--bars-h, 0px); }
   .hero-card .hero-stat { grid-column: 1 / -1; }
 }
 /* Headings: what follows the name is quiet, not bold. */
-.card.panel h2 .hint { font-weight: 400; font-size: 13px; margin-left: 4px; }
+.card.panel h2 .hint, details.card.panel summary h2 .hint { font-weight: 400; font-size: 13px; margin-left: 4px; }
 .card.panel h3 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
 .card.panel h3 .hint { font-weight: 400; margin-left: 4px; }
 /* Tables */
@@ -1380,21 +1431,25 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* The same for the other small controls (21.11.2026: under 32 px on a phone). Grown up and down only, so
    buttons side by side do not take each other's taps. */
 .map-card .map-legend .legend-pick, .b-peer, .rt-switch > button, .region-pick, .panel button.secondary,
-.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .footer-source { position: relative; }
+.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .pool-fold > summary, .footer-source { position: relative; }
 .map-card .map-legend .legend-pick::after { content: ""; position: absolute; inset: -8px 0; }
 .b-peer::after { content: ""; position: absolute; inset: -6px 0; }
 .rt-switch > button::after { content: ""; position: absolute; inset: -5px 0; }
 .region-pick::after { content: ""; position: absolute; inset: -5px 0; }
 .panel button.secondary:not(table button)::after { content: ""; position: absolute; inset: -4px 0; }
 #zoomIn::after, #zoomOut::after, #zoomReset::after { content: ""; position: absolute; inset: -3px; }
+.pool-fold > summary::after { content: ""; position: absolute; inset: -8px 0; }
 .footer-source::after { content: ""; position: absolute; inset: -9px 0; }
-@keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } }
 /* Buttons change state softly. */
 :is(.panel, .pd-actions) button.secondary, :is(.panel, .pd-actions) .action-slot { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+/* What the storage card opens fades in. */
+.panel #storage-card[open] > :not(summary) { animation: fade-in .18s ease-out; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } }
 /* A peer that has just connected lights up once. */
 /* Scrolling back up on a phone: the sections, a tap away. */
 @media (prefers-reduced-motion: reduce) {
   :is(.panel, .pd-actions) button.secondary, :is(.panel, .pd-actions) .action-slot { transition: none; }
+  .panel #storage-card[open] > :not(summary) { animation: none; }
 }
 /* Column headings stay in view over a long table (not as cards). */
 @media (min-width: 601px) {
@@ -1452,7 +1507,21 @@ body { padding-bottom: var(--bars-h, 0px); }
    opened row with Remove. */
 .panel .off-tag { margin-left: 6px; padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; font-size: 11px; font-weight: 500; color: var(--muted); vertical-align: 1px; }
 .panel #pool-table tr.pool-off td:not(:first-child, .pool-enabled, :last-child) { opacity: .5; }
-.card.panel > h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+/* Every card folds to its title on a tap and stays so on this device; open
+   unless the reader closed it (28.10.2026). The chevron is Storage's. */
+.card.panel h2.fold-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.card.panel h2.fold-title::before {
+  content: ''; flex: none; width: 7px; height: 7px; margin: 0 4px 0 2px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg); transition: transform .15s ease;
+}
+.card.panel.folded h2.fold-title::before { transform: rotate(-45deg); }
+.card.panel h2.fold-title:hover::before { border-color: var(--text); }
+.card.panel h2.fold-title:has(> .fold-btn:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.card.panel h2.fold-title .hint { margin-left: 0; }
+.card.panel.folded > :not(h2) { display: none; }
+.card.panel.folded h2 { margin-bottom: 0; }
+.card.panel:not(.folded) .fold-sum { display: none; }
 /* Below 360 px four numbers do not fit a pool card: the average goes, the
    last block stays (04.11.2026). */
 @media (max-width: 359px) {
@@ -1464,8 +1533,12 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* The same head as every other card on the page. Here, after the base rules
    above, so they win. */
 .card.panel { padding-top: 16px; }
-.card.panel > h2 { min-height: 30px; }
-.card.panel h2 .hint { margin: 0; font-size: 12px; }
+.card.panel.folded, details.card.panel:not([open]) { padding-bottom: 16px; }
+.card.panel > h2.fold-title, details.card.panel > summary { min-height: 30px; }
+.card.panel h2 .hint, details.card.panel summary h2 .hint { margin: 0; font-size: 12px; }
+details.card.panel summary { gap: 8px; }
+details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6px; }
+.card.panel h2.fold-title::before { margin: 0 2px 0 1px; width: 6px; height: 6px; }
 
 
 /* Slot Fill: the candidates tried since a slot came free, under the top row
@@ -1494,33 +1567,3 @@ body { padding-bottom: var(--bars-h, 0px); }
 .panel .region-pick.on { background: var(--accent); border-color: var(--accent); color: #1a1200; }
 .panel .region-pick.on b { color: #1a1200; }
 .panel .region-pick:disabled { opacity: .45; cursor: default; }
-
-/* --- Tabs (21.11.2026) ---
-   Under the block height and the counts, the sections one at a time: the page was long and most of it is
-   seldom needed. The active one is underlined in the accent colour; Slot Fill and Stratum Race say on or off. */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 4px 0 16px; overflow-x: auto; scrollbar-width: none; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs button { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; flex: none;
-  padding: 12px 12px 11px; color: var(--muted); font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
-.tabs button:hover { color: var(--text); }
-.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
-.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
-.tabs svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.tabs .short { display: none; }
-.tab-state { font-size: 11px; line-height: 1; padding: 3px 6px; border-radius: 5px; background: #1a2430; color: var(--muted); }
-.tab-state:empty { display: none; }
-.tab-state.on { background: rgba(63,185,80,.15); color: var(--good); }
-.tab-off { display: none !important; }
-@media (max-width: 600px) {
-  .tabs { gap: 0; margin-left: -4px; margin-right: -4px; }
-  .tabs button { padding: 12px 8px 11px; gap: 6px; font-size: 13px; }
-  .tabs .long { display: none; }
-  .tabs .short { display: inline; }
-}
-/* All five on a phone without sliding sideways: the icons go first, the words stay. */
-@media (max-width: 440px) {
-  .tabs { justify-content: space-between; }
-  .tabs svg { display: none; }
-  .tabs button { padding: 12px 6px 11px; gap: 5px; }
-}
-@media (max-width: 359px) { .tabs button { padding: 12px 4px 11px; font-size: 12px; } .tab-state { padding: 3px 4px; } }
