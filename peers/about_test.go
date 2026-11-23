@@ -382,7 +382,9 @@ func TestAboutReadsTheBareName(t *testing.T) {
 		"/Satoshi:28.0.0(neutrino)/":                      "",
 		"/Satoshi:28.1.0(FutureBit-Apollo-Node)/":         "A node on FutureBit Apollo",
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/":   "Named like PyBLOCK",
-		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "PyBLOCK, a node dashboard",
+		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Named like PyBLOCK",
+		"/Satoshi:28.1.0(PyBLOCK Crew)/":                  "PyBLOCK, a node dashboard",
+		"/Satoshi:29.1.0/Knots:20250903/PyBLOCK":          "PyBLOCK, a node dashboard",
 		// No name: no sentence, whatever the version says.
 		"/:monitor/": "",
 		"/:electrs/": "",

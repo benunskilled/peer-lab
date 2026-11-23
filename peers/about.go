@@ -31,6 +31,13 @@ var aboutRules = []aboutRule{
 	// sipa/bitcoin-seeder, L97 at 92d2b46). Any other name with "seeder" in it
 	// only says so.
 	{regexp.MustCompile(`^/bitcoin-seeder:`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from", "DNS seeder", ""},
+	// generic-seeder: sAppName "generic-seeder" (main.cpp L23), sent as
+	// "/generic-seeder/" (bitcoin.cpp L80) in team-exor/generic-seeder, a seeder
+	// for Bitcoin and coins cloned from it (checked 23.11.2026).
+	{regexp.MustCompile(`^/generic-seeder/`), "generic-seeder, a DNS seeder for Bitcoin and coins cloned from it", "generic-seeder", ""},
+	// ua = b"\x10/mrm-census:0.2/" (crawler.py L40 in toomanymao/mrm-node-census,
+	// commit 230796b of 26.07.2026, checked 23.11.2026).
+	{regexp.MustCompile(`^/mrm-census:`), "mrm-node-census, a small crawler that maps reachable nodes, onion ones too", "mrm-node-census crawler", ""},
 	{regexp.MustCompile(`(?i)seeder|dnsseed`), "Named like a DNS seeder, which collects addresses of reachable nodes for new nodes to start from", "Named like a DNS seeder", ""},
 	// BTC Nodes (btcnodes.io), Rodrigo Martínez's successor to Bitnodes
 	// (bitcointalk.org topic 5582226). Its public crawler config still says
@@ -125,11 +132,11 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/bitcoinkernel-node:`), "bitcoinkernel-node, a small full node built on libbitcoinkernel, Core's validation engine as a library", "bitcoinkernel-node", ""},
 	{regexp.MustCompile(`(?i)^/satd:`), "satd, a Bitcoin full node written in Rust that works like Core", "satd node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network", "tbcd, Hemi's daemon", ""},
-	// Not Hemi's own: "soak" is nowhere in hemilabs/heminetwork, and Hemi's
-	// developers describe a "/btcwire:0.5.0/hemi-soak:1.0/ fleet peer" that fed
-	// their node headers with no work (PR #1174 in hemilabs/heminetwork,
-	// September 2026; bnoc.xyz/t/170).
-	{regexp.MustCompile(`(?i)hemi-soak`), "Named like a Hemi soak test; it is not in Hemi's code", "Named like hemi-soak", ""},
+	// "soak" is nowhere in hemilabs/heminetwork. Hemi's developers describe a
+	// "/btcwire:0.5.0/hemi-soak:1.0/ fleet peer" that served a partner's node a
+	// fork of ~2,100 headers with no work (PR #1174 in hemilabs/heminetwork,
+	// merged 16.09.2026; bnoc.xyz/t/170), but do not say who runs it.
+	{regexp.MustCompile(`(?i)hemi-soak`), "Named like a Hemi soak test; Hemi's developers saw one serve their node a fork without work", "Named like hemi-soak", ""},
 	// paulscode's release of 28.10.2026, Knots carried on after it hard-forked
 	// to BLAKE2b: src/clientversion.cpp at tag v31.1.knots-sha256.20261018 in
 	// paulscode/knots-sha256 (not on master).
@@ -353,8 +360,11 @@ var aboutRules = []aboutRule{
 	// (install-full-node.sh in curly60e/pyblock at 3d8be3a, deleted in June
 	// 2026; still in PyBLOCK-Bitcoin/pyblock). "(PyBLOCK-POOL)" is in no
 	// source: a label its operator chose, and its kind is Pool node.
-	{regexp.MustCompile(`\(PyBLOCK-POOL\)`), "Named like PyBLOCK, a node dashboard", "Named like PyBLOCK", ""},
-	{regexp.MustCompile(`(?i)\(PyBLOCK|pyblock`), "PyBLOCK, a node dashboard", "PyBLOCK dashboard", ""},
+	// Only those two are PyBLOCK's own (23.11.2026): "(PyBLOCK Crew)" and
+	// PyBLOCK appended at the end. Any other bracket, "(PyBLOCK-BIP110)" too,
+	// an operator may write by hand.
+	{regexp.MustCompile(`\(PyBLOCK Crew\)|PyBLOCK/?$`), "PyBLOCK, a node dashboard", "PyBLOCK dashboard", ""},
+	{regexp.MustCompile(`(?i)\(PyBLOCK|pyblock`), "Named like PyBLOCK, a node dashboard", "Named like PyBLOCK", ""},
 	// Projects whose name matches; none of them publishes the exact string,
 	// so "Named like".
 	// Urbit reaches Bitcoin through its %btc-provider (github.com/urbit/urbit);
@@ -464,6 +474,11 @@ var aboutRules = []aboutRule{
 	// 0xB10C's list of 15.05.2023, what he saw, not their code (entities.toml
 	// in bitcoin-noc/network-entities, formerly banlist): "Names".
 	{regexp.MustCompile(`^/connector/$`), "DaeConn, a research tool that measures the networks of Bitcoin and its forks", "DaeConn research tool", ""},
+	// nodes.mom.market: MOM.market is Multiven's marketplace, and Multiven said
+	// in March 2018 it monitored Bitcoin nodes (via nodes.multiven.io); nothing
+	// names this subdomain or its crawler. bitcoinstats.com: Christian Decker
+	// runs its DNS seed crawler (delvingbitcoin.org, 01.03.2024), but no source
+	// sets this name (GPT research, 23.11.2026).
 	{regexp.MustCompile(`^/nodes\.mom\.market:`), "Named like nodes.mom.market, a site that monitors Bitcoin nodes", "Named like mom.market", ""},
 	{regexp.MustCompile(`^/btcwire:[^/]*/bitcoinstats\.com:`), "Named like bitcoinstats.com, a site with statistics on the Bitcoin network", "Named like bitcoinstats", ""},
 	// btcd's wire library with the app name after it left empty.
