@@ -111,7 +111,12 @@ const purityByBitsAbout = "Bitcoin Purity under a bare Core name (its -uaspoof=1
 // header past about 961,000 while the node was thousands of blocks further;
 // the other two, a home-built node, were at the tip. synced is the peer's
 // synced_headers (nil or -1 while unknown), tip the highest of any peer.
-func forkOf(services []string, kind string, synced *int64, tip int64) (string, string) {
+//
+// satd gives bit 28 a meaning of its own, NODE_INTACT_BLOCKS: a pruned node
+// that still serves every intact block (-pruneopreturnpeers=intact;
+// node/src/net/peer.rs L7-13 in epochbtc/satd, release notes 0.7.0, checked
+// 23.11.2026). From a peer saying "/satd:" the bit is that, not BLAKE2b.
+func forkOf(subver string, services []string, kind string, synced *int64, tip int64) (string, string) {
 	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
 		return "", ""
 	}
@@ -123,7 +128,7 @@ func forkOf(services []string, kind string, synced *int64, tip int64) (string, s
 		has[s] = true
 	}
 	switch {
-	case has[blake2bService]:
+	case has[blake2bService] && !strings.HasPrefix(strings.ToLower(subver), "/satd:"):
 		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is probably on a chain of its own, not yours"
 	case has[reducedDataService]:
 		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which probably put it on a chain of its own, not yours"

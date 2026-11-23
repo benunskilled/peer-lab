@@ -594,7 +594,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			// gives the same reason live as from the record.
 			forkKind = "Other"
 		}
-		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, forkKind, r.SyncedHeaders, tip)
+		p.Fork, p.ForkWhy = forkOf(r.Subver, r.ServicesNames, forkKind, r.SyncedHeaders, tip)
 		if r.MinFeeFilter != nil && r.BytesRecvPerMsg["feefilter"] > 0 {
 			v := math.Round(*r.MinFeeFilter*1e5*10) / 10
 			p.MinFee = &v

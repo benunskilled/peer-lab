@@ -122,6 +122,9 @@ var kindRules = []struct {
 	// Koyn's header tool says "/bitcoinj:0.14.7/PeerMonitor:1.0/" (Main.java in
 	// elkrem/koyn-sync): a light client, not a crawler, whatever "monitor" says.
 	{"Other light client", regexp.MustCompile(`/PeerMonitor:`), false},
+	// satd in crawler mode says so only in brackets (about.go): a rule that asks
+	// for a bracket itself reads it (classify).
+	{"Crawler", regexp.MustCompile(`(?i)^/satd:[^/(]*\(crawler`), false},
 	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/BTC-Nodes:[^/]*/Probe/|^/btc-peers:|^/bitcoin-peers:|^/logos-peer-list:|^/bip110-observer:|^/nodes\.mom\.market:|^/btcwire:[^/]*/bitcoinstats\.com:|^/open-nodes:|^/btz:|^fluxture$|^/buidl-bootcamp/|/HTTPSeed:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
@@ -208,7 +211,7 @@ var kindRules = []struct {
 	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
 	// names, "/BTC-Nodes:<date>/Sonar/" and ".../Probe/", are caught as a
 	// crawler first.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus):|/utreexod:|^StratisNode:`), true},
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus|bridge):|/utreexod:|^StratisNode:`), true},
 	// GrayersDad: see its line in about.go.
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots|^/GrayersDad:`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
@@ -325,7 +328,7 @@ func classify(subver string) (string, bool) {
 		s := subver
 		if r.name == "Pool node" {
 			s = mempoolWord.ReplaceAllString(subver, "")
-		} else if readsBareName[r.name] {
+		} else if readsBareName[r.name] && !strings.Contains(r.re.String(), `\(`) {
 			s = bare
 		}
 		if r.re.MatchString(s) {

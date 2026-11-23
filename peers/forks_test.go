@@ -42,9 +42,17 @@ func TestForkBits(t *testing.T) {
 		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
 		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
 	} {
-		if got, why := forkOf(c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
+		if got, why := forkOf("", c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
 			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
 		}
+	}
+	// satd's bit 28 is NODE_INTACT_BLOCKS, not BLAKE2b; its bit 27 would still count.
+	intact := []string{"WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^28]"}
+	if got, _ := forkOf("/satd:0.7.2/", intact, "Node (other)", nil, 0); got != "" {
+		t.Errorf("satd with intact blocks: got %q", got)
+	}
+	if got, _ := forkOf("/Satoshi:29.4.1/Knots:20260508/", intact, "Node (Knots)", nil, 0); got != "BLAKE2b fork" {
+		t.Errorf("Knots with bit 28: got %q", got)
 	}
 	// Headers decide when they are known: at the tip it is this chain, stuck
 	// thousands of blocks back it is not, and -1 (not yet known) leaves the bit.
@@ -54,7 +62,7 @@ func TestForkBits(t *testing.T) {
 		want   string
 	}{{972597, ""}, {972591, ""}, {972590, "BIP110 fork"}, {961170, "BIP110 fork"}, {-1, "BIP110 fork"}} {
 		h := c.synced
-		if got, _ := forkOf(bip110, "Other", &h, 972597); got != c.want {
+		if got, _ := forkOf("", bip110, "Other", &h, 972597); got != c.want {
 			t.Errorf("synced %d at tip 972597: got %q, want %q", c.synced, got, c.want)
 		}
 	}

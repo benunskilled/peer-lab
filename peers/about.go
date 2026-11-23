@@ -106,6 +106,12 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/bitcoin-peers:`), "bitcoin-peers, a Rust toolkit to connect to and survey Bitcoin peers", "bitcoin-peers crawler", ""},
 	{regexp.MustCompile(`^/logos-peer-list:`), "Logos peer list, a crawler that checks onion peers for the Logos wallet", "Logos peer list", ""},
 	{regexp.MustCompile(`^/mako:`), "mako, a Bitcoin full node written in C", "mako node (C)", ""},
+	// let ua = b"/bip110-crawler:0.1.0/" (src/p2p.rs L421 in
+	// donaldevine/bip110-crawler at f412989, checked 23.11.2026).
+	{regexp.MustCompile(`^/bip110-crawler:`), "bip110-crawler, a crawler that checks which peers follow BIP-110", "bip110-crawler", ""},
+	// Castor, Floresta's Utreexo bridge, answers with "/bridge:0.1.3/" (src/node.rs
+	// L1541 in getfloresta/castor at 6713d5b, checked 23.11.2026).
+	{regexp.MustCompile(`^/bridge:`), "Castor, Floresta's Utreexo bridge: serves Utreexo proofs to other nodes", "Castor Utreexo bridge", ""},
 	{regexp.MustCompile(`(?i)^/bip110-observer:`), "BIP-110 Observer, a crawler that collects peer user agents and advertised services", "BIP-110 Observer crawler", ""},
 	// Only the name points to favillakey.io; the site documents no P2P
 	// connections, so the kind stays Other.
@@ -130,6 +136,9 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/BitcoinMachineCode:`), "Bitcoin Machine Code, a node written in x86 assembly, entirely AI-generated", "Bitcoin Machine Code node", ""},
 	{regexp.MustCompile(`(?i)^/kernel-node:`), "kernel-node, a node built on libbitcoinkernel, Core's validation engine as a library", "kernel-node (Core kernel)", ""},
 	{regexp.MustCompile(`(?i)^/bitcoinkernel-node:`), "bitcoinkernel-node, a small full node built on libbitcoinkernel, Core's validation engine as a library", "bitcoinkernel-node", ""},
+	// satd's crawl sessions say "/satd:<version>(crawler)/" (user_agent in
+	// node/src/net/crawl.rs in epochbtc/satd at c3be00a, checked 23.11.2026).
+	{regexp.MustCompile(`(?i)^/satd:[^/(]*\(crawler`), "satd in crawler mode: maps reachable nodes", "satd crawler", ""},
 	{regexp.MustCompile(`(?i)^/satd:`), "satd, a Bitcoin full node written in Rust that works like Core", "satd node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network", "tbcd, Hemi's daemon", ""},
 	// "soak" is nowhere in hemilabs/heminetwork. Hemi's developers describe a

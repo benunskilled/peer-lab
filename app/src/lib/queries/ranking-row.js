@@ -7,10 +7,12 @@
 // the bit shared no header past about 961,000. tip is the highest
 // synced_headers of any live peer; a peer not live keeps the bit alone.
 const FORK_TIP_SLACK = 6;
-function otherChainOf(services, syncedHeaders = null, tip = 0) {
+// satd's bit 28 is NODE_INTACT_BLOCKS, a pruned node serving every intact
+// block (peers/forks.go forkOf): from a peer saying "/satd:" it is no fork.
+function otherChainOf(services, syncedHeaders = null, tip = 0, agent = '') {
   const list = typeof services === 'string' ? services.split(',') : [];
   if (syncedHeaders != null && syncedHeaders >= 0 && tip > 0 && tip - syncedHeaders <= FORK_TIP_SLACK) return null;
-  if (list.includes('UNKNOWN[2^28]')) return 'BLAKE2b fork';
+  if (list.includes('UNKNOWN[2^28]') && !/^\/satd:/i.test(agent || '')) return 'BLAKE2b fork';
   if (list.includes('UNKNOWN[2^27]')) return 'BIP110 fork';
   return null;
 }
@@ -174,7 +176,7 @@ function mapRankingRow(now, graceFrom = 0, liveTip = 0) {
       // 29.x-knots branch): 27 ReducedData, the BIP110 chain, 28 the BLAKE2b
       // hard fork. Such a peer cannot deliver a block of this chain. Peer
       // Map's forkOf says the same.
-      otherChain: otherChainOf(r.services, r.liveDirection ? r.syncedHeaders : null, liveTip),
+      otherChain: otherChainOf(r.services, r.liveDirection ? r.syncedHeaders : null, liveTip, r.client),
       // How long a trusted-but-not-currently-live peer has been offline -
       // Core reconnects manuals on its own, but that can fail silently
       // (peer went dark, network hiccup, slot contention) and a peer that's

@@ -267,7 +267,7 @@ function disguised(session, peers) {
 function otherChain(session, chain) {
   if (!session || !(Number(session.synced_headers) >= 0)) return null;
   const names = Array.isArray(session.servicesnames) ? session.servicesnames.join(',') : '';
-  return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks));
+  return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks), session.subver);
 }
 
 // The peer list's word on a peer (peers-service.js peerKinds: kind, fork),
