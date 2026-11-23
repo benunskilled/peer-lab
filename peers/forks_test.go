@@ -46,6 +46,18 @@ func TestForkBits(t *testing.T) {
 			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
 		}
 	}
+	// The panel names the bits Core cannot; satd's 28 and 30 are its own.
+	shown := shownServices("/satd:0.7.2/", []string{"NETWORK_LIMITED", "UNKNOWN[2^28]", "UNKNOWN[2^30]", "UNKNOWN[2^31]"})
+	if strings.Join(shown, ",") != "NETWORK_LIMITED,INTACT_BLOCKS,NAP,UNKNOWN[2^31]" {
+		t.Errorf("satd shown %v", shown)
+	}
+	shown = shownServices("/Satoshi:29.4.1/Knots:20260508/", []string{"UNKNOWN[2^27]", "UNKNOWN[2^28]", "UNKNOWN[2^30]", "UNKNOWN[2^12]"})
+	if strings.Join(shown, ",") != "REDUCED_DATA,BLAKE2B,UNKNOWN[2^30],UTREEXO" {
+		t.Errorf("Knots shown %v", shown)
+	}
+	if shownServices("", nil) != nil || shownServices("", []string{}) == nil {
+		t.Error("nil and empty must stay apart")
+	}
 	// satd's bit 28 is NODE_INTACT_BLOCKS, not BLAKE2b; its bit 27 would still count.
 	intact := []string{"WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^28]"}
 	if got, _ := forkOf("/satd:0.7.2/", intact, "Node (other)", nil, 0); got != "" {

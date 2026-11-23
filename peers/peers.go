@@ -410,7 +410,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			ConnTime: r.ConnTime, Transport: r.Transport, HBTo: r.HBTo, HBFrom: r.HBFrom,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 			TrafficSent: trafficByMessage(r.BytesSentPerMsg), TrafficRecv: trafficByMessage(r.BytesRecvPerMsg),
-			Services: r.ServicesNames, Version: r.Version,
+			Services: shownServices(r.Subver, r.ServicesNames), Version: r.Version,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
 		// is Core saying nothing. Only the first is worth showing.

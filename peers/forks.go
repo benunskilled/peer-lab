@@ -89,6 +89,37 @@ const (
 	purityService      = "UNKNOWN[2^25]"
 )
 
+// shownServices is the peer's services for the panel, with the bits Core only
+// knows as "UNKNOWN[2^n]" named after the software that defines them (checked
+// 23.11.2026): 12 and 13 BIP 183's Utreexo bits (bip183/protocol.go in
+// utreexo/utreexod; Castor sets 12 too), 25 Bitcoin Purity's, 27 BIP110's,
+// 28 Knots' BLAKE2b - or, from satd, NODE_INTACT_BLOCKS (node/src/net/peer.rs
+// in epochbtc/satd) - 29 Libre Relay's, 30 satd's NODE_NAP (nap/p2p.rs).
+// Only for showing: forkOf and the disguise rules read Core's names.
+func shownServices(subver string, services []string) []string {
+	if services == nil {
+		return nil
+	}
+	satd := strings.HasPrefix(strings.ToLower(subver), "/satd:")
+	names := map[string]string{
+		"UNKNOWN[2^12]": "UTREEXO", "UNKNOWN[2^13]": "UTREEXO_ARCHIVE",
+		purityService: "PURITY_ASERT", reducedDataService: "REDUCED_DATA",
+		blake2bService: "BLAKE2B", libreRelayService: "LIBRE_RELAY",
+	}
+	if satd {
+		names[blake2bService] = "INTACT_BLOCKS"
+		names["UNKNOWN[2^30]"] = "NAP"
+	}
+	out := make([]string, len(services))
+	for i, s := range services {
+		if n, ok := names[s]; ok {
+			s = n
+		}
+		out[i] = s
+	}
+	return out
+}
+
 // Bitcoin Purity offers bit 25 (NODE_PURITY_ASERT) beside bit 27 by default
 // (g_local_services in src/init.cpp, github.com/saltduck/bitcoinpurity at
 // 833e2f6), and only it defines bit 25 (src/protocol.h). With -uaspoof=1 its
