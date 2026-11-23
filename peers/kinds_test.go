@@ -327,7 +327,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/bip324-ts:0.0.1/":              "bip324-ts",
 		"/bread:2.1/":                    "BRD's wallet core",
 		"/breadwallet:0.6.7/":            "BRD (breadwallet)",
-		"/bitcoinj:0.16.3/Elastum:0.1z/": "Names Elastum",
+		"/bitcoinj:0.16.3/Elastum:0.1z/": "Named like Elastum",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s about: %q", subver, got)
@@ -410,9 +410,9 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/Bitcoin XT:0.11.0/":         "Bitcoin XT",
 		"/Classic:1.3.8(EB8)/":        "Bitcoin Classic",
 		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
-		"vds_0.9.53":                  "Names VDS",
+		"vds_0.9.53":                  "Named like VDS",
 		"/iriumd:1.0/":                "Irium",
-		"/cf-package-relay:0.3.0/":    "Names package relay",
+		"/cf-package-relay:0.3.0/":    "Named like package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", subver, got, want)

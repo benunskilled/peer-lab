@@ -51,12 +51,9 @@ Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawl
 It is a best guess from what one node can see, so a label can be wrong. Know better about one? [Open an issue](https://github.com/benunskilled/peer-lab/issues) and I will happily fix it.
 
 How sure a label is shows in its first words:
-- No prefix: the exact name is in the project's own code.
-- "Labelled by": a tag the project's setup adds to the name.
+- No prefix: the name is in the project's own code or setup.
 - "Probably": something technical points there, but the name alone is no proof.
-- "Named like": only the name matches a known project.
-- "Names": the name says what it wants to be; nothing else is known.
-- "Claims … / Probably …": a disguised peer, what it says and what it likely is.
+- "Named like": only the name matches.
 
 ## Where they are
 
