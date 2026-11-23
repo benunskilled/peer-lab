@@ -412,7 +412,7 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
 		"vds_0.9.53":                  "Names VDS",
 		"/iriumd:1.0/":                "Irium",
-		"/cf-package-relay:0.3.0/":    "Named after package relay",
+		"/cf-package-relay:0.3.0/":    "Names package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", subver, got, want)

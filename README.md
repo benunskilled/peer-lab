@@ -50,6 +50,14 @@ Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawl
 
 It is a best guess from what one node can see, so a label can be wrong. Know better about one? [Open an issue](https://github.com/benunskilled/peer-lab/issues) and I will happily fix it.
 
+How sure a label is shows in its first words:
+- No prefix: the exact name is in the project's own code.
+- "Labelled by": a tag the project's setup adds to the name.
+- "Probably": something technical points there, but the name alone is no proof.
+- "Named like": only the name matches a known project.
+- "Names": the name says what it wants to be; nothing else is known.
+- "Claims … / Probably …": a disguised peer, what it says and what it likely is.
+
 ## Where they are
 
 Zoom from countries down to regions and click one to filter the tables. Your connections come in three groups: the manual peers, the outbound peers Core picked for you, and the inbound peers that found you on their own.

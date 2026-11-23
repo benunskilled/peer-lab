@@ -14,11 +14,15 @@ import (
 //
 // How sure a sentence may sound, the same for every entry (13.11.2026):
 //   - plainly what it is: the exact string is in the project's source;
+//   - "Labelled by ...": the tag in brackets after Core's name is in the
+//     project's own setup (its bitcoin.conf, install script or guide);
 //   - "Probably ...": something technical points there (service bits only
 //     that software sets, a fixed name in a source) but the name alone is
 //     not proof;
 //   - "Named like ...": only the name matches a known project;
 //   - "Names ...": the name says what it is and nothing else is known.
+//
+// Under one wording, the same as README's "How sure a label is".
 //
 // What one node saw a peer do is never the evidence here: it goes in the
 // comment, with its date, and the page shows it live under the sentence.
@@ -56,6 +60,8 @@ var aboutRules = []aboutRule{
 	// config.toml (echennells/dns-seed-monitor).
 	{regexp.MustCompile(`^/btc-node-observatory:`), "Bitcoin Node Observatory, Shigeyuki Azuchi's daily census of reachable nodes", "Node Observatory census", ""},
 	{regexp.MustCompile(`^/dns-monitor:`), "dns-monitor, a tool that checks the nodes Bitcoin's DNS seeds hand out", "DNS seed monitor", ""},
+	// user_agent = "/DCTRL-YVR-seed-monitor:0.1.0/" (config.toml L14 in
+	// echennells/dns-seed-monitor, 23.11.2026).
 	{regexp.MustCompile(`^/DCTRL-YVR-seed-monitor:`), "DCTRL YVR's DNS seed monitor: checks the nodes Bitcoin's DNS seeds hand out", "DCTRL seed monitor", ""},
 	// Only the word: no source for any of these names.
 	{regexp.MustCompile(`(?i)census|survey|observatory|monitor|sonar`), "Names a node census: counts and watches reachable nodes", "Names a node census", ""},
@@ -162,7 +168,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)\((Official )?MiniBolt[ _]node\)|; MiniBolt node\)`), "Labelled by MiniBolt, a step-by-step guide to building a Bitcoin node", "MiniBolt guide node", ""},
 	// A 2017 Docker image of Bitcore set uacomment=bitcore (m00re/bitcore-docker);
 	// these run newer Core, so the text goes by the name only.
-	{regexp.MustCompile(`\(bitcore\)`), "Labelled bitcore, named like BitPay's Bitcore, an index server that runs on a node", "Labelled bitcore", ""},
+	{regexp.MustCompile(`\(bitcore\)`), "Named like BitPay's Bitcore, an index server that runs on a node", "Named like Bitcore", ""},
 	// userAgent = "/winnow:0.1/" (Sources/WalletCore/Network/Transport/
 	// PeerConnection.swift in winnowwallet/winnow).
 	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly", "Winnow iPhone wallet", ""},
@@ -278,7 +284,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/btcwire:[^/]*/[^/]+-neutrino:`), "Probably neutrino, lnd's light client, under another name: its btcwire start and its version", "Probably renamed neutrino", ""},
 	// Only the word in the name ("/neutrino-checker:0.1/", 14.11.2026): no
 	// source, so no wallet.
-	{regexp.MustCompile(`(?i)neutrino`), "Named after Neutrino, lnd's light client", "Named after Neutrino", ""},
+	{regexp.MustCompile(`(?i)neutrino`), "Named like Neutrino, lnd's light client", "Named like Neutrino", ""},
 	// "/Rust BIP-157:<version>/rust-bitcoin:<version>/" (src/network/outbound.rs
 	// in 2140-dev/kyoto).
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK", "Kyoto light client (BDK)", ""},
@@ -336,12 +342,14 @@ var aboutRules = []aboutRule{
 	// (data/experiment/final/params.py in
 	// m4ycon/cmpct-block-reconstruction-degradation).
 	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet", "p2aburn anchor sweeper", ""},
+	// strSubVer = b'/python-bitcoinlib:' + version (bitcoin/messages.py L123 in
+	// petertodd/python-bitcoinlib, 23.11.2026).
 	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes", "python-bitcoinlib", ""},
 	// PyBLOCK's install scripts set uaappend=PyBLOCK and uacomment=PyBLOCK Crew
 	// (install-full-node.sh in curly60e/pyblock at 3d8be3a, deleted in June
 	// 2026; still in PyBLOCK-Bitcoin/pyblock). "(PyBLOCK-POOL)" is in no
 	// source: a label its operator chose, and its kind is Pool node.
-	{regexp.MustCompile(`\(PyBLOCK-POOL\)`), "Labelled PyBLOCK-POOL, after PyBLOCK, a node dashboard", "Labelled PyBLOCK pool", ""},
+	{regexp.MustCompile(`\(PyBLOCK-POOL\)`), "Named like PyBLOCK, a node dashboard", "Named like PyBLOCK", ""},
 	{regexp.MustCompile(`(?i)\(PyBLOCK|pyblock`), "PyBLOCK, a node dashboard", "PyBLOCK dashboard", ""},
 	// Projects whose name matches; none of them publishes the exact string,
 	// so "Named like".
@@ -356,7 +364,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/dexcash-nodes:`), "Named like DexCash Network, a blockchain of its own", "Named like DexCash", ""},
 	// Bitnodes' crawler sends "/bitnodes.io:0.3/" (protocol.py in
 	// ayeowch/bitnodes); any other name with Bitnodes in it, /alt-bitnodes:/
-	// or /Metrika-Bitnodes:/, is only named after it.
+	// or /Metrika-Bitnodes:/, is only named like it.
 	{regexp.MustCompile(`^/bitnodes\.io:`), "Bitnodes, a public map of reachable nodes", "Bitnodes crawler", ""},
 	// alt-bitnodes: USER_AGENT in deploy/install.sh (ifuensan/alt-bitnodes),
 	// HackNodes' public node count. /bitnodes.earn.com:0.1/: the crawler of a
@@ -364,7 +372,7 @@ var aboutRules = []aboutRule{
 	// branch add_statistics; CONCORDIA, last run 2020).
 	{regexp.MustCompile(`^/alt-bitnodes:`), "alt-bitnodes, HackNodes' crawler built on Bitnodes, counting reachable nodes", "alt-bitnodes crawler", ""},
 	{regexp.MustCompile(`^/bitnodes\.earn\.com:`), "A Bitnodes crawler run for a LORIA/Inria research study", "Bitnodes (Inria study)", ""},
-	{regexp.MustCompile(`(?i)bitnodes`), "Named after Bitnodes, the public node map", "Named after Bitnodes", ""},
+	{regexp.MustCompile(`(?i)bitnodes`), "Named like Bitnodes, the public node map", "Named like Bitnodes", ""},
 	// Seen from one netcup address, offering nothing and gone after a second;
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Names itself a node map; nothing public says whose", "Names a node map", ""},
@@ -519,7 +527,7 @@ var aboutRules = []aboutRule{
 	// 01.11.2026: 23 sessions from 16 addresses, all in Cloudflare's network
 	// (AS13335), none sending BIP 331's sendpackages, gone after 11 s (median).
 	// Only the name is said: what one node saw is no rule for all of them.
-	{regexp.MustCompile(`^/cf-package-relay:`), "Named after package relay, which passes related transactions on together (BIP 331)", "Named after package relay", ""},
+	{regexp.MustCompile(`^/cf-package-relay:`), "Names package relay, which passes related transactions on together (BIP 331)", "Names package relay", ""},
 	// Bitcoin Cash clients carry its block size as "(EB8.0)" too, so they
 	// come before Classic.
 	{regexp.MustCompile(`(?i)Bitcoin ABC`), "Bitcoin ABC, a Bitcoin Cash client, eCash's node since 2020", "Bitcoin ABC (BCH)", ""},

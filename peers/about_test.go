@@ -362,7 +362,7 @@ func TestNodeSetupLabels(t *testing.T) {
 		"/Satoshi:32.0.0(Official MiniBolt node)/":       "Labelled by MiniBolt",
 		"/Satoshi:32.1.0(21M; MiniBolt node)/":           "Labelled by MiniBolt",
 		"/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/": "Labelled by MiniBolt",
-		"/Satoshi:29.0.0(bitcore)/":                      "Labelled bitcore",
+		"/Satoshi:29.0.0(bitcore)/":                      "Named like BitPay's Bitcore",
 	} {
 		if got := aboutOf(ua); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q", ua, got)
@@ -381,7 +381,7 @@ func TestAboutReadsTheBareName(t *testing.T) {
 		"/Satoshi:29.0.0(my-monitor)/":                    "",
 		"/Satoshi:28.0.0(neutrino)/":                      "",
 		"/Satoshi:28.1.0(FutureBit-Apollo-Node)/":         "Labelled by FutureBit Apollo",
-		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/":   "Labelled PyBLOCK-POOL",
+		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/":   "Named like PyBLOCK",
 		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "PyBLOCK, a node dashboard",
 		// No name: no sentence, whatever the version says.
 		"/:monitor/": "",
