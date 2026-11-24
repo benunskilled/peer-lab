@@ -15,11 +15,11 @@ import (
 //
 // The monthly check reads these lines back; see README's "How sure a label is".
 func TestEveryPlainAboutRuleHasASource(t *testing.T) {
-	b, err := os.ReadFile("about.go")
+	b, err := os.ReadFile("clients.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rule := regexp.MustCompile("^\\s*\\{regexp\\.MustCompile\\(`(.*?)`\\), \"((?:[^\"\\\\]|\\\\.)*)\"")
+	rule := regexp.MustCompile("^\\s*\\{re: regexp\\.MustCompile\\(`(.*?)`\\)(?:, kind: \"[^\"]*\")?, text: \"((?:[^\"\\\\]|\\\\.)*)\"")
 	source := regexp.MustCompile(`^\s*// Source: \S+/\S+ \S+ L\d+(-\d+)? @\S+ \(checked \d{4}-\d{2}-\d{2}\)$`)
 	lines := strings.Split(string(b), "\n")
 	plain, missing := 0, 0
@@ -38,7 +38,7 @@ func TestEveryPlainAboutRuleHasASource(t *testing.T) {
 		}
 		if !found {
 			missing++
-			t.Errorf("about.go:%d: %q says plainly what it is but has no // Source: line above it", i+1, m[1])
+			t.Errorf("clients.go:%d: %q says plainly what it is but has no // Source: line above it", i+1, m[1])
 		}
 	}
 	if plain < 150 {
@@ -47,7 +47,7 @@ func TestEveryPlainAboutRuleHasASource(t *testing.T) {
 	// Malformed source lines are as good as none.
 	for i, l := range lines {
 		if strings.Contains(l, "// Source:") && !source.MatchString(l) {
-			t.Errorf("about.go:%d: source line not in the agreed form: %s", i+1, strings.TrimSpace(l))
+			t.Errorf("clients.go:%d: source line not in the agreed form: %s", i+1, strings.TrimSpace(l))
 		}
 	}
 }
