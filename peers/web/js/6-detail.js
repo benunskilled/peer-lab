@@ -122,7 +122,7 @@
     if (p.offline) facts.appendChild(pdFact("Offline", p.offline_ms ? "for " + ago(p.offline_ms / 1000) : "now"));
     const r = rankOf(p);
     if (r && r.eligible) {
-      facts.appendChild(pdFact("First / blocks", r.first + " of " + r.eligible));
+      facts.appendChild(pdFact(r.byIp ? "First / blocks (this IP)" : "First / blocks", r.first + " of " + r.eligible));
     }
     if (r && r.sessionsCount) facts.appendChild(pdFact("Sessions", String(r.sessionsCount)));
     facts.appendChild(pdFact("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type),

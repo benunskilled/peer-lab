@@ -641,7 +641,13 @@ window.addEventListener('peerlab:list', (ev) => {
 // click on one is refused here as well, so no action goes out twice.
 const pendingPeers = new Set();
 window.peerLab = {
-  peer: (address) => rankingByAddress.get(address) || null,
+  // A live inbound peer's blocks counted over every port its IP came in from
+  // (ipFirst/ipEligible, peer-ranking.js); the ranking keeps its own.
+  peer: (address) => {
+    const r = rankingByAddress.get(address);
+    if (!r) return null;
+    return r.ipEligible ? { ...r, first: r.ipFirst || 0, eligible: r.ipEligible, byIp: true } : r;
+  },
   // The candidate Slot Fill is testing: the ranking says so (TESTING), on
   // the same clock as the list.
   onTrial: (address) => (rankingByAddress.get(address) || {}).status === 'TESTING',

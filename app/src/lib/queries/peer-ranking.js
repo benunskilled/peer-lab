@@ -55,6 +55,38 @@ function slotFillTrialAddresses() {
   }
 }
 
+// An inbound peer comes back from a new port almost every time, and each
+// ip:port is a peer of its own here, so its blocks are spread over many rows
+// and the one connected now shows little of them. For the peer list only,
+// a live inbound peer on IPv4 or IPv6 carries the totals of every address
+// of its IP that ever connected in (ipFirst, ipEligible). Never over Tor,
+// I2P, CJDNS or a local address: there every peer comes in from the same
+// proxy address. The ranking and Slot Fill keep counting per address.
+let ipTotalsStmt;
+function addIpTotals(raw, rows) {
+  if (!ipTotalsStmt) {
+    // A range on the address index: every "host:port" sorts between "host:"
+    // and "host;" (";" follows ":").
+    ipTotalsStmt = db.instance.prepare(`
+      SELECT COALESCE(SUM(prs.eligible), 0) AS eligible, COALESCE(SUM(prs.first), 0) AS first
+        FROM peer p JOIN peer_relay_stats prs ON prs.peer_id = p.id
+       WHERE p.address >= ? AND p.address < ?
+         AND EXISTS (SELECT 1 FROM peer_session s WHERE s.peer_id = p.id AND s.direction = 'inbound')`);
+  }
+  const byHost = new Map();
+  raw.forEach((r, i) => {
+    if (r.liveDirection !== 'inbound' || !['ipv4', 'ipv6'].includes(r.coreNetwork)) return;
+    const host = r.address.slice(0, r.address.lastIndexOf(':'));
+    if (!host) return;
+    if (!byHost.has(host)) byHost.set(host, ipTotalsStmt.get(`${host}:`, `${host};`));
+    const t = byHost.get(host);
+    if (t.eligible > rows[i].eligible) {
+      rows[i].ipFirst = t.first;
+      rows[i].ipEligible = t.eligible;
+    }
+  });
+}
+
 function peerRanking() {
   const now = Date.now();
   if (!peerRankingStmt) {
@@ -68,7 +100,9 @@ function peerRanking() {
   }
   const graceFrom = newManualGraceStartedAt();
   const liveTip = liveTipStmt.get()?.tip || 0;
-  const rows = peerRankingStmt.all().map(mapRankingRow(now, graceFrom, liveTip));
+  const raw = peerRankingStmt.all();
+  const rows = raw.map(mapRankingRow(now, graceFrom, liveTip));
+  addIpTotals(raw, rows);
 
   // The manual peers the slot fill has on trial (peer-rotation/fill.js): in
   // their slots, but only for good once Core has connected to them.

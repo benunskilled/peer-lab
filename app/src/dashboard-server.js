@@ -332,7 +332,7 @@ const sseClients = new Set();
 const PAGE_FIELDS = ['address', 'where', 'client', 'status', 'live', 'trusted', 'kept',
   'first', 'eligible', 'sessionsCount', 'offlineSinceMs', 'hb', 'hbFrom',
   'localUmbrelPeer', 'sourceObscured', 'privateNetwork', 'offersNothing', 'otherChain', 'cannotRelay', 'misspelt',
-  'kind', 'noRelay', 'lion', 'fork'];
+  'kind', 'noRelay', 'lion', 'fork', 'ipFirst', 'ipEligible'];
 function forThePage(row) {
   const out = {};
   for (const k of PAGE_FIELDS) {

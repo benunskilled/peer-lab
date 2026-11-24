@@ -225,6 +225,10 @@
     return e;
   };
 
+  // An inbound peer is counted over every port its IP came in from (byIp,
+  // the dashboard's peer()): it comes back from a new one almost every time.
+  const firstTitle = (r) => `First for ${r.first} of the ${r.eligible} blocks ` +
+    (r.byIp ? "this IP was connected for, over all its incoming connections." : "it was connected for.");
   // How often a peer was first, on a phone card under its pill (22.11.2026):
   // "82× first", which needs no key - a bar against the best peer did.
   // Nothing for a peer never first.
@@ -234,7 +238,7 @@
     const e = document.createElement("span");
     e.className = "kind-first";
     e.textContent = r.first.toLocaleString("en-US") + "\u00d7 first";
-    e.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+    e.title = firstTitle(r);
     return e;
   }
   const COLS = [
@@ -340,7 +344,7 @@
           const r = rankOf(p);
           const n = span("pc-x pc-first", r && r.eligible ? r.first + " of " + r.eligible : "\u2013");
           const s = span("pc-x pc-sub", "first/blocks");
-          if (r && r.eligible) n.title = s.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+          if (r && r.eligible) n.title = s.title = firstTitle(r);
           pc.append(n, s);
           pc.append(span("pc-y pc-ping", p.min_ping_ms == null ? "\u2013" : fmtPing(p.min_ping_ms)),
             span("pc-y pc-sub", p.offline ? "offline" : p.conntime ? ago(Date.now() / 1000 - p.conntime) : ""));
@@ -506,7 +510,7 @@
       of.className = "first-of";
       of.textContent = " of " + r.eligible;
       td.append(b, of);
-      td.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+      td.title = firstTitle(r);
     },
   };
   COLS.splice(COLS.findIndex((c) => c.key === "ping"), 0, FIRST_COL);
