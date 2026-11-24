@@ -398,3 +398,17 @@ func TestAboutReadsTheBareName(t *testing.T) {
 		}
 	}
 }
+
+// The hedge of an about sentence must not end up inside the claim:
+// "Claims: the wallet Elastum", not "the wallet Named like Elastum".
+func TestWalletClaimDropsHedge(t *testing.T) {
+	for about, want := range map[string]string{
+		"Named like Elastum, a former exchange; talks to nodes through bitcoinj": "the wallet Elastum",
+		"Probably Foo, a wallet":                        "the wallet Foo",
+		"Bitcoin Wallet, the Android app by Schildbach": "the wallet Bitcoin Wallet",
+	} {
+		if got := walletClaim(about); got != want {
+			t.Errorf("walletClaim(%q) = %q, want %q", about, got, want)
+		}
+	}
+}

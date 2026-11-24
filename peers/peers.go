@@ -446,8 +446,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):
 			claim := claimOf(r.Subver)
 			if p.About != "" {
-				claim, _, _ = strings.Cut(p.About, ",")
-				claim = "the wallet " + claim
+				claim = walletClaim(p.About)
 			}
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+bitcoinjWhy(r, now)
 		case p.Kind == fakeWalletKind:

@@ -596,6 +596,17 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`\(EB[0-9]`), "Probably a big-block client: \"EB\" is the block size it accepts", "Probably big-block client", ""},
 }
 
+// walletClaim is the wallet a peer's name claims, from its about sentence:
+// "Named like Elastum, a former exchange; ..." claims "the wallet Elastum".
+// The hedge belongs to the sentence, not to the claim.
+func walletClaim(about string) string {
+	name, _, _ := strings.Cut(about, ",")
+	for _, hedge := range []string{"Named like ", "Probably "} {
+		name = strings.TrimPrefix(name, hedge)
+	}
+	return "the wallet " + name
+}
+
 // fakeAbout says, for a disguised peer, what it claims and what it probably is. The
 // claim comes from its user agent, the guess from what Core observed of it -
 // the one part nobody can write into a string.
@@ -609,8 +620,7 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 		// The library without an app name claims bitcoinj, not Core or a wallet.
 		claim = claimOf(subver)
 	} else if wallet {
-		claim, _, _ = strings.Cut(walletAbout, ",")
-		claim = "the wallet " + claim
+		claim = walletClaim(walletAbout)
 	}
 	var guess string
 	blocks, v2 := false, false
