@@ -131,6 +131,6 @@ MIT, see [LICENSE](LICENSE).
 - Geolocation and operators: [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0
 - World map: [Natural Earth](https://www.naturalearthdata.com), public domain
 - Tor exits: the Tor Project's [bulk exit list](https://check.torproject.org/torbulkexitlist)
-- Mining pools: [bitcoin-data/mining-pools](https://github.com/bitcoin-data/mining-pools), MIT
+- Mining pools: [mempool/mining-pools](https://github.com/mempool/mining-pools) and [bitcoin-data/mining-pools](https://github.com/bitcoin-data/mining-pools), MIT
 
 Versions and update steps: [peers/geo/SOURCE.md](peers/geo/SOURCE.md), [peers/asn/SOURCE.md](peers/asn/SOURCE.md), [peers/torexit/SOURCE.md](peers/torexit/SOURCE.md), [app/src/data/](app/src/data/).
