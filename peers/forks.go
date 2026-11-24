@@ -64,10 +64,13 @@ func libreRelay(subver string, services []string) (kind, about, label string) {
 	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it", "Libre Relay or Garbageman"
 }
 
-// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h on
-// its 29.x-knots branch; Oracle Knots sets bit 28 too, MarcanoFilms/oracle-knots): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
+// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h;
+// bit 28 in its releases since 29.4.1.knots20260508, 02.09.2026, whose notes
+// say "knots#359 Hardfork: New BLAKE2b proof-of-work algorithm" - every
+// Knots since follows that chain; Oracle Knots sets bit 28 too, MarcanoFilms/oracle-knots): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
 // ReducedData rules, bit 28 NODE_BLAKE2B, a node enforcing a hard fork to
 // BLAKE2b proof of work (and ReducedData). Core lists them as UNKNOWN[2^n].
+// Source: bitcoinknots/bitcoin src/protocol.h L351-355 @v29.5.1.knots20260508 (checked 2026-11-24)
 // In peer-observer's record of the node this was written for, 21. to
 // 25.10.2026, with that node at height 973,026: 898 sessions offering bit 28
 // from 406 addresses reported start heights around 978,000, a chain of their

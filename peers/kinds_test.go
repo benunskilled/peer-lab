@@ -424,7 +424,7 @@ func TestOtherChainAbouts(t *testing.T) {
 // them do, nor a fixed sentence: the session decides what is said. A name
 // that says what it is does get the kind it names.
 func TestNoKindFromOneNode(t *testing.T) {
-	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Natasha:1.0/"} {
+	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/"} {
 		if got := kindOf(ua); got != "Other" {
 			t.Errorf("%s: kind %q, want Other", ua, got)
 		}

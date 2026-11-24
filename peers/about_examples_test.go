@@ -48,6 +48,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/rbtc:0.1.0/", "Node (other)"},
 	{"/BitcoinEcho:0.1.0/", "Node (other)"},
 	{"/exnode:0.1.0/", "Node (other)"},
+	{"/Natasha:0.2.0/", "Node (other)"},
 	{"/therealbitcoin.org:0.9.99.99/", "Node (other)"},
 	{"/BitcoinMachineCode:0.1.0/", "Node (other)"},
 	{"/kernel-node:0.1.0/", "Node (other)"},

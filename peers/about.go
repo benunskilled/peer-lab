@@ -175,6 +175,12 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/BitcoinMachineCode:`), "Bitcoin Machine Code, a node written in x86 assembly, entirely AI-generated", "Bitcoin Machine Code node", ""},
 	// Source: brunoerg/exnode lib/exnode/node.ex L306 @241d057 (checked 2026-11-24)
 	{regexp.MustCompile(`(?i)^/exnode:`), "exnode, a Bitcoin full node written in Elixir that checks scripts with Bitcoin Core's kernel library", "exnode (Elixir node)", ""},
+	// Comb Downloader NG, the Haircomb wallet's block fetcher, says
+	// "/Natasha:<its version>/" only with -natasha ("Useful for servers",
+	// main.go L63); without it, "/Satoshi:29.0.0/" (util.go L8-9). Its source
+	// is on Codeberg, read here from the Go module proxy's copy.
+	// Source: codeberg.org/watashi564/combdownloader-ng main.go L81-82 @698cc05 (checked 2026-11-24)
+	{regexp.MustCompile(`^/Natasha:`), "Comb Downloader NG in server mode: fetches Bitcoin blocks and headers for the Haircomb wallet and passes them on", "Comb Downloader (Natasha)", ""},
 	// Source: kernel-node/kernel-node src/net/peer.rs L470 @ac5ad5c (checked 2026-11-24)
 	{regexp.MustCompile(`(?i)^/kernel-node:`), "kernel-node, a node built on libbitcoinkernel, Core's validation engine as a library", "kernel-node (Core kernel)", ""},
 	// Source: yuvicc/bitcoinkernel-node src/node/p2p.cpp L104 @0d3d474 (checked 2026-11-24)
