@@ -441,7 +441,13 @@ var aboutRules = []aboutRule{
 	// line. Its version 0.9.99.99 is TRB's 99999, so it is likely a TRB
 	// descendant; nothing public says it sends this name.
 	{regexp.MustCompile(`^/jwrd\.net:`), "Named like JWRD Computing's own bitcoind, a fork of an early version", "Named like JWRD", ""},
-	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do", "MIT's Pool Detective", "Pool Detective"},
+	// btcd's wire library with "Satoshi" put after it: two monitors do that,
+	// each with its own version, so only the version tells them apart.
+	// Source: mit-dci/pooldetective blockobserver/coinparam/bitcoin.go L96-97 @232317e (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:0\.19/$`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do", "MIT's Pool Detective", "Pool Detective"},
+	// Source: CIRCL/pbtc peer/peer.go L52-53 @05437a4 (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:0\.9\.3/$`), "pbtc, CIRCL's passive Bitcoin network monitor", "CIRCL's pbtc monitor", "pbtc"},
+	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Probably a network monitor on btcd's library that adds Core's name, like Pool Detective or CIRCL's pbtc", "Probably a btcd monitor", ""},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed", "lit Lightning node (MIT)", ""},
 	// observer/src/protocol.rs in 0xB10C/p2p-observer, work in progress in
 	// October 2026; extractors/p2p in peer-observer/peer-observer, which a

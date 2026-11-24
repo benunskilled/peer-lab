@@ -92,6 +92,8 @@ var kindRules = []struct {
 	// pools do: its block observer speaks btcd's old wire library and adds
 	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
 	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
+	// CIRCL's pbtc does the same with "Satoshi:0.9.3" (peer/peer.go in
+	// CIRCL/pbtc); about.go tells them apart by the version.
 	// /trinetra:/ has no public source and stays "Other" (/p2p-probe:/, no
 	// source either, is a crawler by what its name says):
 	// in peer-observer's record of the node this was written for (21. to

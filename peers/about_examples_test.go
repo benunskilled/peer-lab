@@ -151,6 +151,8 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/RESET-Headers:1.0/", "Other"},
 	{"/jwrd.net:0.9.99.99/", "Other"},
 	{"/btcwire:0.4.1/Satoshi:0.19/", "Research scanner"},
+	{"/btcwire:0.2.0/Satoshi:0.9.3/", "Research scanner"},
+	{"/btcwire:0.5.0/Satoshi:0.20/", "Research scanner"},
 	{"/btcwire:0.4.1/lit:v0.1/", "Lightning wallet"},
 	{"/symphony:0.0.1/", "Indexer"},
 	{"/crawlrs:0.2.0/", "Crawler"},
