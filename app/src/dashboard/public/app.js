@@ -119,7 +119,7 @@ const KIND_RULES = [
   // Bitcoin Unlimited's old Bitcoin edition: a node of this chain, before
   // its "(EB16)" reads as another one's.
   [/^\/BitcoinUnlimited:/i, null, 'whole'],
-  [/Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^\/Bitcoin Interest:|^\/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^\/Aurum:|^\/Ladybug:|\/Purity:|^\/dexcash-nodes:/i, 'a client of another chain', 'whole'],
+  [/Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^\/Bitcoin Interest:|^\/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^\/Aurum:|^\/Ladybug:|\/Purity:|^\/dexcash-nodes:|^\/Satoshi-BTF\(/i, 'a client of another chain', 'whole'],
   // Scanners run as a service and scanners run by universities - the second
   // kind announces itself with its department's domain.
   [/kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^\/btcwire:[^/]*\/Satoshi:|^\/rske-research:|^\/acsrg-research:|^\/dataforge-observer:|^\/connector\/$|^\/Coinscope-GH:|^\/JBS:|\/UU-Network-Research:/i, 'a research scanner'],
@@ -130,16 +130,16 @@ const KIND_RULES = [
   [/bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^\/p2p-observer:|^\/p2p-extractor:|^\/bip324-probe:|^\/topology-probe:|^\/p2p-probe:|^\/probe:|^\/BTC-Nodes:[^/]*\/Probe\/|^\/btc-peers:|^\/bitcoin-peers:|^\/logos-peer-list:|^\/bip110-observer:|^\/nodes\.mom\.market:|^\/btcwire:[^/]*\/bitcoinstats\.com:|^\/open-nodes:|^\/btz:|^fluxture$|^\/buidl-bootcamp\/|\/HTTPSeed:/i, 'a network crawler'],
   // Address indexers for wallets: they follow the chain and relay nothing.
   [/electrs|electrum|esplora|\/mempool|^NBXplorer-|^\/symphony:/i, 'an address indexer'],
-  [/bitcoinj|breadwallet|\/bread:|bither|multibit|wasabi|Bitcoin Wallet|^\/blueberry:|^\/winnow:|^\/BitcoinKit:|^\/WalletKit:|\/hodlwallet:|\/spvwallet:|^\/btcwire:[^/]*\/bitfyn:|^\/twotbit:|^\/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^\/BitcoinSPV:|^\/enginecore:|^\/BitcoinWallet:/i, 'a wallet'],
+  [/bitcoinj|breadwallet|\/bread:|bither|multibit|wasabi|Bitcoin Wallet|^\/blueberry:|^\/winnow:|^\/BitcoinKit:|^\/WalletKit:|\/hodlwallet:|\/spvwallet:|^\/btcwire:[^/]*\/bitfyn:|^\/twotbit:|^\/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^\/BitcoinSPV:|^\/enginecore:|^\/BitcoinWallet:|^\/btcwire:[^/]*\/(CaribouSPV|BisonSPV):/i, 'a wallet'],
   // Lightning wallets on lnd, which follow the chain through neutrino.
-  [/\/neutrino:|\/lit:v/i, 'a Lightning wallet'],
+  [/\/neutrino:|\/lit:v|^\/btcwire:[^/]*\/zap-(desktop|ios):/i, 'a Lightning wallet'],
   // Other BIP157 light clients: Kyoto, which says "Rust BIP-157". VerifiedX
   // validators follow the chain the same way for a chain of their own: headers,
   // some blocks, no transactions.
   // EMPORION and its new name SYMMARTYS fetch headers for OpenTimestamps
   // verification (bitcoin_headers.py in alexar76/emporion). Bitflash's
   // wallet loads only headers and filter hashes (docs.bitflash.network).
-  [/BIP-157|^\/wuji-headers:|^\/bip157-fetch:|kyoto|^Yuki \/|^\/VerifiedX:|^\/nakamoto:|^\/bitcoin-s:|^Stacks\/|\/CaribouSPV:|^\/EMPORION:|^\/SYMMARTYS:|^\/Bitflash:btc-light\/|^\/Notoshi\/$|^\/pyspv:|^\/chainhorn:|^\/Murmel:|^\/BitcoinSwift:|^\/haskoin-btc:|^libbtc |\/bitcoin-net:|^\/rust-spv:|^\/pcoc-bari:/i, 'a light client'],
+  [/BIP-157|^\/wuji-headers:|^\/bip157-fetch:|kyoto|^Yuki \/|^\/VerifiedX:|^\/nakamoto:|^\/bitcoin-s:|^Stacks\/|^\/EMPORION:|^\/SYMMARTYS:|^\/Bitflash:btc-light\/|^\/Notoshi\/$|^\/pyspv:|^\/chainhorn:|^\/Murmel:|^\/BitcoinSwift:|^\/haskoin-btc:|^libbtc |\/bitcoin-net:|^\/rust-spv:|^\/pcoc-bari:/i, 'a light client'],
 ];
 
 // Rules marked 'whole' read the whole agent: a pool or another chain may be

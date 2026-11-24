@@ -85,7 +85,7 @@ var kindRules = []struct {
 	// client for Bitcoin itself, not another chain; it sends "(EB16)" too, so
 	// it comes first (see about.go).
 	{"Node (other)", regexp.MustCompile(`(?i)^/BitcoinUnlimited:`), true},
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^/Bitcoin Interest:|^/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|^/Ladybug:|/Purity:|^/dexcash-nodes:`), false},
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^/Bitcoin Interest:|^/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|^/Ladybug:|/Purity:|^/dexcash-nodes:|^/Satoshi-BTF\(`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	// Pool Detective, MIT's Digital Currency Initiative watching what mining
@@ -142,7 +142,7 @@ var kindRules = []struct {
 	// is Unstoppable Wallet on iPhone (Peer.swift in
 	// horizontalsystems/BitcoinCore.Swift), /BitcoinKit:/ the same wallet on
 	// Android (VersionMessage.kt in horizontalsystems/bitcoin-kit-android).
-	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|/hodlwallet:|/spvwallet:|^/btcwire:[^/]*/bitfyn:|^/twotbit:|^/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^/BitcoinSPV:|^/enginecore:|^/BitcoinWallet:`), false},
+	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|/hodlwallet:|/spvwallet:|^/btcwire:[^/]*/bitfyn:|^/twotbit:|^/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^/BitcoinSPV:|^/enginecore:|^/BitcoinWallet:|^/btcwire:[^/]*/(CaribouSPV|BisonSPV):`), false},
 	// Lightning wallets on lnd that follow the chain through neutrino, its
 	// BIP157 client: Zeus and Blixt among them. Named apart from the other
 	// light clients so the wallets among the peers show as wallets. In
@@ -154,7 +154,7 @@ var kindRules = []struct {
 	// in mit-dci/lit, last changed in 2022).
 	// Only neutrino's own name: one that only has the word in it (a checker,
 	// a renamed copy) is no wallet anyone has shown (14.11.2026).
-	{"Lightning wallet", regexp.MustCompile(`(?i)/neutrino:|/lit:v`), false},
+	{"Lightning wallet", regexp.MustCompile(`(?i)/neutrino:|/lit:v|^/btcwire:[^/]*/zap-(desktop|ios):`), false},
 	// Other BIP157 light clients: Kyoto, which announces itself as
 	// "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
@@ -181,7 +181,7 @@ var kindRules = []struct {
 	// pcoc's Bari timestamping service follows mainnet headers only, never a
 	// block body: USER_AGENT "/pcoc-bari:<v>/" in sdk/rust/pcoc-gossip/src/wire.rs
 	// in groundinglab/pcoc (18.11.2026).
-	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pycoinnet/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:|^/pcoc-bari:`), false},
+	{"Other light client", regexp.MustCompile(`(?i)BIP-157|^/wuji-headers:|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|^/EMPORION:|^/SYMMARTYS:|^/Bitflash:btc-light/|^/Notoshi/$|^/pycoinnet/$|^/pyspv:|^/chainhorn:|^/Murmel:|^/BitcoinSwift:|^/haskoin-btc:|^libbtc |/bitcoin-net:|^/rust-spv:|^/pcoc-bari:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - the dashboard has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},

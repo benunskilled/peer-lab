@@ -296,7 +296,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/symphony:0.0.1/":                       "Indexer",
 		"/your-fork:0.1/":                        "Other",
 		"VDS 0.9.9.1":                            "Other chain",
-		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Other light client",
+		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Wallet",
 		"/btcwire:0.5.0/utreexod:0.5.0/":         "Node (other)",
 		"NBXplorer-4096":                         "Indexer",
 		"/bitcoin-s:1.9.12/":                     "Other light client",

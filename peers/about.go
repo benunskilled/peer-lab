@@ -399,6 +399,17 @@ var aboutRules = []aboutRule{
 	// ("/btcwire:0.5.0/btcpost-neutrino:0.17.1/", 14.11.2026): its code,
 	// renamed, by someone who has not published it.
 	{regexp.MustCompile(`(?i)^/btcwire:[^/]*/[^/]+-neutrino:`), "Probably neutrino, lnd's light client, under another name: its btcwire start and its version", "Probably renamed neutrino", ""},
+	// neutrino under a name its program sets, on btcd's wire library
+	// (/btcwire:<v>/ in front): Bisoncraft's wallets set UserAgentName in their
+	// copy of neutrino, Zap hands lnd --neutrino.useragentname.
+	// Source: bisoncraft/caribou wallet/utxowallet/spv/neutrino.go L49 @fccbc64 (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/CaribouSPV:`), "Caribou, a wallet by Bisoncraft that follows Bitcoin with its own build of neutrino", "Caribou wallet", ""},
+	// Source: bisoncraft/utxowallet spv/neutrino.go L49 @422fc40 (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/BisonSPV:`), "Bisoncraft's utxowallet, a wallet module on its own build of neutrino", "Bisoncraft utxowallet", ""},
+	// Source: LN-Zap/zap-desktop services/neutrino/neutrino.js L371-372 @d89c6c0 (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/zap-desktop:`), "Zap, a Lightning wallet for the desktop, on lnd without a node of its own (neutrino)", "Zap desktop (neutrino)", ""},
+	// Source: LN-Zap/zap-iOS SwiftLnd/Lnd/LocalLndConfiguration.swift L77 @a1af8bf (checked 2026-11-24)
+	{regexp.MustCompile(`^/btcwire:[^/]*/zap-ios:`), "Zap for iPhone, a Lightning wallet on lnd without a node of its own (neutrino)", "Zap iPhone (neutrino)", ""},
 	// Only the word in the name ("/neutrino-checker:0.1/", 14.11.2026): no
 	// source, so no wallet.
 	{regexp.MustCompile(`(?i)neutrino`), "Named like Neutrino, lnd's light client", "Named like Neutrino", ""},
@@ -505,9 +516,11 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/dexcash-nodes:`), "Named like DexCash Network, a blockchain of its own", "Named like DexCash", ""},
 	// Bitnodes' crawler sends "/bitnodes.io:0.3/" (protocol.py in
 	// ayeowch/bitnodes); any other name with Bitnodes in it, /alt-bitnodes:/
-	// or /Metrika-Bitnodes:/, is only named like it.
+	// or /Metrika-Bitnodes:/, is only named like it. BTC Nodes (btcnodes.io),
+	// built from Bitnodes' code, keeps the same default.
 	// Source: ayeowch/bitnodes conf/crawl.conf.default L53 @036dc5c (checked 2026-11-24)
-	{regexp.MustCompile(`^/bitnodes\.io:`), "Bitnodes, a public map of reachable nodes", "Bitnodes crawler", ""},
+	// Source: brunneis/btcnodes conf/crawl.conf.default L55 @f73ab93 (checked 2026-11-24)
+	{regexp.MustCompile(`^/bitnodes\.io:`), "Bitnodes' crawler, or one built from its code such as BTC Nodes: maps reachable nodes", "Bitnodes crawler", ""},
 	// alt-bitnodes: USER_AGENT in deploy/install.sh (ifuensan/alt-bitnodes),
 	// HackNodes' public node count. /bitnodes.earn.com:0.1/: the crawler of a
 	// LORIA/Inria study (conf/crawl.conf.default in jpeisenbarth/bitnodes,
@@ -770,6 +783,10 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own; its node also reads Bitcoin's block headers", "Irium altcoin", ""},
 	// v-dimension/vds-core sends "/MagicBean:x/" (CLIENT_NAME in
 	// src/clientversion.cpp), so "VDS <version>" is only the name.
+	// Bitcoin Finance's own announcement (bitcointalk topic 5500641, June
+	// 2024) prints "Satoshi-BTF(BitcoinFinance)-Main-DCR:0.15.1" as its node's
+	// version; no code of it is public, hence "Probably".
+	{regexp.MustCompile(`^/Satoshi-BTF\(BitcoinFinance\)`), "Probably Bitcoin Finance (BTF), a fork of Bitcoin with a chain of its own", "Probably BTF fork", ""},
 	{regexp.MustCompile(`(?i)vds[_ ]`), "Named like VDS, an altcoin with a chain of its own", "Named like VDS", ""},
 	// CLIENT_NAME("Bitcoin Interest") and CLIENT_NAME("Bitcoin Clashic ABCD")
 	// (src/clientversion.cpp in BitcoinInterestOfficial/BitcoinInterest and
