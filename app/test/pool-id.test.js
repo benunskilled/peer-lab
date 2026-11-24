@@ -72,10 +72,28 @@ test('the embedded list is the real one', () => {
   for (const [tag, name] of [
     ['Mined by AntPool', 'AntPool'],
     ['/ViaBTC/', 'ViaBTC'],
-    ['OCEAN.XYZ', 'Ocean.xyz'],
+    ['OCEAN.XYZ', 'OCEAN'],
+    // In mempool's list only (November 2026).
+    ['cloverpool', 'CloverPool'],
+    ['/trustpool/', 'TrustPool'],
+    // In bitcoin-data's list only: kept by the merge.
+    ['ckpool', 'CKPool'],
+    ['binance/', 'Binance Pool'],
   ]) {
     assert.equal(poolId.identify({ coinbaseHex: hex(tag) }).name, name);
   }
+});
+
+// scripts/mining-pools.js builds the list from both sources; mempool's name
+// wins where they disagree, and nothing only the older list has is lost.
+test('the pool list merge keeps both sources', () => {
+  const { fromMempool, merge } = require('../scripts/mining-pools');
+  const base = fromMempool([{ name: 'CloverPool', link: 'https://clover', tags: ['btccom'], addresses: ['1A'] }]);
+  const older = { coinbase_tags: { btccom: { name: 'BTC.com', link: '' }, ckpool: { name: 'CKPool', link: '' } }, payout_addresses: { '1B': { name: 'Old', link: '' } } };
+  const out = merge(base, older);
+  assert.deepEqual(out.coinbase_tags.btccom, { name: 'CloverPool', link: 'https://clover' });
+  assert.equal(out.coinbase_tags.ckpool.name, 'CKPool');
+  assert.deepEqual(Object.keys(out.payout_addresses), ['1A', '1B']);
 });
 
 // A block from somebody the list has never heard of still says something:

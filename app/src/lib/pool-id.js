@@ -9,8 +9,8 @@
  * Matching either against a public list is how block explorers attribute
  * blocks, and it is the only way to do it without asking a service.
  *
- * The list is `src/data/mining-pools.json` from bitcoin-data/mining-pools
- * (MIT), plus `mining-pools-extra.json`. See src/data/MINING-POOLS.md for the licence and how to refresh it.
+ * The list is `src/data/mining-pools.json`, mempool/mining-pools merged with
+ * bitcoin-data/mining-pools (both MIT), plus `mining-pools-extra.json`. See src/data/MINING-POOLS.md for the licence and how to refresh it.
  *
  * Two honest limits. The payout address is checked first because it is the
  * stronger claim - it is where the money actually went - but a pool that pays
