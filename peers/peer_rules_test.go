@@ -41,6 +41,9 @@ type peerRules struct {
 	Note      string            `json:"note"`
 	EmptyName string            `json:"emptyName"`
 	Bracketed string            `json:"bracketed"`
+	// What a "no-mempool" rule takes out before matching (mempoolWord).
+	MempoolWord      string `json:"mempoolWord"`
+	MempoolWordFlags string `json:"mempoolWordFlags"`
 	Kinds     []peerRulesKind   `json:"kinds"`
 	ForkKinds []string          `json:"forkKinds"`
 	ForkSlack int               `json:"forkTipSlack"`
@@ -105,6 +108,7 @@ func buildPeerRules(t *testing.T) peerRules {
 		ForkSlack: forkTipSlack,
 		Examples:  map[string]string{},
 	}
+	out.MempoolWord, out.MempoolWordFlags = jsPattern(t, mempoolWord.String())
 	seen := map[string]bool{"Other": true}
 	out.ForkKinds = []string{"Other"}
 	for _, r := range kindRules {

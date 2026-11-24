@@ -2,6 +2,8 @@
   "note": "Written by peers/peer_rules_test.go (UPDATE_PEER_RULES=1 go test -run TestPeerRulesFile) from peers/clients.go and peers/forks.go. Do not edit.",
   "emptyName": "^/*$|^/:[^/]*/$",
   "bracketed": "\\([^)]*\\)",
+  "mempoolWord": "mempool",
+  "mempoolWordFlags": "i",
   "kinds": [
     {
       "kind": "Disguised",

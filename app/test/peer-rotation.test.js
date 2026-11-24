@@ -1981,7 +1981,8 @@ test('slot fill: a candidate on another chain is out at once', async () => {
   const asia = inBook('198.18.5.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
-  const fork = manualSession(asia, { synced: TIP - 50000, servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^28]'] });
+  // A named node: a peer with no name is never judged by its bits.
+  const fork = manualSession(asia, { synced: TIP - 50000, subver: '/Satoshi:29.4.1/Knots:20260508/', servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^28]'] });
 
   const result = await step(setPeers([coreOut(), fork]), t0 + 30 * 1000);
 

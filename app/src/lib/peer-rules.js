@@ -14,6 +14,7 @@ const rules = require('../data/peer-rules.json');
 
 const EMPTY_NAME = new RegExp(rules.emptyName);
 const BRACKETED = new RegExp(rules.bracketed, 'g');
+const MEMPOOL_WORD = new RegExp(rules.mempoolWord, `${rules.mempoolWordFlags}g`);
 const KINDS = rules.kinds.map((k) => ({ ...k, re: new RegExp(k.pattern, k.flags) }));
 const FORK_KINDS = new Set(rules.forkKinds);
 
@@ -21,7 +22,7 @@ const FORK_KINDS = new Set(rules.forkKinds);
 function kindOf(agent) {
   if (!agent || EMPTY_NAME.test(agent)) return null;
   const bare = agent.replace(BRACKETED, '');
-  const noMempool = agent.replace(/mempool/gi, '');
+  const noMempool = agent.replace(MEMPOOL_WORD, '');
   for (const k of KINDS) {
     const s = k.reads === 'bare' ? bare : k.reads === 'no-mempool' ? noMempool : agent;
     if (k.re.test(s)) return { kind: k.kind, relays: k.relays };
@@ -55,6 +56,9 @@ function cannotRelayReason(agent) {
  * live peer, and a peer not live keeps the bits alone.
  */
 function otherChainOf(services, syncedHeaders = null, tip = 0, agent = '') {
+  // A peer with no name is the peers service's "No name", which it never
+  // checks for a fork: a tool can repeat bits it saw elsewhere.
+  if (!agent || EMPTY_NAME.test(agent)) return null;
   const k = kindOf(agent);
   if (!FORK_KINDS.has(k ? k.kind : 'Other')) return null;
   const list = typeof services === 'string' ? services.split(',') : [];

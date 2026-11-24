@@ -2,7 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { otherChainOf } = require('../src/lib/peer-rules');
+const { otherChainOf: withAgent } = require('../src/lib/peer-rules');
+
+// Unknown software ("Other") unless a test names one.
+const otherChainOf = (services, synced = null, tip = 0, agent = '/some-node:1.0/') => withAgent(services, synced, tip, agent);
 
 test('a fork bit alone marks another chain', () => {
   assert.equal(otherChainOf('NETWORK,WITNESS,UNKNOWN[2^28]'), 'BLAKE2b fork');
@@ -29,4 +32,10 @@ test('headers at the tip say it follows this chain after all', () => {
   assert.equal(otherChainOf(bip110, -1, 972597), 'BIP110 fork');
   assert.equal(otherChainOf(bip110, null, 972597), 'BIP110 fork');
   assert.equal(otherChainOf(bip110, 972597, 0), 'BIP110 fork');
+});
+
+test('a peer with no name is not judged by its bits, as in the peers service', () => {
+  for (const nothing of ['', null, '/', '//', '/:1.0/']) {
+    assert.equal(withAgent('NETWORK,UNKNOWN[2^27]', null, 0, nothing), null, JSON.stringify(nothing));
+  }
 });
