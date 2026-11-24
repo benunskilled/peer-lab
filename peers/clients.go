@@ -342,6 +342,15 @@ var clients = []client{
 	// Source: minibolt-guide/minibolt bitcoin/bitcoin/bitcoin-client.md L311 @fd980f0 (checked 2026-11-24)
 	// Source: minibolt-guide/minibolt bitcoin/bitcoin/btc-rpc-explorer.md L412 @53f972e (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)\((Official )?MiniBolt[ _]node\)|; MiniBolt node\)`), text: "A node set up with MiniBolt, a step-by-step guide to building a Bitcoin node", label: "MiniBolt guide node"},
+	// mempool's own node config carries "#uacomment=@wiz" (production/
+	// bitcoin.conf L19 at v3.3.2 in mempool/mempool; wiz co-founded
+	// mempool.space). Anyone can copy it, and mempool.space lists no nodes of
+	// its own, so only "Probably".
+	{re: regexp.MustCompile(`(?i)^/Satoshi:[^/]*\(@wiz\)/(Knots:[^/]*/)?$`), text: "Probably a mempool.space node: '@wiz' is the comment in mempool's own node config", label: "Probably mempool.space"},
+	// Both only on a bare Core or Knots name: anything after it (electrs)
+	// says more. "(mempool.guide)": mempool.guide is Retropex's block explorer
+	// (Retropex/mempool's homepage); no source sets this comment.
+	{re: regexp.MustCompile(`(?i)^/Satoshi:[^/]*\(mempool\.guide\)/(Knots:[^/]*/)?$`), text: "Named like mempool.guide, Retropex's block explorer", label: "Named like mempool.guide"},
 	// A 2017 Docker image of Bitcore set uacomment=bitcore (m00re/bitcore-docker);
 	// these run newer Core, so the text goes by the name only.
 	{re: regexp.MustCompile(`\(bitcore\)`), text: "Named like BitPay's Bitcore, an index server that runs on a node", label: "Named like Bitcore"},

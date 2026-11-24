@@ -38,17 +38,17 @@ type peerRulesFork struct {
 }
 
 type peerRules struct {
-	Note      string            `json:"note"`
-	EmptyName string            `json:"emptyName"`
-	Bracketed string            `json:"bracketed"`
+	Note      string `json:"note"`
+	EmptyName string `json:"emptyName"`
+	Bracketed string `json:"bracketed"`
 	// What a "no-mempool" rule takes out before matching (mempoolWord).
-	MempoolWord      string `json:"mempoolWord"`
-	MempoolWordFlags string `json:"mempoolWordFlags"`
-	Kinds     []peerRulesKind   `json:"kinds"`
-	ForkKinds []string          `json:"forkKinds"`
-	ForkSlack int               `json:"forkTipSlack"`
-	ForkBits  []peerRulesFork   `json:"forkBits"`
-	Examples  map[string]string `json:"examples"`
+	MempoolWord      string            `json:"mempoolWord"`
+	MempoolWordFlags string            `json:"mempoolWordFlags"`
+	Kinds            []peerRulesKind   `json:"kinds"`
+	ForkKinds        []string          `json:"forkKinds"`
+	ForkSlack        int               `json:"forkTipSlack"`
+	ForkBits         []peerRulesFork   `json:"forkBits"`
+	Examples         map[string]string `json:"examples"`
 }
 
 func jsPattern(t *testing.T, re string) (string, string) {
