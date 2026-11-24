@@ -21,6 +21,11 @@ import (
 // 18 of them as 30.2.0, all gone straight after the version message.
 const libreRelayService = "UNKNOWN[2^29]"
 
+// rbfService is bit 26, NODE_REPLACE_BY_FEE: Knots 28.1 and 29.1 set it under
+// full RBF (src/init.cpp L1462 at v29.1.knots20250903; gone in 29.2), and so
+// does Garbageman v28.
+const rbfService = "UNKNOWN[2^26]"
+
 // libreRelay is the kind and about for a Core name offering bit 29, or "", "".
 func libreRelay(subver string, services []string) (kind, about, label string) {
 	if !slices.Contains(services, libreRelayService) {
@@ -53,6 +58,12 @@ func libreRelay(subver string, services []string) (kind, about, label string) {
 		return fakeWalletKind, "Claims: Libre Relay\nProbably: " + tool, ""
 	}
 	switch {
+	// Bit 26, NODE_REPLACE_BY_FEE, beside bit 29: Garbageman v28 adds it under
+	// full RBF (src/init.cpp L924 and L1706 at 60ae68d in chrisguida/bitcoin);
+	// Libre Relay never sets it (g_local_services in libre-relay-v28.1-1 and
+	// libre-relay-v30.2-2 is NETWORK_LIMITED | WITNESS | LIBRE_RELAY alone).
+	case slices.Contains(services, rbfService):
+		return fakeWalletKind, garbageman, ""
 	case strings.Contains(subver, "Knots:"):
 		// Libre Relay is Core; only a Garbageman built with its Knots name left in says Knots.
 		return fakeWalletKind, garbageman, ""
@@ -115,6 +126,11 @@ const (
 // utreexo/utreexod; Castor sets 12 too), 25 Bitcoin Purity's, 27 BIP110's,
 // 14 Bitcoin DOG Mode's, 28 Knots' BLAKE2b - or, from satd, NODE_INTACT_BLOCKS (node/src/net/peer.rs
 // in epochbtc/satd) - 29 Libre Relay's, 30 satd's NODE_NAP (nap/p2p.rs).
+// Older ones (checked 24.11.2026): 1 GETUTXO and 4 XTHIN (src/protocol.h
+// L274 and L283 at 4c27454 in bitcoinclassic/bitcoinclassic; Classic sets 4),
+// 24 the Utreexo bit before BIP 183 (Knots' UTREEXO_TMP, src/protocol.h L346
+// at v29.4.1.knots20260508; Floresta 0.8 sets it), 26 REPLACE_BY_FEE (see
+// rbfService).
 // Only for showing: forkOf and the disguise rules read Core's names.
 func shownServices(subver string, services []string) []string {
 	if services == nil {
@@ -126,6 +142,8 @@ func shownServices(subver string, services []string) []string {
 		purityService: "PURITY_ASERT", reducedDataService: "REDUCED_DATA",
 		blake2bService: "BLAKE2B", libreRelayService: "LIBRE_RELAY",
 		dogModeService: "DOG_MODE",
+		"UNKNOWN[2^1]": "GETUTXO", "UNKNOWN[2^4]": "XTHIN",
+		"UNKNOWN[2^24]": "UTREEXO_TMP", rbfService: "REPLACE_BY_FEE",
 	}
 	if satd {
 		names[blake2bService] = "INTACT_BLOCKS"

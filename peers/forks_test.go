@@ -22,6 +22,15 @@ func TestLibreRelayAndGarbageman(t *testing.T) {
 			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
 		}
 	}
+	// Bit 26 beside 29 is Garbageman v28's full RBF; Libre Relay never sets it.
+	rbf := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:28.0.0/", Transport: "v2", ServicesNames: append(bit[:4:4], "UNKNOWN[2^26]", "UNKNOWN[2^29]")}})[0]
+	if rbf.Kind != fakeWalletKind || !strings.Contains(rbf.About, "Probably: Garbageman") {
+		t.Errorf("bits 26+29: got %q / %q", rbf.Kind, rbf.About)
+	}
+	if s := strings.Join(shownServices("/Satoshi:28.1.0/Knots:20250305/", []string{"UNKNOWN[2^1]", "UNKNOWN[2^4]", "UNKNOWN[2^24]", "UNKNOWN[2^26]"}), ","); s != "GETUTXO,XTHIN,UTREEXO_TMP,REPLACE_BY_FEE" {
+		t.Errorf("older bits shown as %q", s)
+	}
 	// Without the bit it is plain Core.
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 		Subver: "/Satoshi:30.2.0/", Transport: "v2", ServicesNames: bit[:4]}})[0]
