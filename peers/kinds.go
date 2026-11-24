@@ -211,7 +211,7 @@ var kindRules = []struct {
 	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
 	// names, "/BTC-Nodes:<date>/Sonar/" and ".../Probe/", are caught as a
 	// crawler first.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus|bridge):|/utreexod:|^StratisNode:`), true},
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus|bridge|exnode|therealbitcoin\.org):|/utreexod:|^StratisNode:`), true},
 	// GrayersDad: see its line in about.go.
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots|^/GrayersDad:`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},

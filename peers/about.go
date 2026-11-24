@@ -131,9 +131,13 @@ var aboutRules = []aboutRule{
 	// from reardencode).
 	{regexp.MustCompile(`(?i)^/rbitcoin:`), "rbitcoin, a Bitcoin full node written in Rust (reardencode)", "rbitcoin node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/rbtc:`), "rbtc, Bitcoin Core rewritten in Rust", "rbtc, Core in Rust", ""},
-	// Its repository, bitcoinecho/bitcoin-echo, is gone (404, 14.11.2026).
-	{regexp.MustCompile(`(?i)^/BitcoinEcho:`), "Named like Bitcoin Echo, a full node in plain C, meant to be frozen as it is", "Named like Bitcoin Echo", ""},
+	// The original repository, bitcoinecho/bitcoin-echo, is gone (404,
+	// 14.11.2026); a kept copy sets the name.
+	// Source: jesterhodl/bitcoin-echo src/protocol/peer.c L31 @9196919 (checked 2026-11-24)
+	{regexp.MustCompile(`(?i)^/BitcoinEcho:`), "Bitcoin Echo, a full node in plain C, meant to be frozen as it is", "Bitcoin Echo node (C)", ""},
 	{regexp.MustCompile(`(?i)^/BitcoinMachineCode:`), "Bitcoin Machine Code, a node written in x86 assembly, entirely AI-generated", "Bitcoin Machine Code node", ""},
+	// Source: brunoerg/exnode lib/exnode/node.ex L306 @241d057 (checked 2026-11-24)
+	{regexp.MustCompile(`(?i)^/exnode:`), "exnode, a Bitcoin full node written in Elixir that checks scripts with Bitcoin Core's kernel library", "exnode (Elixir node)", ""},
 	{regexp.MustCompile(`(?i)^/kernel-node:`), "kernel-node, a node built on libbitcoinkernel, Core's validation engine as a library", "kernel-node (Core kernel)", ""},
 	{regexp.MustCompile(`(?i)^/bitcoinkernel-node:`), "bitcoinkernel-node, a small full node built on libbitcoinkernel, Core's validation engine as a library", "bitcoinkernel-node", ""},
 	// satd's crawl sessions say "/satd:<version>(crawler)/" (user_agent in
@@ -428,9 +432,14 @@ var aboutRules = []aboutRule{
 	// for headers, most wanting no transactions. That is timing and behaviour,
 	// not a source: "Named like" (13.11.2026).
 	{regexp.MustCompile(`(?i)^/reset-`), "Named like RESET, a coin clocked by Bitcoin's blocks that pays a small reward to whoever brings in a new block first", "Named like RESET", "RESET"},
+	// The Real Bitcoin (TRB), a bitcoind kept on the old 0.5.4 line: its
+	// client name and version 99999, written as "/therealbitcoin.org:0.9.99.99/"
+	// by FormatSubVersion (src/util.cpp L899-905).
+	// Source: irnb/therealbitcoin src/knobs.h L4-5 @ec4f7f9 (checked 2026-11-24)
+	{regexp.MustCompile(`^/therealbitcoin\.org:`), "The Real Bitcoin (TRB), a bitcoind kept on the old 0.5.4 line", "The Real Bitcoin (0.5.4)", ""},
 	// JWRD Computing (jwrd.net) maintains its own bitcoind of the old 0.5
-	// line, which writes version 99999 as 0.9.99.99; nothing public says it
-	// sends this name.
+	// line. Its version 0.9.99.99 is TRB's 99999, so it is likely a TRB
+	// descendant; nothing public says it sends this name.
 	{regexp.MustCompile(`^/jwrd\.net:`), "Named like JWRD Computing's own bitcoind, a fork of an early version", "Named like JWRD", ""},
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do", "MIT's Pool Detective", "Pool Detective"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed", "lit Lightning node (MIT)", ""},

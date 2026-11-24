@@ -39,6 +39,9 @@ func TestOtherAbouts(t *testing.T) {
 		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
 		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
 		{"/jwrd.net:0.9.99.99/", 70016, "Named like JWRD Computing's own bitcoind"},
+		{"/therealbitcoin.org:0.9.99.99/", 99999, "The Real Bitcoin (TRB)"},
+		{"/exnode:0.1.0/", 70016, "exnode, a Bitcoin full node written in Elixir"},
+		{"/BitcoinEcho:0.1.0/", 70016, "Bitcoin Echo, a full node in plain C"},
 		{"/curl:8.5.0/", 70015, "Named like curl, the download tool"},
 	}
 	for _, c := range cases {
