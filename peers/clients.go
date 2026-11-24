@@ -175,6 +175,10 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)/Bisq:`), text: "Bisq, a decentralised exchange; its wallet runs on bitcoinj", label: "Bisq exchange wallet"},
 	// Source: forrestv/p2pool p2pool/bitcoin/p2p.py L35 @53c438b (checked 2026-11-24)
 	{re: regexp.MustCompile(`^/P2Pool:`), text: "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator", label: "P2Pool mining pool"},
+	// node-stratum-pool (zone117x) listens for new blocks over P2P, offering
+	// NODE_NETWORK alone, and hands found blocks to its node by RPC.
+	// Source: zone117x/node-stratum-pool lib/peer.js L64 @d1e71da (checked 2026-11-24)
+	{re: regexp.MustCompile(`^/node-stratum/`), kind: "Pool node", text: "node-stratum-pool, Node.js mining pool software listening for new blocks", label: "node-stratum-pool"},
 	// BitcoinRocks uses RocksDB and compressed block storage, retaining
 	// Bitcoin consensus (UA_NAME and CMakeLists.txt in BitcoinRocks-Core/BitcoinRocks).
 

@@ -65,6 +65,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/generic-seeder/", "Crawler"},
 	{"/Satoshi:31.1.0/KnotsSHA256:20261018/", "Node (Knots)"},
 	{"/Satoshi:29.5.1/Knots:20260508/Plumb:15/", "Node (Knots)"},
+	{"/node-stratum/", "Pool node"},
 	{"/pycoinnet/", "Other light client"},
 	{"/blueberry:2026.08.17/", "Wallet"},
 	{"/Satoshi:28.1.0(FutureBit-Apollo-Node)/", "Node (Core)"},

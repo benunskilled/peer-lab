@@ -95,6 +95,13 @@
       "relays": true
     },
     {
+      "kind": "Pool node",
+      "pattern": "^/node-stratum/",
+      "flags": "",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
       "kind": "Node (BitcoinRocks)",
       "pattern": "^/BitcoinRocks:",
       "flags": "",
@@ -1369,6 +1376,7 @@
     "/neutrino:0.2.0/": "Lightning wallet",
     "/new-p2p-crawler:0.1.0/": "Crawler",
     "/nimrod:0.1.0/": "Node (other)",
+    "/node-stratum/": "Pool node",
     "/node.cs.ac.uk:1.0/": "Research scanner",
     "/node.js:22.11.0/bitcoin-net:5.2.0/": "Other light client",
     "/nodemap/": "Crawler",
