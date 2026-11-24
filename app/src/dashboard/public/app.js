@@ -1026,7 +1026,7 @@ function lastTryText(st) {
 // "8 of 8 slots used", then "Pick from 4,812 addresses" with a button per
 // region to pick it (15.11.2026; always shown since 17.11.2026). A region with none shows 0 on
 // its button; the line does not repeat it (16.11.2026).
-const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
+const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North & Central America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
   const box = document.getElementById('slot-book');
   if (!box) return;

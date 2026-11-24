@@ -40,7 +40,7 @@ const TARGET_PER_REGION = config.manualPerRegion;
 // one there is. Core dials them through its own proxy; their operator and
 // country are unknowable, so they never conflict on either.
 const REGION_NAMES = {
-  AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P',
+  AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North & Central America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P',
 };
 const PRIVATE_REGIONS = { Tor: 'TOR', I2P: 'I2P' };
 
