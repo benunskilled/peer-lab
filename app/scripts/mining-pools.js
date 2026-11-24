@@ -3,10 +3,13 @@
 
 // Builds src/data/mining-pools.json from two public lists (see
 // src/data/MINING-POOLS.md):
-//   - mempool/mining-pools pools-v2.json, the maintained one, as the base;
-//   - bitcoin-data/mining-pools pools.json (generated branch), for the tags
-//     and addresses mempool's list does not have, "ckpool" among them.
-// Where both name the same tag or address, mempool's name wins.
+//   - mempool/mining-pools pools-v2.json, the maintained one: the main list;
+//   - bitcoin-data/mining-pools pools.json (generated branch, not rebuilt since
+//     June 2026): only what mempool lacks, kept apart as "fallback". pool-id.js
+//     asks it only when nothing in the main list matches, so a stale address
+//     there cannot beat a pool's own tag ("ckpool" stays for solo CKPool).
+// A pool mempool renamed (BTC.com is CloverPool) gets the new name in the
+// fallback too, read off the tags both lists share.
 //   node scripts/mining-pools.js
 
 const fs = require('fs');
@@ -34,14 +37,38 @@ function fromMempool(list) {
   return out;
 }
 
-function merge(base, older) {
-  const out = { payout_addresses: {}, coinbase_tags: {} };
-  for (const key of Object.keys(out)) {
-    for (const [k, v] of Object.entries(older[key] || {})) out[key][k] = { name: v.name, link: v.link || '' };
-    Object.assign(out[key], base[key]);
-    out[key] = Object.fromEntries(Object.entries(out[key]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+// Old name -> mempool's name, where both lists hold the same tag under
+// different names and every shared tag of that old name agrees. Tags only:
+// a tag is the pool's own name for itself, while an address mempool moved to
+// another pool (three of CKPool's went to MiningKings) says nothing about a
+// rename.
+function renames(base, older) {
+  const seen = {};
+  for (const [k, v] of Object.entries(older.coinbase_tags || {})) {
+    if (!base.coinbase_tags[k]) continue;
+    (seen[v.name] = seen[v.name] || new Set()).add(base.coinbase_tags[k].name);
   }
-  return out;
+  for (const [from, s] of Object.entries(seen)) if (s.has(from)) delete seen[from];
+  return Object.fromEntries(Object.entries(seen).filter(([, s]) => s.size === 1).map(([from, s]) => [from, [...s][0]]));
+}
+
+const sorted = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+
+function merge(base, older) {
+  const names = renames(base, older);
+  // The new name's link too, taken from the main list.
+  const links = {};
+  for (const key of ['payout_addresses', 'coinbase_tags']) for (const v of Object.values(base[key])) links[v.name] = links[v.name] || v.link;
+  const fallback = { payout_addresses: {}, coinbase_tags: {} };
+  for (const key of Object.keys(fallback)) {
+    for (const [k, v] of Object.entries(older[key] || {})) {
+      if (k in base[key]) continue;
+      const name = names[v.name] || v.name;
+      fallback[key][k] = { name, link: names[v.name] ? links[name] || '' : v.link || '' };
+    }
+    fallback[key] = sorted(fallback[key]);
+  }
+  return { payout_addresses: sorted(base.payout_addresses), coinbase_tags: sorted(base.coinbase_tags), fallback };
 }
 
 async function main() {
@@ -49,12 +76,12 @@ async function main() {
   const older = await get(BITCOIN_DATA);
   const out = merge(base, older);
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n');
-  for (const key of Object.keys(out)) {
-    const onlyOld = Object.keys(out[key]).filter((k) => !(k in base[key])).length;
-    console.log(`${key}: ${Object.keys(out[key]).length} (${Object.keys(base[key]).length} from mempool, ${onlyOld} only in bitcoin-data)`);
+  for (const key of ['payout_addresses', 'coinbase_tags']) {
+    console.log(`${key}: ${Object.keys(out[key]).length} from mempool, ${Object.keys(out.fallback[key]).length} fallback from bitcoin-data`);
   }
+  console.log('renamed in the fallback:', JSON.stringify(renames(base, older)));
 }
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });
 
-module.exports = { fromMempool, merge };
+module.exports = { fromMempool, merge, renames };

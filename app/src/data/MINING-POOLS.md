@@ -5,23 +5,30 @@ transaction carries the address the reward is paid to and a short text the
 miner writes. Matching either against this list is how it is done without
 asking any service; see [`src/lib/pool-id.js`](../lib/pool-id.js).
 
-Sources, both MIT licensed, merged by [`scripts/mining-pools.js`](../../scripts/mining-pools.js):
+Sources, both MIT licensed, put together by [`scripts/mining-pools.js`](../../scripts/mining-pools.js):
 
 - **[mempool/mining-pools](https://github.com/mempool/mining-pools)**
   (© mempool and contributors), `pools-v2.json`: the list mempool.space
-  uses and keeps up to date. It is the base, and where both lists name the
-  same tag or address, its name wins (BTC.com is CloverPool there, Ocean.xyz
-  is OCEAN).
+  uses and keeps up to date. It is the main list.
 - **[bitcoin-data/mining-pools](https://github.com/bitcoin-data/mining-pools)**
   (© 2019–2021 btc.com, © 2021– 0xB10C and contributors), `pools.json` from
-  its `generated` branch, last rebuilt on 30 June 2026: only for what the
-  first list lacks, "ckpool" among it, so a solo CKPool block keeps its name.
+  its `generated` branch, last rebuilt on 30 June 2026. What only it holds
+  sits apart as `fallback` and is asked only when nothing in the main list
+  matches - its "ckpool" among it, so a solo CKPool block keeps its name.
+  Where mempool renamed a pool by its tags (BTC.com is CloverPool, Ocean.xyz
+  is OCEAN), the fallback carries the new name.
+
+Why the order: on the 1,005 blocks from 976,359 to 977,363, three addresses
+only bitcoin-data still lists beat a pool's own tag in 15 blocks (TrustPool
+shown as ViaBTC, OCEAN as CleanIncentive, CloverPool as BTC.com). Asked last,
+1,000 of the 1,005 blocks get mempool.space's own name; the other five pay
+NiceHash's address from the extra list below, which mempool does not know.
 
 Neither is only the big pools: solo CKPool, Bitsolo and a handful of
 individuals who once found a block are in there too.
 
-Current copy (24 November 2026): 224 coinbase tags and 246 payout addresses;
-17 tags and 26 addresses of them come only from bitcoin-data. Checked against
+Current copy (24 November 2026): 207 coinbase tags and 220 payout addresses
+from mempool, 17 tags and 26 addresses in the fallback. Checked against
 ten consecutive blocks on one real node in September 2026: ten of ten
 attributed — Foundry three times, F2Pool three times, ViaBTC, Braiins, MARA,
 SpiderPool. Four of those matched by payout address, six only by tag, which
