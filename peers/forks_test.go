@@ -165,3 +165,20 @@ func TestPurityByBits(t *testing.T) {
 		t.Errorf("bit 25 alone: got %q", got.Kind)
 	}
 }
+
+// Bitcoin DOG Mode says Core's name; only its service bit 14 tells it apart.
+func TestDogModeByItsBit(t *testing.T) {
+	bits := []string{"NETWORK_LIMITED", "WITNESS", "UNKNOWN[2^14]"}
+	if k, _, l := dogMode("/Satoshi:31.1.0/", bits); k != "Node (DOG Mode)" || l != "DOG Mode (Core fork)" {
+		t.Errorf("got %q %q", k, l)
+	}
+	if k, _, _ := dogMode("/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS"}); k != "" {
+		t.Errorf("no bit 14, got %q", k)
+	}
+	if k, _, _ := dogMode("/btcwire:0.5.0/", bits); k != "" {
+		t.Errorf("not a Core name, got %q", k)
+	}
+	if got := shownServices("/Satoshi:31.1.0/", bits)[2]; got != "DOG_MODE" {
+		t.Errorf("panel shows %q", got)
+	}
+}

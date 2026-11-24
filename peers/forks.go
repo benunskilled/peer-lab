@@ -64,6 +64,23 @@ func libreRelay(subver string, services []string) (kind, about, label string) {
 	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it", "Libre Relay or Garbageman"
 }
 
+// Bitcoin DOG Mode (github.com/bitcoindogmode/bitcoin, public since
+// 23.08.2026, with a guide for Umbrel at seed.dogofbitcoin.org) is Core under
+// Core's own name, "/Satoshi:31.1.0/", relaying transactions Core filters out,
+// like Libre Relay. Its sign is service bit 14, NODE_DOG_MODE, set on every
+// node (g_local_services, src/init.cpp L863); Core lists it as
+// "UNKNOWN[2^14]".
+// Source: bitcoindogmode/bitcoin src/protocol.h L342 @7503240 (checked 2026-11-24)
+const dogModeService = "UNKNOWN[2^14]"
+
+// dogMode is the kind, about and label for a Core name offering bit 14, or "".
+func dogMode(subver string, services []string) (kind, about, label string) {
+	if !slices.Contains(services, dogModeService) || !strings.HasPrefix(subver, "/Satoshi:") {
+		return "", "", ""
+	}
+	return "Node (DOG Mode)", "Bitcoin DOG Mode, a fork of Core that also relays transactions Core filters out (its service bit 14)", "DOG Mode (Core fork)"
+}
+
 // Service bits Knots gives to rules other than Bitcoin's (src/protocol.h;
 // bit 28 in its releases since 29.4.1.knots20260508, 02.09.2026, whose notes
 // say "knots#359 Hardfork: New BLAKE2b proof-of-work algorithm" - every
@@ -96,7 +113,7 @@ const (
 // knows as "UNKNOWN[2^n]" named after the software that defines them (checked
 // 23.11.2026): 12 and 13 BIP 183's Utreexo bits (bip183/protocol.go in
 // utreexo/utreexod; Castor sets 12 too), 25 Bitcoin Purity's, 27 BIP110's,
-// 28 Knots' BLAKE2b - or, from satd, NODE_INTACT_BLOCKS (node/src/net/peer.rs
+// 14 Bitcoin DOG Mode's, 28 Knots' BLAKE2b - or, from satd, NODE_INTACT_BLOCKS (node/src/net/peer.rs
 // in epochbtc/satd) - 29 Libre Relay's, 30 satd's NODE_NAP (nap/p2p.rs).
 // Only for showing: forkOf and the disguise rules read Core's names.
 func shownServices(subver string, services []string) []string {
@@ -108,6 +125,7 @@ func shownServices(subver string, services []string) []string {
 		"UNKNOWN[2^12]": "UTREEXO", "UNKNOWN[2^13]": "UTREEXO_ARCHIVE",
 		purityService: "PURITY_ASERT", reducedDataService: "REDUCED_DATA",
 		blake2bService: "BLAKE2B", libreRelayService: "LIBRE_RELAY",
+		dogModeService: "DOG_MODE",
 	}
 	if satd {
 		names[blake2bService] = "INTACT_BLOCKS"

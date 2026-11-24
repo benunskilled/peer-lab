@@ -81,6 +81,13 @@
       "relays": true
     },
     {
+      "kind": "Crawler",
+      "pattern": "^/boo:",
+      "flags": "",
+      "reads": "bare",
+      "relays": false
+    },
+    {
       "kind": "Node (Knots)",
       "pattern": "^/GrayersDad:",
       "flags": "i",
@@ -331,6 +338,13 @@
       "flags": "i",
       "reads": "bare",
       "relays": false
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/pynode:([1-9]|0\\.[1-9]|0\\.0\\.([02-9]|1[0-9]))",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
     },
     {
       "kind": "Other chain",
@@ -1260,6 +1274,7 @@
     "/bitnodes.io:0.3/": "Crawler",
     "/blockbrew:0.1.0/": "Node (other)",
     "/blueberry:2026.08.17/": "Wallet",
+    "/boo:0.1.0/": "Crawler",
     "/bread:": "Wallet",
     "/bread:2.1/": "Wallet",
     "/breadwallet:0.6.5/": "Wallet",
@@ -1371,6 +1386,7 @@
     "/programmingbitcoin:0.1/": "Other",
     "/pycoinnet/": "Other light client",
     "/pynode:0.0.1/": "Other",
+    "/pynode:0.1.0/": "Node (other)",
     "/pyspv:0.0.1-alpha1/": "Other light client",
     "/python-bitcoinlib:0.12.2/": "Other",
     "/rbitcoin:0.1.0/": "Node (other)",

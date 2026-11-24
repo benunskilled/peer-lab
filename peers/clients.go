@@ -105,6 +105,8 @@ var clients = []client{
 	// only says so.
 	// Source: sipa/bitcoin-seeder bitcoin.cpp L97 @91e021f (checked 2026-11-24)
 	{re: regexp.MustCompile(`^/bitcoin-seeder:`), text: "A DNS seeder: collects addresses of reachable nodes for new nodes to start from", label: "DNS seeder"},
+	// Source: LunnaBoo/Bitcoin-Seeder-in-C src/protocol.h L14 @c334247 (checked 2026-11-24)
+	{re: regexp.MustCompile(`^/boo:`), kind: "Crawler", text: "Bitcoin Seeder in C, a learning project rebuilding sipa's seeder: collects addresses of reachable nodes", label: "Seeder in C (boo)"},
 	// generic-seeder: sAppName "generic-seeder" (main.cpp L23), sent as
 	// "/generic-seeder/" (bitcoin.cpp L80) in team-exor/generic-seeder, a seeder
 	// for Bitcoin and coins cloned from it (checked 23.11.2026).
@@ -568,6 +570,11 @@ var clients = []client{
 	// offering nothing.
 	// Source: jgarzik/pynode node.py L34 @1898048 (checked 2026-11-24)
 	{re: regexp.MustCompile(`^/pynode:0\.0\.1/$`), text: "Bitcoin Core handing over a transaction privately, then leaving; the name is that of bitcoin-submittx and pynode, which send it too", label: "Core broadcast or pynode"},
+	// Any other pynode version (0.0.1 is Core's private broadcast, above): Laban2122's experimental Python node, which
+	// syncs headers and keeps blocks from a set height (NETWORK_LIMITED only,
+	// p2p/peer_link.py L136).
+	// Source: Laban2122/pynode config.json L31 @22a64ff (checked 2026-11-24)
+	{re: regexp.MustCompile(`^/pynode:([1-9]|0\.[1-9]|0\.0\.([02-9]|1[0-9]))`), kind: "Node (other)", text: "pynode, an experimental Python node that keeps blocks from a set height", label: "pynode (Python node)"},
 	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
 	// rune 1:0 in chains of transactions; on the node this was written for it
 	// pushed unannounced 66-byte transactions, the size of such a sweep. The

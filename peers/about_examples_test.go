@@ -10,6 +10,8 @@ import "testing"
 // source named beside it in about.go.
 var aboutExamples = []struct{ ua, kind string }{
 	{"/bitcoin-seeder:0.01/", "Crawler"},
+	{"/boo:0.1.0/", "Crawler"},
+	{"/pynode:0.1.0/", "Node (other)"},
 	{"/btc-dnsseed:0.2/", "Crawler"},
 	{"/BTC-Nodes:2026-07-14/Sonar/", "Crawler"},
 	{"/21datalab-crawler:1.0/", "Crawler"},

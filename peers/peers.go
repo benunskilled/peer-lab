@@ -426,6 +426,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		p.NoRelay = p.NoRelay || p.NoServices
 		borrowedKind, borrowedAbout, borrowedName, borrowedLabel := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
 		libreKind, libreAbout, libreLabel := libreRelay(r.Subver, r.ServicesNames)
+		dogKind, dogAbout, dogLabel := dogMode(r.Subver, r.ServicesNames)
 		researcher, host, isResearch := researchHostOf(r.Addr)
 		switch {
 		case isResearch:
@@ -460,6 +461,8 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			labelled = p.About
 		case libreKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
+		case dogKind != "" && protocolMismatch(r.Subver, r.Version) == "":
+			p.Kind, p.About, p.Label = dogKind, dogAbout, dogLabel
 			labelled = p.About
 		case borrowedKind != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now) == "":
