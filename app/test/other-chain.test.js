@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { otherChainOf } = require('../src/lib/queries/ranking-row');
+const { otherChainOf } = require('../src/lib/peer-rules');
 
 test('a fork bit alone marks another chain', () => {
   assert.equal(otherChainOf('NETWORK,WITNESS,UNKNOWN[2^28]'), 'BLAKE2b fork');

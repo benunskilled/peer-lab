@@ -151,23 +151,40 @@ const purityByBitsAbout = "Bitcoin Purity under a bare Core name (its -uaspoof=1
 // node/src/net/peer.rs L7-13 in epochbtc/satd, release notes 0.7.0, checked
 // 23.11.2026). From a peer saying "/satd:" the bit is that, not BLAKE2b.
 func forkOf(subver string, services []string, kind string, synced *int64, tip int64) (string, string) {
-	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
+	if !forkApplies(kind) {
 		return "", ""
 	}
 	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced <= forkTipSlack {
 		return "", ""
 	}
-	has := map[string]bool{}
-	for _, s := range services {
-		has[s] = true
-	}
-	switch {
-	case has[blake2bService] && !strings.HasPrefix(strings.ToLower(subver), "/satd:"):
-		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is probably on a chain of its own, not yours"
-	case has[reducedDataService]:
-		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which probably put it on a chain of its own, not yours"
+	for _, b := range forkBits {
+		if !slices.Contains(services, b.service) {
+			continue
+		}
+		if b.exceptAgent != "" && strings.HasPrefix(strings.ToLower(subver), b.exceptAgent) {
+			continue
+		}
+		return b.fork, b.why
 	}
 	return "", ""
+}
+
+// forkBit is one service bit that puts a peer on a chain of its own, asked in
+// this order. exceptAgent is a lower-case name start for which the bit means
+// something else. The dashboard reads the same list (peer-rules.json).
+type forkBit struct {
+	service, fork, why, exceptAgent string
+}
+
+var forkBits = []forkBit{
+	{blake2bService, "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is probably on a chain of its own, not yours", "/satd:"},
+	{reducedDataService, "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which probably put it on a chain of its own, not yours", ""},
+}
+
+// forkApplies is whether forkOf judges a peer of this kind at all: only nodes
+// and unknown software; a wallet or crawler repeating a bit it saw is no fork.
+func forkApplies(kind string) bool {
+	return kind == "Other" || strings.HasPrefix(kind, "Node")
 }
 
 // Syncing: a peer that takes whole blocks from this node faster than the chain

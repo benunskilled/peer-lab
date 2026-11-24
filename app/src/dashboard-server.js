@@ -331,7 +331,7 @@ const sseClients = new Set();
 // false and a value that is unknown are left out: the page reads both as no.
 const PAGE_FIELDS = ['address', 'where', 'client', 'status', 'live', 'trusted', 'kept',
   'first', 'eligible', 'sessionsCount', 'offlineSinceMs', 'hb', 'hbFrom',
-  'localUmbrelPeer', 'sourceObscured', 'privateNetwork', 'offersNothing', 'otherChain',
+  'localUmbrelPeer', 'sourceObscured', 'privateNetwork', 'offersNothing', 'otherChain', 'cannotRelay', 'misspelt',
   'kind', 'noRelay', 'lion', 'fork'];
 function forThePage(row) {
   const out = {};

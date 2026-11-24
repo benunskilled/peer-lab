@@ -92,84 +92,10 @@ function fmtBytes(bytes) {
 // Deliberately NOT in here: block-relay-only peers. They refuse transactions
 // and pass blocks on, which is the opposite of this list.
 //
-// These are the peers service's kindRules (peers/kinds.go), same patterns in
-// the same order, and it has to stay that way. The peer list and the ranking
-// show the same node's peers, and a peer that is marked in one and not the
-// other is worse than no marking at all. The Go side names each family; here only
-// the answer to "can this thing pass a block on" is needed, so a family that
-// relays carries a null reason and is simply a stop.
-//
-// Order is load-bearing, exactly as it is there: first match wins, so a pool
-// node is recognised before anything else gets to read its user agent. A
-// solo-pool operator who puts the pool's name in the bracketed comment -
-// "/Satoshi:29.1.0(mempool-pool)/" and the like - is running a relaying node,
-// and without that rule first the word inside the brackets would have it
-// painted as an indexer.
-const KIND_RULES = [
-  // Core's name misspelt ("/Sat0shi:", "/Satoshi2:"): Disguised in the peer list.
-  // What it runs is unknown, so it is not struck - and it comes first, so the
-  // rest of its agent is not read as a crawler or a wallet either.
-  [/^\/Sat0shi:|^\/Satoshi[0-9X]+:|^Satoshi:|^\/Satoshi:[^/]*$/, null, 'whole'],
-  // Mining pool software speaking p2p, or a node whose operator says in the
-  // bracketed comment that it belongs to a pool. Relays.
-  [/ckpool|^\/ckp2p:|^\/CKCoinD:|\([^)]*pool[^)]*\)|^\/P2Pool:|^\/[^:/(]*pool[^:/(]*:|^\/miningcore-btc-solo:/i, null, 'no-mempool'],
-  // Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
-  // Irium and VDS are forks and altcoins of their own. Bitcoin Purity, a hard
-  // fork of Knots, says "/Satoshi:29.4/Purity:1.1.0/".
-  // Bitcoin Unlimited's old Bitcoin edition: a node of this chain, before
-  // its "(EB16)" reads as another one's.
-  [/^\/BitcoinUnlimited:/i, null, 'whole'],
-  [/Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^\/Bitcoin Interest:|^\/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^\/Aurum:|^\/Ladybug:|\/Purity:|^\/dexcash-nodes:|^\/Satoshi-BTF\(/i, 'a client of another chain', 'whole'],
-  // Scanners run as a service and scanners run by universities - the second
-  // kind announces itself with its department's domain.
-  [/kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^\/btcwire:[^/]*\/Satoshi:|^\/rske-research:|^\/acsrg-research:|^\/dataforge-observer:|^\/connector\/$|^\/Coinscope-GH:|^\/JBS:|\/UU-Network-Research:/i, 'a research scanner'],
-  // Koyn's header tool, on bitcoinj: a light client, not a crawler.
-  [/\/PeerMonitor:/, 'a light client'],
-  // Crawlers, seeders and node counters, including the ones that only say
-  // "scan", "seeder", "census" or "monitor".
-  [/bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^\/p2p-observer:|^\/p2p-extractor:|^\/bip324-probe:|^\/topology-probe:|^\/p2p-probe:|^\/probe:|^\/BTC-Nodes:[^/]*\/Probe\/|^\/btc-peers:|^\/bitcoin-peers:|^\/logos-peer-list:|^\/bip110-observer:|^\/nodes\.mom\.market:|^\/btcwire:[^/]*\/bitcoinstats\.com:|^\/open-nodes:|^\/btz:|^fluxture$|^\/buidl-bootcamp\/|\/HTTPSeed:/i, 'a network crawler'],
-  // Address indexers for wallets: they follow the chain and relay nothing.
-  [/electrs|electrum|esplora|\/mempool|^NBXplorer-|^\/symphony:/i, 'an address indexer'],
-  [/bitcoinj|breadwallet|\/bread:|bither|multibit|wasabi|Bitcoin Wallet|^\/blueberry:|^\/winnow:|^\/BitcoinKit:|^\/WalletKit:|\/hodlwallet:|\/spvwallet:|^\/btcwire:[^/]*\/bitfyn:|^\/twotbit:|^\/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^\/BitcoinSPV:|^\/enginecore:|^\/BitcoinWallet:|^\/btcwire:[^/]*\/(CaribouSPV|BisonSPV):/i, 'a wallet'],
-  // Lightning wallets on lnd, which follow the chain through neutrino.
-  [/\/neutrino:|\/lit:v|^\/btcwire:[^/]*\/zap-(desktop|ios):/i, 'a Lightning wallet'],
-  // Other BIP157 light clients: Kyoto, which says "Rust BIP-157". VerifiedX
-  // validators follow the chain the same way for a chain of their own: headers,
-  // some blocks, no transactions.
-  // EMPORION and its new name SYMMARTYS fetch headers for OpenTimestamps
-  // verification (bitcoin_headers.py in alexar76/emporion). Bitflash's
-  // wallet loads only headers and filter hashes (docs.bitflash.network).
-  [/BIP-157|^\/wuji-headers:|^\/bip157-fetch:|kyoto|^Yuki \/|^\/VerifiedX:|^\/nakamoto:|^\/bitcoin-s:|^Stacks\/|^\/EMPORION:|^\/SYMMARTYS:|^\/Bitflash:btc-light\/|^\/Notoshi\/$|^\/pyspv:|^\/chainhorn:|^\/Murmel:|^\/BitcoinSwift:|^\/haskoin-btc:|^libbtc |\/bitcoin-net:|^\/rust-spv:|^\/pcoc-bari:/i, 'a light client'],
-];
-
-// Rules marked 'whole' read the whole agent: a pool or another chain may be
-// named in the brackets (the pool rule without the word "mempool"). The rest read only the name outside them - a word
-// like "monitor" or "electrs" in an operator's label does not make a Core
-// node a crawler or an indexer. The peers service's classify does the same.
-// The first rule that names this client, as its place in KIND_RULES, or -1.
-// Nothing but slashes, or a version with no name before it ("/:1.1.0/"):
-// nothing said, as with no agent at all - kinds.go emptyName.
-const EMPTY_NAME = /^\/*$|^\/:[^/]*\/$/;
-function kindRuleIndex(client) {
-  if (!client || EMPTY_NAME.test(client)) return -1;
-  const bare = client.replace(/\([^)]*\)/g, '');
-  // "pool" inside "mempool" is no pool: "(mempool.guide)" is a node's label.
-  const noMempool = client.replace(/mempool/gi, '');
-  return KIND_RULES.findIndex(([re, , reads]) => re.test(reads === 'whole' ? client : reads === 'no-mempool' ? noMempool : bare));
-}
-// The rule the ranking marks a peer by when the peers service has no word on it.
-const MISSPELT_RULE = 0;
-
-function cannotRelayReason(client) {
-  const i = kindRuleIndex(client);
-  return i < 0 ? null : KIND_RULES[i][1];
-}
-
-// Whether any rule names this client at all. The peer list flags a fork only
-// on nodes and unknown software, not on a peer it already named as something
-// else (a pool, a misspelt Core), so the ranking asks the same.
-const namedByKindRule = (client) => kindRuleIndex(client) >= 0;
-const otherChainShown = (p) => (p.otherChain && !namedByKindRule(p.client) ? p.otherChain : null);
+// What a peer's name alone says - its kind, whether that kind can pass a
+// block on, and the fork its service bits name - comes with each ranking row
+// from the server (cannotRelay, misspelt, otherChain), which reads the peers
+// service's own rules (lib/peer-rules.js). The page holds no rules of its own.
 
 const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 // subver (Client) is fully attacker-controlled - any P2P peer can set an
@@ -515,7 +441,7 @@ function actionsCell(p, { lock = '' } = {}) {
   // hold a manual slot Slot Fill then has to free again; a disguised one
   // is not to be trusted with it.
   // The peers service's word where it has one, the name rules otherwise.
-  const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : kindRuleIndex(p.client) === MISSPELT_RULE);
+  const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : Boolean(p.misspelt));
   // A Tor or I2P peer this node dialled carries its own address, and Core
   // reaches it again by itself (15.11.2026): it can be added. One that
   // dialled in carries the proxy's address, and CJDNS no proxy at all.
@@ -898,7 +824,7 @@ document.addEventListener('selectionchange', () => {
 // "never first", and gets no "Add as Manual". The peer list marks the same
 // peers with ⊘.
 function neverFirstReason(p) {
-  const own = cannotRelayReason(p.client) || (p.offersNothing ? 'it offers no services' : null);
+  const own = p.cannotRelay || (p.offersNothing ? 'it offers no services' : null);
   // The peers service's word where it has one, for a connected peer - the
   // same word the peer list shows: a "wallet" that offers blocks is a
   // disguise that may well pass them on, whatever its name says, and the
@@ -909,7 +835,7 @@ function neverFirstReason(p) {
   }
   // Without it - not connected, or the peers service is down - by name and
   // service bits, as recorded.
-  const chain = otherChainShown(p) ? `it is probably on a chain of its own (${otherChainShown(p)}), not yours` : null;
+  const chain = p.otherChain ? `it is probably on a chain of its own (${p.otherChain}), not yours` : null;
   return own || chain;
 }
 

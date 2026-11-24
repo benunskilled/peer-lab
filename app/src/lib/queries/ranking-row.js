@@ -1,21 +1,9 @@
 'use strict';
 
-// The peers service's forkOf (peers/forks.go). Which kinds it applies to is the dashboard's to decide
-// (it knows the kinds); here it is the bits and the chain. A live peer whose
-// headers reach the tip follows this chain whatever it offers: one home-built
-// node set bit 27 and stayed at the tip, while 3,945 of 3,947 sessions with
-// the bit shared no header past about 961,000. tip is the highest
-// synced_headers of any live peer; a peer not live keeps the bit alone.
-const FORK_TIP_SLACK = 6;
-// satd's bit 28 is NODE_INTACT_BLOCKS, a pruned node serving every intact
-// block (peers/forks.go forkOf): from a peer saying "/satd:" it is no fork.
-function otherChainOf(services, syncedHeaders = null, tip = 0, agent = '') {
-  const list = typeof services === 'string' ? services.split(',') : [];
-  if (syncedHeaders != null && syncedHeaders >= 0 && tip > 0 && tip - syncedHeaders <= FORK_TIP_SLACK) return null;
-  if (list.includes('UNKNOWN[2^28]') && !/^\/satd:/i.test(agent || '')) return 'BLAKE2b fork';
-  if (list.includes('UNKNOWN[2^27]')) return 'BIP110 fork';
-  return null;
-}
+// The peers service's rules for a peer it has no word on: kind, whether that
+// kind passes blocks on, and the fork its service bits name (peers/forkOf),
+// read from the file the peers service writes (lib/peer-rules.js).
+const peerRules = require('../peer-rules');
 
 /**
  * What one row of the peer ranking MEANS - the half of the ranking that is
@@ -172,11 +160,16 @@ function mapRankingRow(now, graceFrom = 0, liveTip = 0) {
       // An empty list is the peer saying it offers nothing - no blocks to pass
       // on, whatever its user agent says. NULL is Core saying nothing.
       offersNothing: r.services === '',
-      // Knots' service bits for chains of their own (protocol.h on its
-      // 29.x-knots branch): 27 ReducedData, the BIP110 chain, 28 the BLAKE2b
-      // hard fork. Such a peer cannot deliver a block of this chain. Peer
-      // Map's forkOf says the same.
-      otherChain: otherChainOf(r.services, r.liveDirection ? r.syncedHeaders : null, liveTip, r.client),
+      // Knots' service bits for chains of their own: 27 ReducedData, the
+      // BIP110 chain, 28 the BLAKE2b hard fork - only on nodes and unknown
+      // software, as the peer list marks them. Such a peer cannot deliver a
+      // block of this chain.
+      otherChain: peerRules.otherChainOf(r.services, r.liveDirection ? r.syncedHeaders : null, liveTip, r.client),
+      // By name alone, for when the peers service has no word on this peer:
+      // why its software can never deliver a block first, and whether its
+      // name is Core's misspelt (the peer list's "Disguised").
+      cannotRelay: peerRules.cannotRelayReason(r.client),
+      misspelt: (peerRules.kindOf(r.client) || {}).kind === 'Disguised',
       // How long a trusted-but-not-currently-live peer has been offline -
       // Core reconnects manuals on its own, but that can fail silently
       // (peer went dark, network hiccup, slot contention) and a peer that's
@@ -197,4 +190,4 @@ function mapRankingRow(now, graceFrom = 0, liveTip = 0) {
   };
 }
 
-module.exports = { mapRankingRow, otherChainOf, whereOf };
+module.exports = { mapRankingRow, whereOf };

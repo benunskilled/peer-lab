@@ -37,7 +37,7 @@ const { addressKey, hostFromAddress, unreachableNetwork } = require('../address'
 const spread = require('./spread');
 const { pickedRegions } = require('./picks');
 const { bookEntries, usableNetworks, offeredNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
-const { otherChainOf } = require('../queries/ranking-row');
+const { otherChainOf } = require('../peer-rules');
 
 const TRIAL_KEY = 'slot_fill_trial';
 // Candidates on trial at once. Each holds a slot while it runs, so never more
@@ -259,7 +259,7 @@ function disguised(session, peers) {
 }
 
 // A candidate that says it follows another chain - the service bits the
-// peer list marks as a fork (ranking-row.js otherChainOf), and not on our tip
+// peer list marks as a fork (peer-rules.js otherChainOf), and not on our tip
 // either: out at once, as a disguised one is (15.11.2026: a BLAKE2b-fork Knots
 // node held a slot three minutes for nothing).
 // Only with a height Core knows for it: before its first headers (-1, the
