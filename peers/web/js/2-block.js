@@ -416,7 +416,12 @@
     const own = stops.find((s) => s.kind === "own");
     if (tpl && own && own.t < tpl.t) {
       if (tpl.t - own.t <= TEMPLATE_ROUNDING_MS) tpl.t = own.t;
-      else stops.splice(stops.indexOf(tpl), 1);
+      else {
+        stops.splice(stops.indexOf(tpl), 1);
+        // The time goes, the size stays: how many transactions the template
+        // carried is a count, not a moment (24.11.2026).
+        own.tplTx = tpl.tx;
+      }
     }
     return stops.sort((x, y) => x.t - y.t);
   }
@@ -492,7 +497,9 @@
     }
     // No template timing for this block: the two are one stretch.
     if (a.kind === "core" && z.kind === "own") {
-      return ["template + job", ms, "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
+      const tx = z.tplTx != null ? " · " + Math.round(z.tplTx).toLocaleString("en-US") + " tx" : "";
+      return ["template + job" + tx, ms, "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job" +
+        (tx ? " - the more transactions the template carries, the longer that takes" : "")];
     }
     return ["", ms, ""];
   }
