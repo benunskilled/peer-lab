@@ -1227,6 +1227,7 @@
     "/Satoshi:29.3.0/Knots:20260210+bip110-v0.4.1/UASF-BIP110:0.4/": "Other chain",
     "/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
     "/Satoshi:29.4/Purity:1.1.0/": "Other chain",
+    "/Satoshi:29.5.1/Knots:20260508/Plumb:15/": "Node (Knots)",
     "/Satoshi:31.0.0(Samourai Dojo 1.29.3)/": "Node (Core)",
     "/Satoshi:31.1.0/KnotsSHA256:20261018/": "Node (Knots)",
     "/SatoshiSharp:0.1.0/": "Other",

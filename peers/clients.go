@@ -304,6 +304,11 @@ var clients = []client{
 	{re: regexp.MustCompile(`\(2x\)`), text: "btc1, the SegWit2x client of 2017; its fork was called off", label: "btc1 SegWit2x (2017)"},
 	// Source: paulscode/knots-sha256 src/clientversion.cpp L74 @e9c534b (checked 2026-11-24)
 	{re: regexp.MustCompile(`/KnotsSHA256:`), text: "Knots (SHA256), paulscode's build of Knots that stays on the SHA256 chain", label: "Knots (SHA256), paulscode"},
+	// Plumb (plumb-node/plumb): one Knots release plus the spam filters its
+	// maintainers reviewed; policy only, so it follows that release's chain
+	// (README). "/Plumb:15/" after Knots' own part; its kind stays Knots.
+	// Source: plumb-node/plumb src/clientversion.cpp L76 @a583168 (checked 2026-11-24)
+	{re: regexp.MustCompile(`/Plumb:`), text: "Plumb, Bitcoin Knots with extra spam-policy filters on top", label: "Plumb (Knots fork)"},
 	// spruned's copy of pycoinnet: subversion=b"/pycoinnet/" in
 	// spruned/dependencies/pycoinnet/version.py L81, used unchanged by
 	// spruned/daemon/bitcoin_p2p/p2p_connection.py L114 (mempoolco/spruned,
