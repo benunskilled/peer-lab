@@ -22,6 +22,19 @@ func TestLibreRelayAndGarbageman(t *testing.T) {
 			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
 		}
 	}
+	// The short label survives the whole conversion, not only libreRelay().
+	for subver, label := range map[string]string{"/Satoshi:30.2.0/": "Libre Relay (Core fork)", "/Satoshi:28.1.0/": "Libre Relay or Garbageman"} {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+			Subver: subver, Transport: "v2", ServicesNames: bit}})[0]
+		if got.Label != label {
+			t.Errorf("%s: label %q, want %q", subver, got.Label, label)
+		}
+	}
+	dog := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:31.1.0/", Transport: "v2", ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^14]"}}})[0]
+	if dog.Label != "DOG Mode (Core fork)" {
+		t.Errorf("DOG Mode: label %q", dog.Label)
+	}
 	// Bit 26 beside 29 is Garbageman v28's full RBF; Libre Relay never sets it.
 	rbf := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 		Subver: "/Satoshi:28.0.0/", Transport: "v2", ServicesNames: append(bit[:4:4], "UNKNOWN[2^26]", "UNKNOWN[2^29]")}})[0]

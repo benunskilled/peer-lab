@@ -461,6 +461,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			labelled = p.About
 		case libreKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
+			labelled = p.About
 		case dogKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = dogKind, dogAbout, dogLabel
 			labelled = p.About
