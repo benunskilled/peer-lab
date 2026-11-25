@@ -403,12 +403,16 @@ function finalizeRace(hash) {
   openRaces.delete(prevhash);
   clearTimeout(race.timer);
   // Charged a miss only if its connection stood for the whole race (review
-  // G4): a pool we could not reach, or that dropped meanwhile, had no
-  // chance, and Miss says "connected and silent" - how fast pools are, not
-  // whether this node reaches them.
+  // G4) and had already brought a job before it began: a pool we could not
+  // reach, that dropped meanwhile, or that was still authorising us (see
+  // readySince in lib/stratum-client.js) had no chance, and Miss says
+  // "connected and silent" - how fast pools are, not whether this node
+  // reaches them.
   race.watched = [...active].filter(([, { conn }]) => {
     const since = conn.connectedSince;
-    return since === undefined || (since != null && since <= race.createdAt);
+    if (!(since === undefined || (since != null && since <= race.createdAt))) return false;
+    const ready = conn.readySince;
+    return ready === undefined || (ready != null && ready <= race.createdAt);
   }).map(([id]) => id);
   race.generation = generation;
   publishLive(race, true);

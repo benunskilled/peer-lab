@@ -624,3 +624,18 @@ test('a pool with no connection during the race is not charged a miss', async ()
   await race.finalizeRace(prevhash(198));
   assert.deepEqual(observationsFor(prevhash(198)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B connected and silent; C down, D came up late');
 });
+
+// The case behind two false misses of an owner's ckpool (25.11.2026): the
+// socket stood before the block, but the pool had not authorised us yet and
+// sent its first job only afterwards. Connected is not enough - it has to
+// have been working.
+test('a pool still authorising us when the block came is not charged a miss', async () => {
+  const at = Date.now();
+  const pools = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  race.active.clear();
+  const ready = { 1: at - 60_000, 2: at - 30_000, 3: null };
+  for (const p of pools) race.active.set(p.id, { conn: { stop() {}, connectedSince: at - 60_000, readySince: ready[p.id] }, pool: p });
+  race.handleNotify(pools[0], prevhash(199), hr(), at);
+  await race.finalizeRace(prevhash(199));
+  assert.deepEqual(observationsFor(prevhash(199)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B worked and stayed silent; C had no job yet');
+});

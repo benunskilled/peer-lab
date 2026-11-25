@@ -176,3 +176,16 @@ test('a long burst of complete lines is not mistaken for one oversized line', ()
   assert.equal(fired, 2000, 'every line is handled');
   assert.equal(reported, 0, 'and nothing is reported');
 });
+
+// A connection counts as working only once it brought a job: ckpool accepted
+// the socket and took 20 s to two minutes to authorise (25.11.2026).
+test('readySince is when the connection brought its first job, and only then', () => {
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'test' });
+  assert.equal(conn.readySince, null, 'no job yet');
+  const line = (hash) => `${JSON.stringify({ method: 'mining.notify', params: ['j', hash, '', '', [], '', '', '', true] })}\n`;
+  conn._handleChunk(Buffer.from(line('ab'.repeat(32))), process.hrtime.bigint(), 1789900000100);
+  conn._handleChunk(Buffer.from(line('cd'.repeat(32))), process.hrtime.bigint(), 1789900000900);
+  assert.equal(conn.readySince, 1789900000100, 'the first job, not the latest');
+  conn.stop();
+  assert.equal(conn.readySince, null, 'gone with the connection');
+});

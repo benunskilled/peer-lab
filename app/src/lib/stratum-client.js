@@ -69,6 +69,7 @@ class StratumPoolConnection extends EventEmitter {
     this.notifyCount = 0;
     this.authorized = null; // null = no response yet, true/false = pool's answer
     this._connectedAt = null;
+    this._readyAt = null;
     this._heartbeatTimer = null;
   }
 
@@ -83,9 +84,20 @@ class StratumPoolConnection extends EventEmitter {
     return this._connectedAt;
   }
 
+  // When the open connection brought its first job, null until it has. A
+  // connection is not working until then: a pool may accept the socket and
+  // take its time to authorise - ckpool took 20 seconds to two minutes on a
+  // real node (25.11.2026) - and a block inside that wait finds a pool that
+  // has the new job ready and no way yet to send it here. Charging that as a
+  // miss blamed the pool for this end's handshake.
+  get readySince() {
+    return this._readyAt;
+  }
+
   stop() {
     this.stopped = true;
     this._connectedAt = null;
+    this._readyAt = null;
     clearTimeout(this._reconnectTimer);
     if (this.socket) this.socket.destroy();
   }
@@ -121,6 +133,7 @@ class StratumPoolConnection extends EventEmitter {
       this.notifyCount = 0;
       this.authorized = null;
       this._connectedAt = Date.now();
+      this._readyAt = null;
       const subscribe = JSON.stringify({ id: 1, method: 'mining.subscribe', params: ['peer-lab/1.0'] });
       socket.write(`${subscribe}\n`);
       // Many stratum servers - solo-mining ckpool-based ones especially,
@@ -164,6 +177,7 @@ class StratumPoolConnection extends EventEmitter {
         // accepts and drops at once is otherwise redialled every 2 seconds.
         if (this._connectedAt && Date.now() - this._connectedAt >= HELD_MS) this.reconnectDelayMs = 2000;
         this._connectedAt = null;
+        this._readyAt = null;
         clearTimeout(this._reconnectTimer);
         this._reconnectTimer = setTimeout(() => this._connect(), this.reconnectDelayMs);
         this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 1.5, 30000);
@@ -236,6 +250,7 @@ class StratumPoolConnection extends EventEmitter {
         return;
       }
       this.notifyCount += 1;
+      if (this.notifyCount === 1) this._readyAt = receivedAtMs;
       this.emit('notify', {
         prevhash,
         cleanJobs: Boolean(cleanJobs),
