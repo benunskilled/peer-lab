@@ -252,12 +252,53 @@
       <div id="stratum-body">
       <!-- The public pools to race, by country (data/stratum-pools.json). A
            fresh install has none ticked; older installs see theirs ticked. -->
-      <details class="pool-pick" id="pool-pick">
-        <summary>Choose pools <span class="hint" id="pool-pick-sum"></span></summary>
+      <details class="pool-pick how" id="pool-pick">
+        <summary><span>Choose pools</span><span class="pick-sum" id="pool-pick-sum"></span><span class="pick-found" id="pool-pick-found"></span></summary>
+        <div class="rt-switch pick-kind" id="pool-pick-kind" role="group" aria-label="Kind">
+          <button type="button" data-action="pool-kind" data-kind="all">All</button>
+          <button type="button" data-action="pool-kind" data-kind="solo">Solo</button>
+          <button type="button" data-action="pool-kind" data-kind="shared">Shared</button>
+        </div>
         <div class="cc-filter" id="pool-pick-filter" role="group" aria-label="Country"></div>
         <label class="cc-select"><span class="sr-only">Country</span><select id="pool-pick-select"></select></label>
         <ul class="plist" id="pool-pick-list"></ul>
-        <p class="hint">Each ticked pool is one open connection; nothing is mined. Unticking pauses a pool and keeps its numbers. "routed": the pool is reached through a distributor, so where its servers stand is not known.</p>
+        <p class="hint">Each pool switched on is one open connection; nothing is mined. Switched off, a pool pauses and keeps its numbers. Solo: whoever finds a block keeps it. Shared: the pool's miners split the reward. "routed": the pool is reached through a distributor, so where its servers stand is not known.</p>
+        <!-- A pool app on this Umbrel, or any pool by hand: set up once, so
+             inside the fold too. A pool app found here is named in the
+             folded line. -->
+        <div class="pick-own">
+        <div class="inline-form" id="pool-templates">
+          <span class="hint">Local Umbrel pool:</span>
+          <button type="button" class="secondary" data-action="fill-pool-template" data-template="gobrrr">GoBrrr</button>
+          <button type="button" class="secondary" data-action="fill-pool-template" data-template="bassin">Bassin</button>
+          <button type="button" class="secondary" data-action="fill-pool-template" data-template="public-pool">Public Pool</button>
+          <button type="button" class="secondary" data-action="fill-pool-template" data-template="datum">DATUM</button>
+          <button type="button" class="secondary" data-action="fill-pool-template" data-template="pogolo">Pogolo</button>
+        </div>
+        <form id="pool-add-form" class="inline-form">
+          <input type="text" id="pool-label" aria-label="Pool name" placeholder="Label" required />
+          <input
+            type="text"
+            id="pool-host"
+            aria-label="Pool host"
+            placeholder="Host"
+            title="A local Umbrel pool app isn't reached at umbrel.local - use its container name instead (e.g. gobrrr-pool_ckpool_1), same network as this app."
+            required
+          />
+          <input
+            type="number"
+            id="pool-port"
+            aria-label="Pool port"
+            placeholder="Port"
+            min="1"
+            max="65535"
+            title="The stratum port inside the pool's container, not the one your miner uses on your network. The buttons above fill it in."
+            required
+          />
+          <button type="submit">Add Pool</button>
+          <span id="pool-add-result" class="hint"></span>
+        </form>
+        </div>
       </details>
       <!-- The range as a switch, like the one on the block card. -->
       <div class="rt-switch" id="stratum-range" role="group" aria-label="Range">
@@ -265,37 +306,6 @@
         <button type="button" data-range="100" aria-pressed="false">100 blocks</button>
         <button type="button" data-range="all" aria-pressed="false">All time</button>
       </div>
-      <div class="inline-form" id="pool-templates">
-        <span class="hint">Local Umbrel pool:</span>
-        <button type="button" class="secondary" data-action="fill-pool-template" data-template="gobrrr">GoBrrr</button>
-        <button type="button" class="secondary" data-action="fill-pool-template" data-template="bassin">Bassin</button>
-        <button type="button" class="secondary" data-action="fill-pool-template" data-template="public-pool">Public Pool</button>
-        <button type="button" class="secondary" data-action="fill-pool-template" data-template="datum">DATUM</button>
-        <button type="button" class="secondary" data-action="fill-pool-template" data-template="pogolo">Pogolo</button>
-      </div>
-      <form id="pool-add-form" class="inline-form">
-        <input type="text" id="pool-label" aria-label="Pool name" placeholder="Label" required />
-        <input
-          type="text"
-          id="pool-host"
-          aria-label="Pool host"
-          placeholder="Host"
-          title="A local Umbrel pool app isn't reached at umbrel.local - use its container name instead (e.g. gobrrr-pool_ckpool_1), same network as this app."
-          required
-        />
-        <input
-          type="number"
-          id="pool-port"
-          aria-label="Pool port"
-          placeholder="Port"
-          min="1"
-          max="65535"
-          title="The stratum port inside the pool's container, not the one your miner uses on your network. The buttons above fill it in."
-          required
-        />
-        <button type="submit">Add Pool</button>
-        <span id="pool-add-result" class="hint"></span>
-      </form>
       <div class="table-wrap">
         <table id="pool-table">
           <thead>

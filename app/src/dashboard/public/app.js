@@ -1378,9 +1378,12 @@ async function refreshPools() {
 // ---- Choose pools: the public pools by country (lib/pool-catalog.js) ----
 
 let poolPick = null; // the last answer of /api/pools/catalog
+let localPoolsFound = []; // pool apps on this Umbrel not yet in the race
 let poolPickBusy = 0; // ticks on their way: no redraw under the finger
 const POOL_COUNTRY_KEY = 'peerlab.poolCountry';
 let poolCountry = (() => { try { return localStorage.getItem(POOL_COUNTRY_KEY) || 'all'; } catch { return 'all'; } })();
+const POOL_KIND_KEY = 'peerlab.poolKind';
+let poolKind = (() => { try { return localStorage.getItem(POOL_KIND_KEY) || 'all'; } catch { return 'all'; } })();
 // A routed pool has no country: a globe and "Routed" instead.
 const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
 const pickCountry = (cc) => (cc ? countryName(cc) : 'Routed');
@@ -1398,8 +1401,14 @@ async function refreshPoolPick() {
 function renderPoolPick() {
   const box = document.getElementById('pool-pick');
   if (!box || !poolPick) return;
-  const pools = poolPick.pools;
+  // The kind first: the countries then count only pools of that kind.
+  const pools = poolPick.pools.filter((p) => poolKind === 'all' || p.kind === poolKind);
   const racing = poolPick.racing;
+  for (const b of document.querySelectorAll('#pool-pick-kind button')) {
+    const on = b.dataset.kind === poolKind;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
   const ticked = pools.filter((p) => p.enabled).length;
   const counts = new Map();
   for (const p of pools) counts.set(p.country || '', (counts.get(p.country || '') || 0) + 1);
@@ -1407,14 +1416,16 @@ function renderPoolPick() {
   if (poolCountry !== 'all' && poolCountry !== 'on' && !counts.has(poolCountry === 'routed' ? '' : poolCountry)) poolCountry = 'all';
 
   document.getElementById('pool-pick-sum').textContent =
-    `· ${racing} of ${poolPick.max} racing · ${pools.length} public pools in ${countries.length} countries`;
+    `${racing} of ${poolPick.max} racing · ${poolPick.pools.length} public pools`;
+  const foundEl = document.getElementById('pool-pick-found');
+  if (foundEl) foundEl.textContent = localPoolsFound.length ? `· ${localPoolsFound.join(', ')} found on this Umbrel` : '';
   // A fresh install has nothing racing: the list is what to do first.
   if (!box.dataset.seen) {
     box.dataset.seen = '1';
     if (!racing) box.open = true;
   }
 
-  const options = [['all', 'All', pools.length], ['on', 'Ticked', ticked]]
+  const options = [['all', 'All countries', pools.length], ['on', 'Switched on', ticked]]
     .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
   if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
   document.getElementById('pool-pick-filter').innerHTML = options.map(([k, t, n]) =>
@@ -1430,13 +1441,19 @@ function renderPoolPick() {
     const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'location not known';
     const tag = p.routed ? 'shared · routed' : p.kind;
     const off = full && !p.enabled;
-    return `<li><label${off ? ` title="At most ${poolPick.max} pools race at once - untick one first"` : ''}>
-      <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" ${p.enabled ? 'checked' : ''}${off ? ' disabled' : ''} />
+    return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
       <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
       <span class="w">${escapeHtml(where)}</span>
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
+      <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' disabled' : ''} />
     </label></li>`;
-  }).join('') : '<li class="hint">None ticked yet.</li>';
+  }).join('') : `<li class="hint">${poolCountry === 'on' ? 'None switched on yet.' : 'No pool of this kind here.'}</li>`;
+}
+
+function setPoolKind(kind) {
+  poolKind = kind;
+  try { localStorage.setItem(POOL_KIND_KEY, kind); } catch { /* private window: fine */ }
+  renderPoolPick();
 }
 
 function setPoolCountry(cc) {
@@ -1892,6 +1909,9 @@ async function refreshLocalPools() {
   localPoolsAtMs = Date.now();
   try { list = await api('/api/pools/local'); } catch { localPoolsAtMs = 0; return; }
   localPoolTemplates = Object.fromEntries(list.map((p) => [p.key, p]));
+  // Named in the folded line too: the buttons that say so are inside the fold.
+  localPoolsFound = list.filter((p) => p.installed && !p.added).map((p) => p.label);
+  renderPoolPick();
   document.querySelectorAll('#pool-templates button[data-template]').forEach((btn) => {
     const t = localPoolTemplates[btn.dataset.template];
     const found = Boolean(t && t.installed && !t.added);
@@ -1910,6 +1930,10 @@ document.body.addEventListener('click', async (e) => {
 
   if (action === 'pool-country') {
     setPoolCountry(btn.dataset.cc);
+    return;
+  }
+  if (action === 'pool-kind') {
+    setPoolKind(btn.dataset.kind);
     return;
   }
 
@@ -2068,6 +2092,8 @@ document.body.addEventListener('change', async (e) => {
     try {
       await api('/api/pools/catalog', { method: 'POST', body: JSON.stringify({ host: pick.dataset.host, port: Number(pick.dataset.port), enabled }) });
       showToast(enabled ? 'Pool added to the race.' : 'Pool paused.', 'success');
+      const row = pick.closest('label');
+      if (row) row.classList.toggle('on', enabled);
     } catch (err) {
       if (pick.isConnected) pick.checked = !enabled;
       showToast(`Could not change the pool: ${err.message}`, 'error');

@@ -1568,25 +1568,43 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .panel .region-pick.on b { color: #1a1200; }
 .panel .region-pick:disabled { opacity: .45; cursor: default; }
 
-/* Stratum Race: the public pools to pick from, filtered by country. */
-.pool-pick { margin: 0 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-.pool-pick > summary { cursor: pointer; font-weight: 600; color: var(--text); }
-.pool-pick > summary .hint { font-weight: 400; }
-.cc-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.cc-filter button { border: 1px solid var(--border); background: none; color: var(--muted); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+/* Stratum Race: the public pools to pick from, by kind and country. Each
+   pool has the same switch as Slot Fill and the pool table: one control for
+   on and off across the page. The filters are grey like the range switch -
+   they change the view, not the setting. */
+.pool-pick { margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.pool-pick > summary { font-weight: 600; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.pool-pick > summary .pick-sum { font-weight: 400; font-size: 13px; color: var(--muted); }
+.pool-pick > summary::after { align-self: center; }
+.pool-pick .pick-kind { margin: 10px 0 0; }
+.cc-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.cc-filter button { border: 1px solid var(--border); background: none; color: #c3ccd5; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.cc-filter button:hover { color: var(--text); border-color: var(--muted); }
 .cc-filter button.on { background: var(--land-hot); color: var(--text); border-color: transparent; }
-.cc-filter button small { opacity: .7; margin-left: 3px; }
-.cc-select { display: none; margin: 10px 0; }
-.cc-select select { font: inherit; font-size: 15px; padding: 6px 8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; max-width: 100%; }
-.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2px 16px; margin: 0; padding: 0; list-style: none; }
-.plist label { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
-.plist label:hover { background: rgba(255, 255, 255, .03); }
-.plist input { grid-row: 1 / 3; width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
-.plist input:disabled + .n { opacity: .5; }
-.plist .n { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plist .w { grid-column: 2; color: var(--muted); font-size: 12px; }
-.plist .tag { grid-row: 1 / 3; grid-column: 3; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.cc-filter button small { opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.cc-select { display: none; margin: 10px 0 12px; }
+.cc-select select { font: inherit; font-size: 15px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
+.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; }
+.plist label { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--panel-2); }
+.plist label:hover { border-color: var(--muted); }
+.plist label.on { border-color: rgba(247, 147, 26, .45); }
+.plist .n { color: var(--text); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .w { grid-column: 1; color: var(--muted); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .tag { grid-row: 1 / 3; grid-column: 2; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .plist .tag.shared { color: var(--accent); border-color: rgba(247, 147, 26, .4); }
+.plist input[type="checkbox"] {
+  grid-row: 1 / 3; grid-column: 3; appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
+  width: 34px; height: 20px; border-radius: 999px; background: #2a3541; position: relative; transition: background .15s;
+}
+.plist input[type="checkbox"]::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; }
+.plist input[type="checkbox"]:checked { background: var(--accent); }
+.plist input[type="checkbox"]:checked::after { left: 17px; }
+.plist input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plist input[type="checkbox"]:disabled { opacity: .4; cursor: not-allowed; }
+.plist li.hint { grid-column: 1 / -1; }
+.pick-own { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pick-own .inline-form:last-child { margin-bottom: 0; }
+.pool-pick > summary .pick-found { font-weight: 400; font-size: 13px; color: var(--accent); }
 @media (max-width: 600px) {
   .cc-filter { display: none; }
   .cc-select { display: block; }

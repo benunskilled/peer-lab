@@ -543,7 +543,7 @@
    "source": "https://antpoolsupport-hc.zendesk.com/hc/en-us/articles/5984340865177-BTC-BCH-Mining-Tutorial"
   },
   {
-   "name": "ViaBTC (routed)",
+   "name": "ViaBTC",
    "host": "btc.viabtc.io",
    "port": 3333,
    "country": null,
@@ -553,7 +553,7 @@
    "source": "https://support.viabtc.com/hc/en-us/articles/14367481714191-Mining-Pools-Information"
   },
   {
-   "name": "SECPOOL (routed)",
+   "name": "SECPOOL",
    "host": "btc.secpool.com",
    "port": 3333,
    "country": null,
@@ -583,7 +583,7 @@
    "source": "https://help.cloverpool.com/hc/en-us/articles/360038354832-Bitcoin-Mining-Tutorial"
   },
   {
-   "name": "EMCD (routed)",
+   "name": "EMCD",
    "host": "eu.emcd.network",
    "port": 3333,
    "country": null,
