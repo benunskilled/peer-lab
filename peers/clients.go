@@ -977,8 +977,15 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)^/Bitcoin Interest:`), kind: "Other chain", text: "Bitcoin Interest, a fork of Bitcoin with a chain of its own", label: "Bitcoin Interest fork"},
 	// Source: Bitcoin-Clashic/bitcoin-clashic src/clientversion.cpp L16 @3d18496 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)^/Bitcoin Clashic`), kind: "Other chain", text: "Bitcoin Clashic, a fork of Bitcoin Cash from 2017", label: "Bitcoin Clashic (BCH)"},
-	// Source: bitcoinclassic/bitcoinclassic src/Application.cpp L172 @4c27454 (checked 2026-11-24)
-	{re: regexp.MustCompile(`(?i)Classic:`), text: "Bitcoin Classic: a Bitcoin Cash client", label: "Bitcoin Classic (BCH)"},
+	// Bitcoin Classic: 0.11.2 to 1.2.x were for Bitcoin ("the first Bitcoin
+	// Classic release, focused on doubling the transaction capacity of
+	// Bitcoin", v0.11.2.cl1 release notes). From 1.3 there were two editions
+	// with the same name: the standard one ignores Bitcoin Cash by default,
+	// the "uahf" one follows it (v1.3.4 and v1.3.0uahf release notes).
+	// Source: bitcoinclassic/bitcoinclassic src/clientversion.cpp L16 @27057bb (checked 2026-11-25)
+	{re: regexp.MustCompile(`(?i)Classic:(0\.|1\.[0-2]\.)`), kind: "Node (other)", text: "Bitcoin Classic, a big-block client for Bitcoin from 2016–2017", label: "Bitcoin Classic"},
+	// Source: bitcoinclassic/bitcoinclassic src/Application.cpp L172 @529d8c9 (checked 2026-11-25)
+	{re: regexp.MustCompile(`(?i)Classic:`), kind: "Node (other)", text: "Bitcoin Classic 1.3 or later: follows Bitcoin by default, its UAHF edition Bitcoin Cash; the name doesn't tell which", label: "Bitcoin Classic 1.3+"},
 	// "(EB8)" is the block size a big-block client accepts: Classic, Unlimited
 	// and others all send it, so alone it says only that much.
 	{re: regexp.MustCompile(`\(EB[0-9]`), text: "Probably a big-block client: \"EB\" is the block size it accepts", label: "Probably big-block client"},
@@ -992,7 +999,6 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)Bitcoin XT`), kind: "Other chain"},
 	{re: regexp.MustCompile(`(?i)OracleKnots:`), kind: "Other chain"},
 	{re: regexp.MustCompile(`(?i)UASF-BIP110:`), kind: "Other chain"},
-	{re: regexp.MustCompile(`(?i)Classic:`), kind: "Other chain"},
 	{re: regexp.MustCompile(`(?i)\(EB[0-9]`), kind: "Other chain"},
 	{re: regexp.MustCompile(`(?i)SuperBitcoin`), kind: "Other chain"},
 	{re: regexp.MustCompile(`(?i)iriumd`), kind: "Other chain"},
