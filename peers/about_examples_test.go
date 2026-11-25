@@ -115,6 +115,8 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/rust-sha2-p2p-client/", "Other"},
 	{"/Gnostr:0.1.0/", "Other"},
 	{"/Aurum:0.12.4/", "Other chain"},
+	{"/Floptoshi:2.0.0/", "Other chain"},
+	{"/BTokenCore:0.0.0/", "Wallet"},
 	{"/Satoshi:29.4/Purity:1.1.0/", "Other chain"},
 	{"/bitcoinj:0.14.4/Bitcoin Wallet:5.18/", "Wallet"},
 	{"/bread:", "Wallet"},

@@ -342,6 +342,20 @@
       "relays": false
     },
     {
+      "kind": "Other chain",
+      "pattern": "^/Floptoshi:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/BTokenCore:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
       "kind": "Other light client",
       "pattern": "^/Bitflash:btc-light/",
       "flags": "i",
@@ -1144,6 +1158,7 @@
     "/BTC-Nodes:1.0/Probe/": "Crawler",
     "/BTC-Nodes:2026-07-14/Sonar/": "Crawler",
     "/BTC-Nodes:2026-09-24/Sonar/": "Crawler",
+    "/BTokenCore:0.0.0/": "Wallet",
     "/BUCash:1.9.0/": "Other chain",
     "/BitArgus:0.1/": "Crawler",
     "/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
@@ -1178,6 +1193,7 @@
     "/Denovo:0.7.0/": "Other",
     "/EMPORION:0.3/": "Other light client",
     "/FavillaKEY:0.1/": "Other",
+    "/Floptoshi:2.0.0/": "Other chain",
     "/Floresta:0.9.1/": "Node (Floresta)",
     "/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
     "/Forseti:0.2.0/": "Node (other)",
