@@ -166,6 +166,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/curl:8.5.0/", "Other"},
 	{"/dexcash-nodes:0.1.0/", "Other chain"},
 	{"/bitnodes.io:0.3/", "Crawler"},
+	{"/getaddr.bitnodes.io:0.1/", "Crawler"},
 	{"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/", "Wallet"},
 	{"/btcwire:0.5.0/BisonSPV:0.0.1-beta/", "Wallet"},
 	{"/btcwire:0.5.0/zap-desktop:0.7.7-beta/", "Lightning wallet"},

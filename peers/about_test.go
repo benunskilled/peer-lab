@@ -40,7 +40,7 @@ func TestOtherAbouts(t *testing.T) {
 		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
 		{"/btcwire:0.2.0/Satoshi:0.9.3/", 70002, "pbtc, CIRCL's"},
 		{"/btcwire:0.5.0/Satoshi:0.20/", 70016, "Probably a network monitor on btcd's library"},
-		{"/jwrd.net:0.9.99.99/", 70016, "Named like JWRD Computing's own bitcoind"},
+		{"/jwrd.net:0.9.99.99/", 70016, "JWRD Computing's own bitcoind"},
 		{"/therealbitcoin.org:0.9.99.99/", 99999, "The Real Bitcoin (TRB)"},
 		{"/exnode:0.1.0/", 70016, "exnode, a Bitcoin full node written in Elixir"},
 		{"/BitcoinEcho:0.1.0/", 70016, "Bitcoin Echo, a full node in plain C"},

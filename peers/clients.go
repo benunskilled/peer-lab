@@ -222,9 +222,10 @@ var clients = []client{
 	{re: regexp.MustCompile(`^/bridge:`), text: "Named like Castor, Floresta's Utreexo bridge", label: "Named like Castor"},
 	// Source: decentralizedb/bip110-observer app/crawler.py L134 @588e0a8 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)^/bip110-observer:`), kind: "Crawler", text: "BIP-110 Observer, a crawler that collects peer user agents and advertised services", label: "BIP-110 Observer crawler"},
-	// Only the name points to favillakey.io; the site documents no P2P
-	// connections, so the kind stays Other.
-	{re: regexp.MustCompile(`^/FavillaKEY:`), text: "Named like Favilla KEY, a Nostr and Bitcoin signing device (favillakey.io); what it connects for is not documented", label: "Named like Favilla KEY"},
+	// Favilla KEY's firmware: its inheritance feature (Emberwill) sends
+	// "/FavillaKEY:0.1/", then getheaders, and later the payout transaction.
+	// Source: Favilla-Pty-Ltd/favilla-key src/ember_mvp.inc L210 @62f8940 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/FavillaKEY:`), text: "Favilla KEY, a signing device: its inheritance feature fetches block headers and sends the payout itself", label: "Favilla KEY"},
 	// Bitcoin Ghost (github.com/bitcoin-ghost/ghost): ghostd, a fork of Core
 	// v30, UA_NAME "Ghost" in clientversion.cpp.
 
@@ -355,7 +356,8 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)\((Official )?MiniBolt[ _]node\)|; MiniBolt node\)`), text: "A node set up with MiniBolt, a step-by-step guide to building a Bitcoin node", label: "MiniBolt guide node"},
 	// mempool's own node config carries "#uacomment=@wiz" (production/
 	// bitcoin.conf L19 at v3.3.2 in mempool/mempool; wiz co-founded
-	// mempool.space). Anyone can copy it, and mempool.space lists no nodes of
+	// mempool.space); its 2020 production/README.md (L63 at c732f2d) set
+	// "uacomment=@wiz" uncommented. Anyone can copy it, and mempool.space lists no nodes of
 	// its own, so only "Probably".
 	{re: regexp.MustCompile(`(?i)^/Satoshi:[^/]*\(@wiz\)/(Knots:[^/]*/)?$`), text: "Probably a mempool.space node: '@wiz' is the comment in mempool's own node config", label: "Probably mempool.space"},
 	// Both only on a bare Core or Knots name: anything after it (electrs)
@@ -524,8 +526,10 @@ var clients = []client{
 	// Source: WalletWasabi/WalletWasabi WalletWasabi/Wallets/P2pBlockProvider.cs L166 @v2.0.0.0 (checked 2026-11-25)
 	// Source: WalletWasabi/WalletWasabi WalletWasabi.Fluent/Global.cs L261 @v2.0.0.0 (checked 2026-11-25)
 	{re: regexp.MustCompile(`^/Wasabi(Client)?:`), text: "Wasabi Wallet, an older version; newer ones introduce themselves as Bitcoin Core", label: "Wasabi Wallet"},
-	// Newer Wasabi (v2.8.5) picks a Core name at random, "/Satoshi:30.2.0/"
-	// and others (UserAgents in WalletWasabi/Helpers/Constants.cs).
+	// From v1.1.12 (PR #3757) Wasabi picks a Core name at random,
+	// "/Satoshi:30.2.0/" and others (UserAgents in WalletWasabi/Helpers/
+	// Constants.cs); "/Wasabi:" stayed on block downloads from the user's
+	// node until v2.5.1 (SpecificNodeBlockProvider.cs) and is gone from v2.6.0.
 	{re: regexp.MustCompile(`(?i)wasabi`), text: "Named like Wasabi Wallet", label: "Named like Wasabi"},
 	// On bitcoinj, so before its rule: HTTPSeed (crawler.kt in bitcoinj/httpseed)
 	// and CoinView (Main.java in vs-uulm/CoinView), see the sources further down.
@@ -698,6 +702,9 @@ var clients = []client{
 	{re: regexp.MustCompile(`/Symbiosis Bitcoin Bridge:`), text: "Named like the Bitcoin bridge of Symbiosis Finance, on btcd's Go library", label: "Named like Symbiosis"},
 	{re: regexp.MustCompile(`^/curl:`), text: "Named like curl, the download tool; curl itself does not speak Bitcoin's protocol", label: "Named like curl"},
 	{re: regexp.MustCompile(`(?i)^/dexcash-nodes:`), kind: "Other chain", text: "Named like DexCash Network, a blockchain of its own", label: "Named like DexCash"},
+	// Bitnodes' early crawler: user_agent = /getaddr.bitnodes.io:0.1/.
+	// Source: ayeowch/bitnodes crawl.conf L22 @d70dc87 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/getaddr\.bitnodes\.io:`), text: "Bitnodes' crawler, an early version: maps reachable nodes", label: "Bitnodes crawler (early)"},
 	// Bitnodes' crawler sends "/bitnodes.io:0.3/" (protocol.py in
 	// ayeowch/bitnodes); any other name with Bitnodes in it, /alt-bitnodes:/
 	// or /Metrika-Bitnodes:/, is only named like it. BTC Nodes (btcnodes.io),
@@ -757,10 +764,11 @@ var clients = []client{
 	// by FormatSubVersion (src/util.cpp L899-905).
 	// Source: irnb/therealbitcoin src/knobs.h L4-5 @ec4f7f9 (checked 2026-11-24)
 	{re: regexp.MustCompile(`^/therealbitcoin\.org:`), text: "The Real Bitcoin (TRB), a bitcoind kept on the old 0.5.4 line", label: "The Real Bitcoin (0.5.4)"},
-	// JWRD Computing (jwrd.net) maintains its own bitcoind of the old 0.5
-	// line. Its version 0.9.99.99 is TRB's 99999, so it is likely a TRB
-	// descendant; nothing public says it sends this name.
-	{re: regexp.MustCompile(`^/jwrd\.net:`), text: "Named like JWRD Computing's own bitcoind, a fork of an early version", label: "Named like JWRD"},
+	// JWRD Computing's patch bitcoin_rebranding (jfxpt.com, part of its
+	// fetch-bitcoind-0003 release) sets strClientVersionName("jwrd.net") and
+	// 99999, sent as "/jwrd.net:0.9.99.99/"; -setverstring can change it.
+	// Source: jfxpt.com/v bitcoin_rebranding.vpatch L48 @fetch-bitcoind-0003 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/jwrd\.net:`), text: "JWRD Computing's own bitcoind, a fork of an early version", label: "JWRD bitcoind"},
 	// btcd's wire library with "Satoshi" put after it: two monitors do that,
 	// each with its own version, so only the version tells them apart.
 	// Source: mit-dci/pooldetective blockobserver/coinparam/bitcoin.go L96-97 @232317e (checked 2026-11-24)
