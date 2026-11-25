@@ -360,8 +360,16 @@ var clients = []client{
 	// says more. "(mempool.guide)": mempool.guide is Retropex's block explorer
 	// (Retropex/mempool's homepage); no source sets this comment.
 	{re: regexp.MustCompile(`(?i)^/Satoshi:[^/]*\(mempool\.guide\)/(Knots:[^/]*/)?$`), text: "Named like mempool.guide, Retropex's block explorer", label: "Named like mempool.guide"},
+	// Bitcoin Backbone (bitcoinbackbone.org) announced its mainnet test user
+	// agent on bnoc.xyz (Antoine Riard, 2026-09-08: "the user agent is the
+	// following backbone-alpha:0.0.1"); its code is not public, hence "Probably".
+	{re: regexp.MustCompile(`(?i)backbone-alpha`), text: "Probably Bitcoin Backbone, a networking test on mainnet by Antoine Riard (bitcoinbackbone.org)", label: "Probably Bitcoin Backbone"},
+	// BitPay's own fork of Bitcoin Core 0.11/0.12 put "bitcore" into the
+	// version comment (Bitcore Node 3.x ran it with uacomment 'bitcore').
+	// Source: bitpay/bitcoin src/net.cpp L436-437 @f959d4d (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/Satoshi:0\.1[12]\.[^/]*\(bitcore\)`), text: "BitPay's Bitcore, Bitcoin Core with Bitcore's index", label: "Bitcore (BitPay)"},
 	// A 2017 Docker image of Bitcore set uacomment=bitcore (m00re/bitcore-docker);
-	// these run newer Core, so the text goes by the name only.
+	// newer versions are not BitPay's fork, so the text goes by the name only.
 	{re: regexp.MustCompile(`\(bitcore\)`), text: "Named like BitPay's Bitcore, an index server that runs on a node", label: "Named like Bitcore"},
 	// userAgent = "/winnow:0.1/" (Sources/WalletCore/Network/Transport/
 	// PeerConnection.swift in winnowwallet/winnow).

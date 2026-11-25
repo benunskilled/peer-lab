@@ -85,6 +85,8 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/Satoshi:29.0.0(RoninDojo 2.3.0)/", "Node (Core)"},
 	{"/Satoshi:29.0.0(MiniBolt_Node)/", "Node (Core)"},
 	{"/Satoshi:29.0.0(bitcore)/", "Node (Core)"},
+	{"/Satoshi:0.12.1(bitcore)/", "Node (Core)"},
+	{"/backbone-alpha:0.0.1/", "Other"},
 	{"/winnow:0.1.0/", "Wallet"},
 	{"/BitcoinKit:0.1.0/", "Wallet"},
 	{"/WalletKit:0.1.0/", "Wallet"},
