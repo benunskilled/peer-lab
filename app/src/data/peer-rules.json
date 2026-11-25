@@ -1234,6 +1234,7 @@
     "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
     "/Satoshi:29.1.0/Knots:20250903/PyBLOCK": "Node (Knots)",
     "/Satoshi:29.3.0/Knots:20260210+bip110-v0.4.1/UASF-BIP110:0.4/": "Other chain",
+    "/Satoshi:29.3.0/Knots:20261124/": "Node (Knots)",
     "/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
     "/Satoshi:29.4/Purity:1.1.0/": "Other chain",
     "/Satoshi:29.5.0(mempool.guide)/Knots:20260508/": "Node (Knots)",

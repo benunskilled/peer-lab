@@ -313,6 +313,13 @@ var clients = []client{
 	// (README). "/Plumb:15/" after Knots' own part; its kind stays Knots.
 	// Source: plumb-node/plumb src/clientversion.cpp L76 @a583168 (checked 2026-11-24)
 	{re: regexp.MustCompile(`/Plumb:`), text: "Plumb, Bitcoin Knots with extra spam-policy filters on top", label: "Plumb (Knots fork)"},
+	// Knots Legacy (DimiH2025/KnotsLegacy) keeps Knots 29.3.0 and its own date:
+	// CLIENT_VERSION_SUFFIX ".knots20260920" (tag V29.3.0.20260920) and
+	// ".knots20261124" (tag V29.3.0.20261124). Knots itself tagged 29.3 only
+	// with 20260210, 20260507 and 20260508. Anyone can build that string, so
+	// "Probably". Its kind stays Knots.
+	// Source: DimiH2025/KnotsLegacy CMakeLists.txt L29-37 @2a38019 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/Satoshi:29\.3\.0(\([^)]*\))?/Knots:(20260920|20261124)/`), text: "Probably Knots Legacy, a fork that stays on Knots 29.3: Knots itself never released 29.3 with this date", label: "Probably Knots Legacy"},
 	// spruned's copy of pycoinnet: subversion=b"/pycoinnet/" in
 	// spruned/dependencies/pycoinnet/version.py L81, used unchanged by
 	// spruned/daemon/bitcoin_p2p/p2p_connection.py L114 (mempoolco/spruned,

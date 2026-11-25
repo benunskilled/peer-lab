@@ -65,6 +65,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/generic-seeder/", "Crawler"},
 	{"/Satoshi:31.1.0/KnotsSHA256:20261018/", "Node (Knots)"},
 	{"/Satoshi:29.5.1/Knots:20260508/Plumb:15/", "Node (Knots)"},
+	{"/Satoshi:29.3.0/Knots:20261124/", "Node (Knots)"},
 	{"/node-stratum/", "Pool node"},
 	{"/Satoshi:32.1.0(@wiz)/", "Node (Core)"},
 	{"/Satoshi:29.5.0(mempool.guide)/Knots:20260508/", "Node (Knots)"},
