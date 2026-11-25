@@ -470,7 +470,9 @@ var clients = []client{
 	// src/lib.rs in gnostr-org/gnostr-bitcoin: user_agent = "/rust-sha2-p2p-client/".
 	// Source: gnostr-org/gnostr-bitcoin src/lib.rs L434 @71effa0 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), text: "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project", label: "gnostr-bitcoin monitor"},
-	{re: regexp.MustCompile(`(?i)^/Gnostr:`), text: "Named like gnostr, the git+nostr tools", label: "Named like gnostr"},
+	// An older src/p2p.rs of the same repo: format!("/Gnostr:{}/", CARGO_PKG_VERSION).
+	// Source: gnostr-org/gnostr-bitcoin src/p2p.rs L421 @9865f6b (checked 2026-11-25)
+	{re: regexp.MustCompile(`(?i)^/Gnostr:`), text: "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project", label: "gnostr-bitcoin monitor"},
 	// CLIENT_NAME("Aurum") (src/clientversion.cpp in aurumcoin-au/Aurumcoin-AU),
 	// with Bitcoin's network magic. First on Core 0.12, since v32.1.0 on Core
 	// 32.1 with the same name (UA_NAME "Aurum", own port 11080).
@@ -514,10 +516,17 @@ var clients = []client{
 	// Bither/bitherj).
 	// Source: bither/bitherj bitherj/src/main/java/net/bither/bitherj/message/VersionMessage.java L124 @1dff0be (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)bither`), text: "Bither, a wallet for phone and desktop", label: "Bither wallet"},
-	// Wasabi itself picks a Core name at random, "/Satoshi:30.2.0/" and others
-	// (UserAgents in WalletWasabi/Helpers/Constants.cs): a peer saying "wasabi"
-	// only borrows the name.
-	{re: regexp.MustCompile(`(?i)wasabi`), text: "Named like Wasabi Wallet; Wasabi itself introduces itself as Bitcoin Core", label: "Named like Wasabi"},
+	// Older Wasabi sent names of its own: "/Wasabi:<version>/" to fetch blocks
+	// from the node the user set, "/WasabiClient:<version>/" to its bundled
+	// node, and its coinjoin coordinator "/WasabiCoordinator:<version>/".
+	// Source: WalletWasabi/WalletWasabi WalletWasabi.Backend/Global.cs L129 @365ef90 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/WasabiCoordinator:`), text: "The coordinator server of Wasabi Wallet's coinjoins", label: "Wasabi coordinator"},
+	// Source: WalletWasabi/WalletWasabi WalletWasabi/Wallets/P2pBlockProvider.cs L166 @v2.0.0.0 (checked 2026-11-25)
+	// Source: WalletWasabi/WalletWasabi WalletWasabi.Fluent/Global.cs L261 @v2.0.0.0 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/Wasabi(Client)?:`), text: "Wasabi Wallet, an older version; newer ones introduce themselves as Bitcoin Core", label: "Wasabi Wallet"},
+	// Newer Wasabi (v2.8.5) picks a Core name at random, "/Satoshi:30.2.0/"
+	// and others (UserAgents in WalletWasabi/Helpers/Constants.cs).
+	{re: regexp.MustCompile(`(?i)wasabi`), text: "Named like Wasabi Wallet", label: "Named like Wasabi"},
 	// On bitcoinj, so before its rule: HTTPSeed (crawler.kt in bitcoinj/httpseed)
 	// and CoinView (Main.java in vs-uulm/CoinView), see the sources further down.
 	// Source: bitcoinj/httpseed src/main/kotlin/crawler.kt L158 @40d2e88 (checked 2026-11-24)
@@ -672,6 +681,11 @@ var clients = []client{
 	// Source: PyBLOCK-Bitcoin/pyblock install-full-node.sh L458 @010f211 (checked 2026-11-24)
 	// Source: PyBLOCK-Bitcoin/pyblock install-full-node.sh L455 @010f211 (checked 2026-11-24)
 	{re: regexp.MustCompile(`\(PyBLOCK Crew\)|PyBLOCK/?$`), text: "PyBLOCK, a node dashboard", label: "PyBLOCK dashboard"},
+	// PyBLOCK Crew's Knots app in their own Umbrel store sets
+	// -uaspoof=/Satoshi:.../Knots:.../PATUM:<v>(https://b.pyblock.xyz:8443)/
+	// and -uaappend=PyBLOCK Crew.
+	// Source: astrolexis-group1/pyblock-umbrel-store pyblock-bitcoinknots/docker-compose.yml L28 @e94b9da (checked 2026-11-25)
+	{re: regexp.MustCompile(`/PATUM:[0-9.]+\(https://b\.pyblock\.xyz[^)]*\)/PyBLOCK Crew/?$`), text: "PyBLOCK's Bitcoin Knots app for Umbrel, from PyBLOCK Crew's own app store", label: "PyBLOCK Knots (Umbrel)"},
 	{re: regexp.MustCompile(`(?i)\(PyBLOCK|pyblock`), text: "Named like PyBLOCK, a node dashboard", label: "Named like PyBLOCK"},
 	// Projects whose name matches; none of them publishes the exact string,
 	// so "Named like".
@@ -826,9 +840,11 @@ var clients = []client{
 	// in March 2018 it monitored Bitcoin nodes (via nodes.multiven.io); nothing
 	// names this subdomain or its crawler. bitcoinstats.com: Christian Decker
 	// runs its DNS seed crawler (delvingbitcoin.org, 01.03.2024), but no source
-	// sets this name (GPT research, 23.11.2026).
+	// sets this name (GPT research, 23.11.2026). A 2023 thesis (CUT Cyprus,
+	// Table 4.1) lists "/btcwire:0.5.0/bitcoinstats.com:0.2/" as a network
+	// monitor; no code, hence "Probably" (25.11.2026).
 	{re: regexp.MustCompile(`(?i)^/nodes\.mom\.market:`), kind: "Crawler", text: "Named like nodes.mom.market, a site that monitors Bitcoin nodes", label: "Named like mom.market"},
-	{re: regexp.MustCompile(`(?i)^/btcwire:[^/]*/bitcoinstats\.com:`), kind: "Crawler", text: "Named like bitcoinstats.com, a site with statistics on the Bitcoin network", label: "Named like bitcoinstats"},
+	{re: regexp.MustCompile(`(?i)^/btcwire:[^/]*/bitcoinstats\.com:`), kind: "Crawler", text: "Probably the network monitor of bitcoinstats.com, a site with statistics on the Bitcoin network", label: "Probably bitcoinstats"},
 	// btcd's wire library with the app name after it left empty.
 	// Source: btcsuite/btcd wire/msgversion.go L257 @3cb9f60 (checked 2026-11-24)
 	{re: regexp.MustCompile(`^/btcwire:[^/]*/:/$`), text: "A program on btcd's Go library that left its own name empty", label: "btcd library, empty name"},
