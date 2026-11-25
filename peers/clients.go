@@ -470,9 +470,10 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), text: "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project", label: "gnostr-bitcoin monitor"},
 	{re: regexp.MustCompile(`(?i)^/Gnostr:`), text: "Named like gnostr, the git+nostr tools", label: "Named like gnostr"},
 	// CLIENT_NAME("Aurum") (src/clientversion.cpp in aurumcoin-au/Aurumcoin-AU),
-	// with Bitcoin's network magic.
-	// Source: aurumcoin-au/Aurumcoin-AU src/clientversion.cpp L22 @96bad6d (checked 2026-11-24)
-	{re: regexp.MustCompile(`(?i)^/Aurum:`), kind: "Other chain", text: "Aurumcoin, an altcoin built on Bitcoin Core 0.12", label: "Aurumcoin altcoin"},
+	// with Bitcoin's network magic. First on Core 0.12, since v32.1.0 on Core
+	// 32.1 with the same name (UA_NAME "Aurum", own port 11080).
+	// Source: aurumcoin-au/Aurumcoin-AU src/clientversion.cpp L22 @3d5bf16 (checked 2026-11-25)
+	{re: regexp.MustCompile(`(?i)^/Aurum:`), kind: "Other chain", text: "Aurumcoin, an altcoin built on Bitcoin Core", label: "Aurumcoin altcoin"},
 	// Source: saltduck/bitcoinpurity src/clientversion.cpp L79 @124fbc8 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)/Purity:`), text: "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637", label: "Bitcoin Purity hard fork"},
 	// Source: Flopcoin/Flopcoin src/clientversion.cpp L16 @3ad241b (checked 2026-11-25)
