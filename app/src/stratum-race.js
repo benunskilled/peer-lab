@@ -19,6 +19,7 @@ const { StratumPoolConnection } = require('./lib/stratum-client');
 const toggle = require('./lib/stratum-race-toggle');
 const { canonical, encodings } = require('./lib/prevhash');
 const rpc = require('./lib/rpc');
+const live = require('./lib/stratum-live');
 
 // Pools only ever change through the dashboard, and a few minutes' delay in
 // noticing that is imperceptible - this used to run every 30 seconds, which
@@ -408,6 +409,7 @@ function finalizeRace(hash) {
     return since === undefined || (since != null && since <= race.createdAt);
   }).map(([id]) => id);
   race.generation = generation;
+  publishLive(race, true);
   return settleRace(race);
 }
 
@@ -526,7 +528,30 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
   const rank = race.reported.size;
 
   race.results.push({ poolId: pool.id, label: pool.label, elapsedMs, rank });
+  // After the timestamp, and asynchronously: see lib/stratum-live.js.
+  publishLive(race);
   logger.info('pool reported job', { label: pool.label, rank, elapsedMs: Number(elapsedMs.toFixed(1)) });
+}
+
+/**
+ * The race so far, for the block card while it is still open (and once more
+ * when it closes, with the pools that sent nothing). Only labels and times:
+ * no hosts, nothing the page would not get from the database a moment later.
+ */
+function publishLive(race, done = false) {
+  const own = (poolId) => {
+    const a = active.get(poolId);
+    return Boolean(a && a.pool && !a.pool.is_default);
+  };
+  const entries = race.results.map((r) => ({ label: r.label, own: own(r.poolId), latencyMs: r.elapsedMs, rank: r.rank }));
+  if (done) {
+    for (const poolId of race.watched || []) {
+      if (race.reported.has(poolId) || race.excused.has(poolId)) continue;
+      const a = active.get(poolId);
+      if (a && a.pool) entries.push({ label: a.pool.label, own: own(poolId), latencyMs: null, rank: null });
+    }
+  }
+  live.publish({ prevhash: race.prevhash, createdAt: race.createdAt, done, entries });
 }
 
 function stopAllConnections() {

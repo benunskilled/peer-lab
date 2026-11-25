@@ -123,11 +123,29 @@
     return seenAt.get(hash);
   }
 
+  // The Stratum race while it is still open, from the dashboard's event
+  // stream (peerlab:stratum): each pool as its job arrives, instead of all of
+  // them once the race has been written, eight seconds and a refresh later.
+  // Only ever for the block the card shows, and only until the recorded race
+  // is there - that one is what stays.
+  let liveRace = null;
+  window.addEventListener("peerlab:stratum", (e) => {
+    const d = e.detail;
+    if (!d || !Array.isArray(d.hashes) || !d.stratum || !Array.isArray(d.stratum.entries)) return;
+    liveRace = d;
+    const b = state.data && state.data.last_block;
+    if (b && !b.stratum && d.hashes.includes(String(b.hash || "").toLowerCase())) renderBlockCard();
+  });
+  function withLiveRace(b) {
+    if (!b || b.stratum || !liveRace || !liveRace.hashes.includes(String(b.hash || "").toLowerCase())) return b;
+    return { ...b, stratum: liveRace.stratum };
+  }
+
   function renderBlockCard() {
     const card = $("blockCard");
     if (!card) return;
     if (!state.data) { card.hidden = true; return; }
-    const b = state.data.last_block;
+    const b = withLiveRace(state.data.last_block);
     // No block since Peer Lab started - a fresh install: the card says what
     // will come, rather than leave the page to begin with the map. Only when
     // the dashboard said so: a dashboard that did not answer (restarting,

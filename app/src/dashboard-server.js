@@ -25,6 +25,7 @@ const config = require('./lib/config');
 const db = require('./lib/db');
 const rpc = require('./lib/rpc');
 const queries = require('./lib/queries');
+const stratumLive = require('./lib/stratum-live');
 const peerSync = require('./lib/peer-sync');
 const peersService = require('./lib/peers-service');
 const { proxyPeers } = require('./lib/peers-proxy');
@@ -402,6 +403,46 @@ function broadcastLatestBlock() {
   if (key === lastBroadcastKey) return;
   lastBroadcastKey = key;
   sseBroadcast('block', race);
+  // The race may have started before Core had the block: now that the block
+  // is here, the live race can say where Core stood against it.
+  broadcastLiveStratum();
+}
+
+// The Stratum race while it is still open (lib/stratum-live.js): the race
+// worker leaves the pools that have reported so far in a file, this passes
+// them on. Laid next to the newest block, when it is the same one, for the
+// moment Core announced it.
+let lastLiveKey = null;
+function liveStratumPayload() {
+  const snap = stratumLive.read();
+  if (!snap) return null;
+  let detectedAt = null;
+  try {
+    const race = queries.latestBlock();
+    if (race && race.blockHash) {
+      const page = stratumLive.forPage(snap, null);
+      if (page && page.hashes.includes(String(race.blockHash).toLowerCase())) detectedAt = race.detectedAt;
+    }
+  } catch (err) {
+    logger.debug('could not read the latest block for the live race', { error: err.message });
+  }
+  return stratumLive.forPage(snap, detectedAt);
+}
+
+// The worker replaces the file after every pool that reports. A stat five
+// times a second, of one small file - the only way that sees a write from
+// another container reliably (fs.watch does not on every volume driver).
+function watchLiveStratum() {
+  fs.watchFile(stratumLive.FILE, { interval: 200, persistent: false }, () => broadcastLiveStratum());
+}
+
+function broadcastLiveStratum() {
+  const payload = liveStratumPayload();
+  if (!payload) return;
+  const key = JSON.stringify(payload);
+  if (key === lastLiveKey) return;
+  lastLiveKey = key;
+  sseBroadcast('stratum', payload);
 }
 
 function handleEventStream(req, res) {
@@ -433,6 +474,8 @@ function handleEventStream(req, res) {
   try {
     const race = queries.latestBlock();
     if (race) res.write(`event: block\ndata: ${JSON.stringify(race)}\n\n`);
+    const live = liveStratumPayload();
+    if (live) res.write(`event: stratum\ndata: ${JSON.stringify(live)}\n\n`);
   } catch (err) {
     logger.debug('initial block event failed', { error: err.message });
   }
@@ -1132,6 +1175,7 @@ function main() {
       }
       sseClients.clear(); // so a late broadcast cannot write to an ended stream
       server.close();
+      fs.unwatchFile(stratumLive.FILE);
     },
   });
 
@@ -1157,6 +1201,8 @@ function main() {
   safetyTimer = setInterval(() => broadcastLatestBlock(), 20_000);
   safetyTimer.unref?.();
 
+  watchLiveStratum();
+
   server.on('error', (err) => {
     // Previously an EADDRINUSE surfaced as a bare stack trace with no
     // indication of which port or why.
@@ -1171,4 +1217,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { server, main, acceptsGzip, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };
+module.exports = { server, main, acceptsGzip, watchLiveStratum, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };

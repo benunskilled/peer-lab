@@ -2246,6 +2246,15 @@ function startEventStream() {
       /* malformed frame - the next event supersedes it */
     }
   });
+  // The Stratum race while it is open, pool by pool: the block card (the
+  // peer list's script) lays it in until the recorded race arrives.
+  source.addEventListener('stratum', (e) => {
+    try {
+      window.dispatchEvent(new CustomEvent('peerlab:stratum', { detail: JSON.parse(e.data) }));
+    } catch (err) {
+      /* malformed frame - the next event supersedes it */
+    }
+  });
   source.addEventListener('error', () => {
     if (source.readyState !== EventSource.CLOSED) return; // reconnecting by itself
     setTimeout(startEventStream, EVENT_STREAM_RETRY_MS);
