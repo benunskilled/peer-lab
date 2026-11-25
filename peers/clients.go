@@ -217,7 +217,9 @@ var clients = []client{
 	// Castor, Floresta's Utreexo bridge, answers with "/bridge:0.1.3/" (src/node.rs
 	// L1541 in getfloresta/castor at 6713d5b, checked 23.11.2026).
 	// Source: getfloresta/castor src/node.rs L1541 @eba7b22 (checked 2026-11-24)
-	{re: regexp.MustCompile(`^/bridge:`), text: "Castor, Floresta's Utreexo bridge: serves Utreexo proofs to other nodes", label: "Castor Utreexo bridge"},
+	{re: regexp.MustCompile(`^/bridge:0\.`), text: "Castor, Floresta's Utreexo bridge: serves Utreexo proofs to other nodes", label: "Castor Utreexo bridge"},
+	// "bridge" is a common word: other versions go by the name only.
+	{re: regexp.MustCompile(`^/bridge:`), text: "Named like Castor, Floresta's Utreexo bridge", label: "Named like Castor"},
 	// Source: decentralizedb/bip110-observer app/crawler.py L134 @588e0a8 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)^/bip110-observer:`), kind: "Crawler", text: "BIP-110 Observer, a crawler that collects peer user agents and advertised services", label: "BIP-110 Observer crawler"},
 	// Only the name points to favillakey.io; the site documents no P2P
@@ -798,7 +800,7 @@ var clients = []client{
 	// Source: cloudhead/nakamoto p2p/src/fsm.rs L70 @76ab7a3 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)^/nakamoto:`), kind: "Other light client", text: "nakamoto, a light client on compact block filters", label: "nakamoto light client"},
 	// Source: OpenBazaar/spvwallet config.go L73 @225c519 (checked 2026-11-24)
-	{re: regexp.MustCompile(`(?i)/spvwallet:`), text: "spvwallet, the wallet of OpenBazaar, a marketplace closed in 2021", label: "OpenBazaar's spvwallet"},
+	{re: regexp.MustCompile(`(?i)/spvwallet:`), text: "OpenBazaar's spvwallet, or another program on its wallet library; OpenBazaar closed in 2021", label: "OpenBazaar's spvwallet"},
 	// Autarkysoft's C# toolkit (Configuration.cs); it pushes transactions
 	// under "/Satoshi:0.22.0/" instead, so only its own name lands here.
 	// Source: Autarkysoft/Denovo Src/Denovo/Models/Configuration.cs L26 @858aff3 (checked 2026-11-24)
