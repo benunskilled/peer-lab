@@ -539,7 +539,7 @@ var clients = []client{
 	// appName = "Bitcoin" (Utils.scala), peerGroup.setUserAgent(appName,
 	// "1.075") in WalletApp.scala; 1.072 and 1.074 in earlier commits.
 	// Source: btcontract/wallet app/src/main/java/com/btcontract/wallet/WalletApp.scala L121 @7ec01b1 (checked 2026-11-25)
-	{re: regexp.MustCompile(`^/bitcoinj:[^/]*/Bitcoin:[0-9]`), text: "Simple Bitcoin Wallet by btcontract, an Android wallet", label: "Simple Bitcoin Wallet"},
+	{re: regexp.MustCompile(`^/bitcoinj:[^/]*/Bitcoin:1\.07[0-9]`), text: "Simple Bitcoin Wallet by btcontract, an Android wallet", label: "Simple Bitcoin Wallet"},
 	// bitcoinj's own programs: peers.setUserAgent("WalletTool", "1.0") in its
 	// command-line wallet tool, and APP_NAME = "WalletTemplate" with "1.0" in
 	// its desktop wallet template (wallettemplate/.../Main.java L46, L152).
@@ -1007,9 +1007,9 @@ var clients = []client{
 	// with the same name: the standard one ignores Bitcoin Cash by default,
 	// the "uahf" one follows it (v1.3.4 and v1.3.0uahf release notes).
 	// Source: bitcoinclassic/bitcoinclassic src/clientversion.cpp L16 @27057bb (checked 2026-11-25)
-	{re: regexp.MustCompile(`(?i)Classic:(0\.|1\.[0-2]\.)`), kind: "Node (other)", text: "Bitcoin Classic, a big-block client for Bitcoin from 2016–2017", label: "Bitcoin Classic"},
+	{re: regexp.MustCompile(`(?i)^/Classic:(0\.|1\.[0-2]([./]|$))`), kind: "Node (other)", text: "Bitcoin Classic, a big-block client for Bitcoin from 2016–2017", label: "Bitcoin Classic"},
 	// Source: bitcoinclassic/bitcoinclassic src/Application.cpp L172 @529d8c9 (checked 2026-11-25)
-	{re: regexp.MustCompile(`(?i)Classic:`), kind: "Node (other)", text: "Bitcoin Classic 1.3 or later: follows Bitcoin by default, its UAHF edition Bitcoin Cash; the name doesn't tell which", label: "Bitcoin Classic 1.3+"},
+	{re: regexp.MustCompile(`(?i)^/Classic:`), kind: "Node (other)", text: "Bitcoin Classic 1.3 or later: follows Bitcoin by default, its UAHF edition Bitcoin Cash; the name doesn't tell which", label: "Bitcoin Classic 1.3+"},
 	// "(EB8)" is the block size a big-block client accepts: Classic, Unlimited
 	// and others all send it, so alone it says only that much.
 	{re: regexp.MustCompile(`\(EB[0-9]`), text: "Probably a big-block client: \"EB\" is the block size it accepts", label: "Probably big-block client"},

@@ -226,6 +226,7 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"VDS 0.9.9.1", "Other chain"},
 	{"/Classic:1.3.8(EB8)/", "Node (other)"},
 	{"/Classic:0.11.2/", "Node (other)"},
+	{"/Classic:1.2/", "Node (other)"},
 	{"/Satoshi:0.14.2(EB8; AD6)/", "Other chain"},
 	// Sources found 14.11.2026 (Recherche C).
 	{"/btc-node-observatory:0.1.0/", "Crawler"},

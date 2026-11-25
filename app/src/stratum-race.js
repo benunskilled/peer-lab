@@ -59,6 +59,8 @@ const active = new Map();
  * genuinely overlapping races can both stay open.
  */
 const openRaces = new Map();
+// The prevhash of the race opened last: the one the live view shows.
+let newestRace = null;
 
 // See handleNotify for why ten is already absurdly generous.
 const MAX_OPEN_RACES = 10;
@@ -506,6 +508,7 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
     // announced the block, so a late zero made "Core to your pool" look
     // longer than it was.
     rememberPrevhash(prevhash);
+    newestRace = prevhash;
     race = {
       prevhash,
       createdAt: receivedAtMs,
@@ -539,6 +542,9 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
  * no hosts, nothing the page would not get from the database a moment later.
  */
 function publishLive(race, done = false) {
+  // One file, so one race: the newest. A second race open at the same time
+  // (a lagging or made-up prevhash) must not overwrite the real one's view.
+  if (race.prevhash !== newestRace) return;
   const own = (poolId) => {
     const a = active.get(poolId);
     return Boolean(a && a.pool && !a.pool.is_default);

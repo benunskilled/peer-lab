@@ -128,16 +128,24 @@
   // them once the race has been written, eight seconds and a refresh later.
   // Only ever for the block the card shows, and only until the recorded race
   // is there - that one is what stays.
-  let liveRace = null;
+  // The dashboard's script may have heard the race before this one was
+  // loaded: it keeps the last one on window (peerLabLiveRace).
+  const validLive = (d) => Boolean(d && Array.isArray(d.hashes) && d.stratum && Array.isArray(d.stratum.entries));
+  let liveRace = validLive(window.peerLabLiveRace) ? window.peerLabLiveRace : null;
+  let liveAt = liveRace ? Date.now() : 0;
+  // A live race that is never recorded (a reset, a write that failed) is not
+  // kept on screen past the block's moment: two minutes, as on the server.
+  const LIVE_RACE_MS = 2 * 60 * 1000;
   window.addEventListener("peerlab:stratum", (e) => {
     const d = e.detail;
-    if (!d || !Array.isArray(d.hashes) || !d.stratum || !Array.isArray(d.stratum.entries)) return;
+    if (!validLive(d)) return;
     liveRace = d;
+    liveAt = Date.now();
     const b = state.data && state.data.last_block;
     if (b && !b.stratum && d.hashes.includes(String(b.hash || "").toLowerCase())) renderBlockCard();
   });
   function withLiveRace(b) {
-    if (!b || b.stratum || !liveRace || !liveRace.hashes.includes(String(b.hash || "").toLowerCase())) return b;
+    if (!b || b.stratum || !liveRace || Date.now() - liveAt > LIVE_RACE_MS || !liveRace.hashes.includes(String(b.hash || "").toLowerCase())) return b;
     return { ...b, stratum: liveRace.stratum };
   }
 

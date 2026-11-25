@@ -33,6 +33,7 @@ test.before(() => {
 
 test.after(async () => {
   await race.finalizeAllRaces();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
 test('each pool shows up in the live file as its job arrives, before the race is written', async () => {
@@ -61,6 +62,22 @@ test('each pool shows up in the live file as its job arrives, before the race is
   snap = live.read();
   assert.equal(snap.done, true);
   assert.deepEqual(snap.entries.map((e) => [e.label, e.latencyMs]), [['A', 0], ['Mine', snap.entries[1].latencyMs], ['C', null]]);
+});
+
+test('only the newest race goes to the live file, so a second open race cannot overwrite it', async () => {
+  const a = { id: 1, label: 'A', host: 'a.example', port: 3333, is_default: 1 };
+  const b = { id: 2, label: 'B', host: 'b.example', port: 3333, is_default: 1 };
+  watch(a, b);
+  const at = Date.now();
+  race.handleNotify(a, hash(21), hr(), at);
+  race.handleNotify(b, hash(22), hr(), at); // B opens another race, e.g. a made-up prevhash
+  race.handleNotify(b, hash(21), hr(), at); // B's report for the first race is not published
+  await live.flushed();
+  assert.equal(live.read().prevhash, hash(22));
+  await race.finalizeRace(hash(21)); // its close does not overwrite the newer race either
+  await live.flushed();
+  assert.equal(live.read().prevhash, hash(22));
+  await race.finalizeRace(hash(22));
 });
 
 test('the page gets every spelling of the hash, the card\'s shape, and the Core stop when known', () => {

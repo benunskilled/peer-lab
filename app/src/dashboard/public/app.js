@@ -2248,9 +2248,14 @@ function startEventStream() {
   });
   // The Stratum race while it is open, pool by pool: the block card (the
   // peer list's script) lays it in until the recorded race arrives.
+  // Kept on window too: this script opens the stream before the peer list's
+  // (deferred) script is there to listen, and the replay on connect would be
+  // lost; the block card reads it from here when it starts.
   source.addEventListener('stratum', (e) => {
     try {
-      window.dispatchEvent(new CustomEvent('peerlab:stratum', { detail: JSON.parse(e.data) }));
+      const detail = JSON.parse(e.data);
+      window.peerLabLiveRace = detail;
+      window.dispatchEvent(new CustomEvent('peerlab:stratum', { detail }));
     } catch (err) {
       /* malformed frame - the next event supersedes it */
     }
