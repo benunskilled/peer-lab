@@ -65,6 +65,13 @@ const SILENCE_FACTOR = 4;
 const SILENCE_GAPS_NEEDED = 3;
 const SILENCE_GAPS_KEPT = 20;
 const SILENCE_CHECK_MS = 10_000;
+// Several jobs within seconds of each other are one burst (a pool that sends
+// on a new block, then again as its template fills), not its rhythm: counted,
+// they made the median a few hundred ms and the limit the one-minute floor,
+// and such a pool was redialled after every block. Only gaps longer than this
+// teach the rhythm.
+const SILENCE_GAP_MIN_MS = 5_000;
+const SILENCE_FIRST_JOB_MS = 5 * 60_000;
 
 class StratumPoolConnection extends EventEmitter {
   constructor({ host, port, label, idleTimeoutMs = 6 * 60 * 60 * 1000, authorizeAddress = '1BitcoinEaterAddressDontSendf59kuE' }) {
@@ -126,9 +133,17 @@ class StratumPoolConnection extends EventEmitter {
     return Math.max(SILENCE_MIN_MS, SILENCE_FACTOR * median);
   }
 
+  // Measured from the last job, or, on a connection that has brought none
+  // yet, from when it opened: a pool that accepts the socket and never
+  // authorises would otherwise only be noticed by the six-hour idle timeout.
+  // A connection still waiting for its first job gets at least five minutes:
+  // the same ckpool took up to two to authorise a new connection, and one cut
+  // off in that wait would only start it over.
   silentTooLong(now = Date.now()) {
     const limit = this.silenceLimitMs();
-    return limit != null && this._lastNotifyAt != null && now - this._lastNotifyAt > limit;
+    if (limit == null) return false;
+    if (this._lastNotifyAt != null) return now - this._lastNotifyAt > limit;
+    return this._connectedAt != null && now - this._connectedAt > Math.max(limit, SILENCE_FIRST_JOB_MS);
   }
 
   stop() {
@@ -196,7 +211,8 @@ class StratumPoolConnection extends EventEmitter {
       this._startHeartbeat();
       this._silenceTimer = setInterval(() => {
         if (!this.silentTooLong()) return;
-        this._closeReason = `silent for ${Math.round((Date.now() - this._lastNotifyAt) / 1000)} s, usually every ${Math.round(this.silenceLimitMs() / SILENCE_FACTOR / 1000)} s`;
+        const since = this._lastNotifyAt != null ? this._lastNotifyAt : this._connectedAt;
+        this._closeReason = `${this._lastNotifyAt != null ? 'silent' : 'no job'} for ${Math.round((Date.now() - since) / 1000)} s, usually every ${Math.round(this.silenceLimitMs() / SILENCE_FACTOR / 1000)} s`;
         socket.destroy();
       }, SILENCE_CHECK_MS);
       this._silenceTimer.unref?.();
@@ -316,7 +332,7 @@ class StratumPoolConnection extends EventEmitter {
       }
       this.notifyCount += 1;
       if (this.notifyCount === 1) this._readyAt = receivedAtMs;
-      if (this._lastNotifyAt != null && receivedAtMs > this._lastNotifyAt) {
+      if (this._lastNotifyAt != null && receivedAtMs - this._lastNotifyAt >= SILENCE_GAP_MIN_MS) {
         this._gaps.push(receivedAtMs - this._lastNotifyAt);
         if (this._gaps.length > SILENCE_GAPS_KEPT) this._gaps.shift();
       }

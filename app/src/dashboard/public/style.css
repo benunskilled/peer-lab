@@ -1584,7 +1584,7 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .cc-filter button small { opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
 .cc-select { display: none; margin: 10px 0 12px; }
 .cc-select select { font: inherit; font-size: 15px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
-.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; }
+.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; }
 .plist label { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--panel-2); }
 .plist label:hover { border-color: var(--muted); }
 .plist label.on { border-color: rgba(247, 147, 26, .45); }

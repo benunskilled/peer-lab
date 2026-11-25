@@ -168,7 +168,7 @@
    "since": "1.0.0"
   },
   {
-   "name": "2Miners Solo DE",
+   "name": "2Miners Solo BTC",
    "host": "solo-btc.2miners.com",
    "port": 2323,
    "country": "DE",

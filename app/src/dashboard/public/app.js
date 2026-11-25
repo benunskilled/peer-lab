@@ -1388,14 +1388,28 @@ let poolKind = (() => { try { return localStorage.getItem(POOL_KIND_KEY) || 'all
 const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
 const pickCountry = (cc) => (cc ? countryName(cc) : 'Routed');
 
+let poolPickSeq = 0;
 async function refreshPoolPick() {
   if (poolPickBusy) return;
+  const seq = ++poolPickSeq;
+  let answer;
   try {
-    poolPick = await api('/api/pools/catalog');
+    answer = await api('/api/pools/catalog');
   } catch {
     return; // the list stays as it was; the table above still works
   }
+  // A tick sent while this was on its way makes the answer old: the refresh
+  // after the tick brings the right one.
+  if (seq !== poolPickSeq || poolPickBusy) return;
+  poolPick = answer;
   renderPoolPick();
+}
+
+// Written only when it changed: a redraw every refresh took the keyboard
+// focus off a switch and shut an open country list on iOS.
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el && el.dataset.drawn !== html) { el.innerHTML = html; el.dataset.drawn = html; }
 }
 
 function renderPoolPick() {
@@ -1428,16 +1442,16 @@ function renderPoolPick() {
   const options = [['all', 'All countries', pools.length], ['on', 'Switched on', ticked]]
     .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
   if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
-  document.getElementById('pool-pick-filter').innerHTML = options.map(([k, t, n]) =>
-    `<button type="button" data-action="pool-country" data-cc="${k}" class="${k === poolCountry ? 'on' : ''}" aria-pressed="${k === poolCountry}">${escapeHtml(t)}<small>${n}</small></button>`).join('');
-  document.getElementById('pool-pick-select').innerHTML = options.map(([k, t, n]) =>
-    `<option value="${k}"${k === poolCountry ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join('');
+  setHtml('pool-pick-filter', options.map(([k, t, n]) =>
+    `<button type="button" data-action="pool-country" data-cc="${escapeHtml(k)}" class="${k === poolCountry ? 'on' : ''}" aria-pressed="${k === poolCountry}">${escapeHtml(t)}<small>${n}</small></button>`).join(''));
+  setHtml('pool-pick-select', options.map(([k, t, n]) =>
+    `<option value="${escapeHtml(k)}"${k === poolCountry ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join(''));
 
   const shown = pools
     .filter((p) => poolCountry === 'all' || (poolCountry === 'on' ? p.enabled : poolCountry === 'routed' ? !p.country : p.country === poolCountry))
     .sort((a, b) => (a.country ? 0 : 1) - (b.country ? 0 : 1) || pickCountry(a.country).localeCompare(pickCountry(b.country)) || a.name.localeCompare(b.name));
   const full = racing >= poolPick.max;
-  document.getElementById('pool-pick-list').innerHTML = shown.length ? shown.map((p) => {
+  setHtml('pool-pick-list', shown.length ? shown.map((p) => {
     const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'location not known';
     const tag = p.routed ? 'shared · routed' : p.kind;
     const off = full && !p.enabled;
@@ -1447,7 +1461,7 @@ function renderPoolPick() {
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' disabled' : ''} />
     </label></li>`;
-  }).join('') : `<li class="hint">${poolCountry === 'on' ? 'None switched on yet.' : 'No pool of this kind here.'}</li>`;
+  }).join('') : `<li class="hint">${poolCountry === 'on' ? 'None switched on yet.' : 'No pool of this kind here.'}</li>`);
 }
 
 function setPoolKind(kind) {
@@ -1498,7 +1512,9 @@ function renderPools(pools) {
 // Only the panels': the block card's folds belong to the other script.
 for (const box of document.querySelectorAll('.panel details.how')) {
   box.addEventListener('click', (e) => {
-    if (!box.open || e.target.closest('summary, a, button, input')) return;
+    // A control, or a row of the pool list (its label switches the pool), is
+    // not a tap on the text: it does its own thing and the fold stays open.
+    if (!box.open || e.target.closest('summary, a, button, input, select, textarea, label, form, .plist')) return;
     if (String(window.getSelection()).length > 0) return;
     // Its title on screen: it rolls up into it, in place. Scrolled away: shut
     // at once, and the title comes back to the top of the screen.

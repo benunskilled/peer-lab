@@ -45,6 +45,10 @@ func TestOtherAbouts(t *testing.T) {
 		{"/exnode:0.1.0/", 70016, "exnode, a Bitcoin full node written in Elixir"},
 		{"/BitcoinEcho:0.1.0/", 70016, "Bitcoin Echo, a full node in plain C"},
 		{"/curl:8.5.0/", 70015, "Named like curl, the download tool"},
+		{"/Classic:1.2/", 70015, "Bitcoin Classic, a big-block client"},
+		{"/Classic:1.2.1/", 70015, "Bitcoin Classic, a big-block client"},
+		{"/Classic:1.20/", 70015, "Bitcoin Classic 1.3 or later"},
+		{"/Classic:1.3.8(EB8)/", 70015, "Bitcoin Classic 1.3 or later"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,

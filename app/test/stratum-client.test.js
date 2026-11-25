@@ -211,7 +211,7 @@ test('a pool silent for four of its usual gaps, and at least a minute, counts as
 
   // And a fast one never less than a minute.
   const fast = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'fast' });
-  for (let i = 0; i < 4; i++) fast._handleChunk(notifyLine('ef'.repeat(32)), process.hrtime.bigint(), t0 + i * 1_000);
+  for (let i = 0; i < 4; i++) fast._handleChunk(notifyLine('ef'.repeat(32)), process.hrtime.bigint(), t0 + i * 6_000);
   assert.equal(fast.silenceLimitMs(), 60_000);
 });
 
@@ -241,4 +241,24 @@ test('a connection that held is dialled again at once, and the log says the pool
     for (const s of sockets) s.destroy();
     server.close();
   }
+});
+
+test('a burst of jobs after each block does not teach a rhythm of a few hundred ms', () => {
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'bursty' });
+  const t0 = 1789900000000;
+  for (let b = 0; b < 4; b++) {
+    for (const d of [0, 300, 900]) conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0 + b * 600_000 + d);
+  }
+  assert.equal(conn.silenceLimitMs(), 4 * (600_000 - 900), 'only the gaps between blocks count');
+});
+
+test('a connection that never brings a job is replaced too, after five minutes at the least', () => {
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'quiet' });
+  const t0 = 1789900000000;
+  for (let i = 0; i < 4; i++) conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0 + i * 20_000);
+  // A new connection: nothing yet.
+  conn._lastNotifyAt = null;
+  conn._connectedAt = t0 + 100_000;
+  assert.equal(conn.silentTooLong(t0 + 100_000 + 90_000), false, 'eighty seconds is its rhythm, but the first job may take longer');
+  assert.equal(conn.silentTooLong(t0 + 100_000 + 301_000), true);
 });

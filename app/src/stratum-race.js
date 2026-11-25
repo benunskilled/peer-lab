@@ -559,8 +559,10 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
  * no hosts, nothing the page would not get from the database a moment later.
  */
 function publishLive(race, done = false) {
-  // One file, so one race: the newest. A second race open at the same time
-  // (a lagging or made-up prevhash) must not overwrite the real one's view.
+  // One file, so one race: the newest opened. A second race open at the same
+  // time (a lagging or made-up prevhash) shows instead of the real one if it
+  // opened later - the live view only, for the race's eight seconds; the
+  // recorded race is unaffected and replaces it on the card.
   if (race.prevhash !== newestRace) return;
   const own = (poolId) => {
     const a = active.get(poolId);

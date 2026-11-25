@@ -9,6 +9,7 @@
 
 const net = require('net');
 const { pools } = require('../src/data/stratum-pools.json');
+const { canonical } = require('../src/lib/prevhash');
 
 const WAIT_MS = (Number(process.argv[2]) || 45) * 1000;
 const USER = '1BitcoinEaterAddressDontSendf59kuE.worker1';
@@ -34,7 +35,7 @@ function check(p) {
         let m;
         try { m = JSON.parse(line); } catch { continue; }
         if (m.id === 2) r.auth = m.result === true;
-        if (m.method === 'mining.notify' && Array.isArray(m.params)) { r.jobs += 1; if (!r.prev) r.prev = String(m.params[1]); }
+        if (m.method === 'mining.notify' && Array.isArray(m.params)) { r.jobs += 1; if (!r.prev) r.prev = canonical(String(m.params[1])); }
       }
     });
     s.on('error', (e) => { r.err = e.code || e.message; clearTimeout(timer); end(); });
