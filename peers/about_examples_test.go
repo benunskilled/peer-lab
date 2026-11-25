@@ -66,6 +66,8 @@ var aboutExamples = []struct{ ua, kind string }{
 	{"/Satoshi:31.1.0/KnotsSHA256:20261018/", "Node (Knots)"},
 	{"/Satoshi:29.5.1/Knots:20260508/Plumb:15/", "Node (Knots)"},
 	{"/Satoshi:29.3.0/Knots:20261124/", "Node (Knots)"},
+	{"/bitcoinj:0.14.3/Bitcoin Wallet:1.0.5/", "Wallet"},
+	{"/bitcoinj:0.17.1/Schildbach Bitcoin Wallet:1.0.2/", "Wallet"},
 	{"/bitcoinj:0.14.3/Bitcoin Wallet:4.58.1-btcx/", "Wallet"},
 	{"/bitcoinj:0.14.4/Bitcoin Wallet:5.21-blackberry/", "Wallet"},
 	{"/bitcoinj:0.14.4/Bitcoin:1.075/", "Wallet"},

@@ -467,6 +467,10 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)^/Aurum:`), kind: "Other chain", text: "Aurumcoin, an altcoin built on Bitcoin Core 0.12", label: "Aurumcoin altcoin"},
 	// Source: saltduck/bitcoinpurity src/clientversion.cpp L79 @124fbc8 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)/Purity:`), text: "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637", label: "Bitcoin Purity hard fork"},
+	// Schildbach's wallet was already at 4.57 on bitcoinj 0.14.3 and went
+	// up from there, so "Bitcoin Wallet:1.0.x" on bitcoinj 0.14+ is not it.
+	// Source: bitcoin-wallet/bitcoin-wallet wallet/build.gradle L13 @8cbe9f9 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/bitcoinj:0\.(1[4-9]|[2-9][0-9])[^/]*/(Schildbach )?Bitcoin Wallet:1\.0[./]`), text: "Named like Schildbach's Bitcoin Wallet, but its version doesn't match", label: "Named like Bitcoin Wallet"},
 	// BTCX's fork keeps the name "Bitcoin Wallet" and marks its version:
 	// android:versionName="4.58.1-btcx", package se.btcx.wallet.
 	// Source: BTCX/bitcoin-wallet wallet/AndroidManifest.xml L4-7 @5dc1697 (checked 2026-11-25)
