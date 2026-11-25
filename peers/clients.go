@@ -138,8 +138,10 @@ var clients = []client{
 	// 29.x-knots branch (src/protocol.h at 5811235), not in knots20260508.
 	{re: regexp.MustCompile(`(?i)^/GrayersDad:`), kind: "Node (Knots)", text: "Probably Bitcoin Knots under a name its operator chose", label: "Probably Knots"},
 	// Before the census rule, which would take it for "monitor" (koyn-sync).
+	// bitcoinj's own example sends the same: peerGroup.setUserAgent(
+	// "PeerMonitor", "1.0") (examples/.../PeerMonitor.java L69 at v0.14.4).
 	// Source: elkrem/koyn-sync src/main/java/io/elkrem/koynsync/Main.java L257 @c9b9ef1 (checked 2026-11-24)
-	{re: regexp.MustCompile(`/PeerMonitor:`), text: "Koyn's header tool, which collects block headers for the Koyn Arduino library", label: "Koyn header tool"},
+	{re: regexp.MustCompile(`/PeerMonitor:`), text: "Koyn's header tool, which collects block headers for the Koyn Arduino library, or bitcoinj's PeerMonitor example of the same name", label: "Koyn/bitcoinj PeerMonitor"},
 	// Census and seed monitors whose names hold one of the census words, each
 	// with its source (14.11.2026): USER_AGENT in lib/observatory.rb
 	// (azuchi/btc-node-observatory), OUR_USER_AGENT in dns_monitor/handshake.py
@@ -465,6 +467,14 @@ var clients = []client{
 	{re: regexp.MustCompile(`(?i)^/Aurum:`), kind: "Other chain", text: "Aurumcoin, an altcoin built on Bitcoin Core 0.12", label: "Aurumcoin altcoin"},
 	// Source: saltduck/bitcoinpurity src/clientversion.cpp L79 @124fbc8 (checked 2026-11-24)
 	{re: regexp.MustCompile(`(?i)/Purity:`), text: "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637", label: "Bitcoin Purity hard fork"},
+	// BTCX's fork keeps the name "Bitcoin Wallet" and marks its version:
+	// android:versionName="4.58.1-btcx", package se.btcx.wallet.
+	// Source: BTCX/bitcoin-wallet wallet/AndroidManifest.xml L4-7 @5dc1697 (checked 2026-11-25)
+	{re: regexp.MustCompile(`Bitcoin Wallet:[^/]*-btcx/`), text: "BTCX's Android wallet, a fork of Schildbach's Bitcoin Wallet", label: "BTCX wallet (fork)"},
+	// Schildbach's own BlackBerry build, branch blackberry-prod:
+	// android:versionName="5.21-blackberry".
+	// Source: schildbach/bitcoin-wallet wallet/AndroidManifest.xml L4-7 @bc173d3 (checked 2026-11-25)
+	{re: regexp.MustCompile(`Bitcoin Wallet:[^/]*-blackberry`), text: "Bitcoin Wallet by Schildbach, its BlackBerry build", label: "BlackBerry Bitcoin Wallet"},
 	// USER_AGENT = "Bitcoin Wallet" (wallet/src/de/schildbach/wallet/Constants.java
 	// in bitcoin-wallet/bitcoin-wallet), on bitcoinj.
 	// Source: bitcoin-wallet/bitcoin-wallet wallet/src/de/schildbach/wallet/Constants.java L127 @e1c558c (checked 2026-11-24)
@@ -492,6 +502,26 @@ var clients = []client{
 	// and CoinView (Main.java in vs-uulm/CoinView), see the sources further down.
 	// Source: bitcoinj/httpseed src/main/kotlin/crawler.kt L158 @40d2e88 (checked 2026-11-24)
 	{re: regexp.MustCompile(`/HTTPSeed:`), text: "Cartographer (HTTPSeed), bitcoinj's crawler behind an HTTP seed, archived", label: "HTTPSeed crawler"},
+	// Simple Bitcoin Wallet (btcontract/wallet, package com.btcontract.wallet):
+	// appName = "Bitcoin" (Utils.scala), peerGroup.setUserAgent(appName,
+	// "1.075") in WalletApp.scala; 1.072 and 1.074 in earlier commits.
+	// Source: btcontract/wallet app/src/main/java/com/btcontract/wallet/WalletApp.scala L121 @7ec01b1 (checked 2026-11-25)
+	{re: regexp.MustCompile(`^/bitcoinj:[^/]*/Bitcoin:[0-9]`), text: "Simple Bitcoin Wallet by btcontract, an Android wallet", label: "Simple Bitcoin Wallet"},
+	// bitcoinj's own programs: peers.setUserAgent("WalletTool", "1.0") in its
+	// command-line wallet tool, and APP_NAME = "WalletTemplate" with "1.0" in
+	// its desktop wallet template (wallettemplate/.../Main.java L46, L152).
+	// Source: bitcoinj/bitcoinj tools/src/main/java/org/bitcoinj/tools/WalletTool.java L1214 @v0.14.4 (checked 2026-11-25)
+	{re: regexp.MustCompile(`/WalletTool:`), text: "WalletTool, bitcoinj's command-line wallet", label: "bitcoinj WalletTool"},
+	// Source: bitcoinj/bitcoinj wallettemplate/src/main/java/wallettemplate/Main.java L152 @v0.14.4 (checked 2026-11-25)
+	{re: regexp.MustCompile(`/WalletTemplate:`), text: "bitcoinj's wallet template, a sample desktop wallet to build on", label: "bitcoinj WalletTemplate"},
+	// BlockchainAnalyzer (catena2w/BlockchainAnalyzer, IOHK's Scorex):
+	// peerGroup.setUserAgent("SmartContract.com", "0.1") on mainnet.
+	// Source: catena2w/BlockchainAnalyzer src/main/scala/iohk/scorex/bitcoin/Analyzer.scala L63 @5e20e76 (checked 2026-11-25)
+	{re: regexp.MustCompile(`/SmartContract\.com:`), text: "BlockchainAnalyzer, a research tool that reads the chain through bitcoinj", label: "BlockchainAnalyzer"},
+	// You've Got Bitcoin (duncannevin/youvegotbitcoin), sending bitcoin by
+	// email: peerGroup.setUserAgent("email bitcoin", "0.1").
+	// Source: duncannevin/youvegotbitcoin src/main/scala/com/duncannevin/youvegotbitcoin/bitcoin/BitcoinClient.scala L152 @1804b0f (checked 2026-11-25)
+	{re: regexp.MustCompile(`/email bitcoin:`), text: "You've Got Bitcoin, an app that sends bitcoin by email, on bitcoinj", label: "You've Got Bitcoin"},
 	// Source: vs-uulm/CoinView collection/application/research/Main.java L24 @d3a9f95 (checked 2026-11-24)
 	{re: regexp.MustCompile(`/UU-Network-Research:`), text: "CoinView, Ulm University's collector of transaction announcements", label: "CoinView (Ulm University)"},
 	// The library alone, without a wallet app's name after it. After the
