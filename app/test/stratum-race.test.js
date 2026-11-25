@@ -12,6 +12,7 @@ process.env.DATA_DIR = tmpDir;
 process.env.LOG_LEVEL = 'error';
 
 const db = require('../src/lib/db');
+const { seedPools } = require('./helpers/pools');
 const race = require('../src/stratum-race');
 const toggle = require('../src/lib/stratum-race-toggle');
 
@@ -39,6 +40,7 @@ function observationsFor(hash) {
 
 test.before(() => {
   db.open();
+  seedPools(db);
 });
 
 test.beforeEach(async () => {

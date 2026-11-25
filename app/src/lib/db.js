@@ -290,19 +290,10 @@ CREATE TABLE IF NOT EXISTS traffic_day (
 );
 `;
 
-// label, host, port - sourced from public solo-pool directories (Aug 2026).
-// Purely a starting point: every row is a normal stratum_pool row the user
-// can disable or delete like any other, nothing is special-cased in code.
-const DEFAULT_POOLS = [
-  ['AtlasPool', 'solo.atlaspool.io', 3333],
-  ['EU CKPool', 'eusolo.ckpool.org', 3333],
-  ['Braiins Solo', 'solo.stratum.braiins.com', 3333],
-  ['SoloHash DE', 'solo-de.solohash.co.uk', 3333],
-  ['SoloMining.de', 'pool.solomining.de', 3333],
-  ['Satoshi Radio', 'pool.satoshiradio.nl', 3333],
-  ['2Miners Solo BTC', 'solo-btc.2miners.com', 2323],
-  ['Parasite Pool', 'parasite.wtf', 42069],
-];
+// A fresh install starts with no pool at all (25.11.2026): the user picks
+// from the list of public pools (data/stratum-pools.json) or adds their own.
+// Installs from before keep the eight pools they were given then - they are
+// rows like any other, and the list shows them ticked.
 
 // A VACUUM is only worth its exclusive lock if this share of the file is
 // actually free space waiting to be reclaimed.
@@ -392,10 +383,6 @@ function openOnce() {
 function seedDefaultPools() {
   const already = db.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get();
   if (already) return;
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 1, ?)`,
-  );
-  const now = Date.now();
   const tx = db.transaction(() => {
     // Re-check inside the transaction: all four processes call open() at once, and on a fresh
     // install all four read "not seeded yet". meta.key is a PRIMARY KEY, so
@@ -405,7 +392,6 @@ function seedDefaultPools() {
     // afterwards.
     const raced = db.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get();
     if (raced) return false;
-    for (const [label, host, port] of DEFAULT_POOLS) insert.run(label, host, port, now);
     db.prepare(`INSERT INTO meta (key, value) VALUES ('pools_seeded', '1')`).run();
     return true;
   });
@@ -413,7 +399,7 @@ function seedDefaultPools() {
   // the flag first and only then asks to write, and when another process
   // committed in between, SQLite refuses the upgrade at once with
   // SQLITE_BUSY_SNAPSHOT - no busy_timeout applies to that.
-  if (tx.immediate()) logger.info('seeded default stratum pools', { count: DEFAULT_POOLS.length });
+  tx.immediate();
 }
 
 // Held for the life of the process rather than compiled per call. This is on

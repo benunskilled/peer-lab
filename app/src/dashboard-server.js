@@ -30,6 +30,7 @@ const peerSync = require('./lib/peer-sync');
 const peersService = require('./lib/peers-service');
 const { proxyPeers } = require('./lib/peers-proxy');
 const localPools = require('./lib/local-pools');
+const poolCatalog = require('./lib/pool-catalog');
 const health = require('./lib/health');
 const processGuard = require('./lib/process-guard');
 const hashblock = require('./lib/hashblock-subscriber');
@@ -138,8 +139,13 @@ function sendBody(res, status, headers, body) {
   res.end(out);
 }
 
-// How many pools Stratum Race may hold, the default nine included.
+// How many pools may race at once: each one is a socket held open and a row
+// per block. Paused pools keep their rows (their history) and do not count;
+// the rows themselves are bounded too, at the public list plus this many.
 const MAX_POOLS = 20;
+const MAX_POOL_ROWS = poolCatalog.size + MAX_POOLS;
+const enabledPools = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE enabled = 1').get().n;
+const poolRows = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n;
 
 function sendJson(res, status, data) {
   sendBody(res, status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(data));
@@ -997,6 +1003,39 @@ const routes = {
     return sendJson(res, 200, await localPools.list(configured));
   },
 
+  // The public pools to pick from, each with its tick.
+  'GET /api/pools/catalog': async (req, res, url) => {
+    const rows = db.instance.prepare('SELECT id, host, port, enabled FROM stratum_pool').all();
+    return sendJson(res, 200, { checked: poolCatalog.checked, max: MAX_POOLS, racing: enabledPools(), pools: poolCatalog.withRows(rows) });
+  },
+
+  // A tick in that list: { host, port, enabled }. Only a pool on the list;
+  // its name comes from the list. Unticking pauses it and keeps its history.
+  'POST /api/pools/catalog': async (req, res, url) => {
+    const body = await readBody(req);
+    const entry = poolCatalog.find(body.host, body.port);
+    if (!entry) return sendJson(res, 400, { ok: false, error: 'not a pool on the list' });
+    if (typeof body.enabled !== 'boolean') return sendJson(res, 400, { ok: false, error: 'enabled must be true or false' });
+    const row = db.instance.prepare('SELECT id, enabled FROM stratum_pool WHERE lower(host) = lower(?) AND port = ?').get(entry.host, entry.port);
+    if (body.enabled && !(row && row.enabled) && enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - untick one first` });
+    }
+    try {
+      if (row) {
+        db.instance.prepare('UPDATE stratum_pool SET enabled = ? WHERE id = ?').run(body.enabled ? 1 : 0, row.id);
+      } else if (body.enabled) {
+        if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
+        db.instance
+          .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 1, ?)`)
+          .run(entry.name, entry.host, entry.port, Date.now());
+      }
+    } catch (err) {
+      logger.error('changing a listed pool failed', { error: err.message });
+      return sendJson(res, 500, { ok: false, error: 'internal error' });
+    }
+    return sendJson(res, 200, { ok: true, enabled: body.enabled, racing: enabledPools() });
+  },
+
   'GET /api/pools': async (req, res, url) => {
     return sendJson(res, 200, queries.stratumRanking(poolRange(url.searchParams.get('range'))));
   },
@@ -1022,8 +1061,11 @@ const routes = {
     }
     // Every pool is a socket held open and a row per block; without a limit
     // the form could open them until the app ran out of either.
-    if (db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n >= MAX_POOLS) {
-      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools` });
+    if (enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - pause one first` });
+    }
+    if (poolRows() >= MAX_POOL_ROWS) {
+      return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
     }
     try {
       db.instance
@@ -1086,6 +1128,12 @@ async function poolRoute(req, res, id) {
   // body silently disabled the pool and answered 200. Say what was wrong.
   if (typeof body.enabled !== 'boolean') {
     return sendJson(res, 400, { error: 'enabled must be true or false' });
+  }
+  if (body.enabled) {
+    const row = db.instance.prepare('SELECT enabled FROM stratum_pool WHERE id = ?').get(id);
+    if (row && !row.enabled && enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { error: `at most ${MAX_POOLS} pools race at once - pause one first` });
+    }
   }
   const updated = db.instance
     .prepare(`UPDATE stratum_pool SET enabled = ? WHERE id = ?`)

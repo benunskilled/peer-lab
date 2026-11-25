@@ -13,6 +13,7 @@ process.env.SQLITE_PATH = path.join(tmpDir, 'test.db');
 process.env.DATA_DIR = tmpDir;
 
 const db = require('../src/lib/db');
+const { seedPools } = require('./helpers/pools');
 const queries = require('../src/lib/queries');
 
 test.before(() => {
@@ -30,37 +31,16 @@ function openSession(peerId, { direction = 'outbound', connectionType = 'outboun
     .run(peerId, direction, connectionType, Date.now() - 3600000);
 }
 
-test('seeds the default stratum pool list exactly once', () => {
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 8);
-
-  // Counting after a single open() proves nothing: the seed uses INSERT OR
-  // IGNORE against a unique (host, port), so the count would be 8 with or
-  // without the pools_seeded guard. What the guard is actually for is the
-  // first boot, where all four processes race open() and the loser used to die
-  // on a meta primary-key conflict. So: seed again, and assert both that
-  // nothing is duplicated AND that a user's own edits survive it.
-  db.instance.prepare(`UPDATE stratum_pool SET enabled = 0 WHERE label = 'AtlasPool'`).run();
-  db.instance.prepare(`DELETE FROM stratum_pool WHERE label = 'Parasite Pool'`).run();
-
+test('a fresh install starts with no pool, and opening again adds none', () => {
+  // Since 25.11.2026 the user picks pools from the list (lib/pool-catalog.js).
+  // The flag still guards the first boot, where all four processes race
+  // open(): the losers used to die on a meta primary-key conflict.
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 0);
+  assert.ok(db.instance.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get());
   db.seedDefaultPools();
-
-  assert.equal(
-    db.instance.prepare(`SELECT COUNT(*) AS n FROM stratum_pool WHERE label = 'Parasite Pool'`).get().n,
-    0,
-    'a default pool the user deleted must stay deleted - re-seeding must not resurrect it',
-  );
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 7, 'and nothing is duplicated');
-  assert.equal(
-    db.instance.prepare(`SELECT enabled FROM stratum_pool WHERE label = 'AtlasPool'`).get().enabled,
-    0,
-    'nor undo what the user changed about one they kept',
-  );
-
-  // Leave the fixture as found for the tests that follow.
-  db.instance
-    .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES ('Parasite Pool','parasite.wtf',42069,1,1,?)`)
-    .run(Date.now());
-  db.instance.prepare(`UPDATE stratum_pool SET enabled = 1 WHERE label = 'AtlasPool'`).run();
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 0);
+  // The tests below rank pools: eight, as an older install has them.
+  seedPools(db);
 });
 
 test('getOrCreatePeer is idempotent by address', () => {

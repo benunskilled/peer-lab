@@ -12,11 +12,13 @@ process.env.DATA_DIR = tmpDir;
 process.env.LOG_LEVEL = 'error';
 
 const db = require('../src/lib/db');
+const { seedPools } = require('./helpers/pools');
 const queries = require('../src/lib/queries');
 const peerRanking = require('../src/lib/queries/peer-ranking');
 
 test.before(() => {
   db.open();
+  seedPools(db);
 });
 
 function aggregateFromRawRows() {

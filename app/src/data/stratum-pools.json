@@ -1,0 +1,596 @@
+{
+ "checked": "2026-11-25",
+ "note": "Public Bitcoin stratum V1 endpoints (plain TCP) that send jobs to an unregistered username. Each was connected to and sent a job for the current block on the date above; country and region from the server address (geo/), not from the pool. See STRATUM-POOLS.md.",
+ "pools": [
+  {
+   "name": "CKPool Solo Australia",
+   "host": "ausolo.ckpool.org",
+   "port": 3333,
+   "country": "AU",
+   "region": "Queensland",
+   "kind": "solo",
+   "source": "https://solo.ckpool.org/"
+  },
+  {
+   "name": "SoloFury Brazil",
+   "host": "lat-btc.solofury.com",
+   "port": 6060,
+   "country": "BR",
+   "region": "Rio de Janeiro",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloPool.com Brazil",
+   "host": "sp.solopool.com",
+   "port": 3333,
+   "country": "BR",
+   "region": "Sao Paulo",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloPool.org Canada",
+   "host": "us1.solopool.org",
+   "port": 8005,
+   "country": "CA",
+   "region": "Quebec",
+   "kind": "solo",
+   "source": "https://btc.solopool.org/help"
+  },
+  {
+   "name": "SoloFury DE",
+   "host": "eu-btc.solofury.com",
+   "port": 6060,
+   "country": "DE",
+   "region": "Baden-Wurttemberg",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "Bitaxe Pool",
+   "host": "stratum.bitaxe.de",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://stratum.bitaxe.de/en/"
+  },
+  {
+   "name": "SoloPool.com DE",
+   "host": "eu.solopool.com",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloPool.org DE",
+   "host": "eu3.solopool.org",
+   "port": 8005,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://btc.solopool.org/help"
+  },
+  {
+   "name": "PowerHash",
+   "host": "eu.powerhash.org",
+   "port": 3335,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://powerhash.org/btc"
+  },
+  {
+   "name": "Mineshop Solo DE",
+   "host": "stratum-de.solo.mineshop.eu",
+   "port": 3333,
+   "country": "DE",
+   "region": "Bavaria",
+   "kind": "solo",
+   "source": "https://solo.mineshop.eu/"
+  },
+  {
+   "name": "SpiderPool DE",
+   "host": "btc-eu.spiderpool.com",
+   "port": 2309,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "shared",
+   "source": "https://support.spiderpool.com/bitcoin-mining"
+  },
+  {
+   "name": "BitFuFu DE",
+   "host": "btc-eu.bitfufu.com",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "shared",
+   "source": "https://help.bitfufu.com/en/article/bitfufu-pool-mining-tutorial-1m68u73/"
+  },
+  {
+   "name": "Kryptex DE",
+   "host": "btc-eu.kryptex.network",
+   "port": 7014,
+   "country": "DE",
+   "region": "Saxony",
+   "kind": "shared",
+   "source": "https://pool.kryptex.com/en/btc"
+  },
+  {
+   "name": "NexusPool Solo",
+   "host": "solo.nexuspool.io",
+   "port": 3350,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://nexuspool.io/docs/technical"
+  },
+  {
+   "name": "WhitePool Solo",
+   "host": "pool1-eu.whitebit.com",
+   "port": 8888,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://whitepool.tech/mining"
+  },
+  {
+   "name": "EU CKPool",
+   "host": "eusolo.ckpool.org",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://solo.ckpool.org/",
+   "since": "1.0.0"
+  },
+  {
+   "name": "SoloHash DE",
+   "host": "solo-de.solohash.co.uk",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://solohash.co.uk/",
+   "since": "1.0.0"
+  },
+  {
+   "name": "Satoshi Radio",
+   "host": "pool.satoshiradio.nl",
+   "port": 3333,
+   "country": "DE",
+   "region": "Saxony",
+   "kind": "solo",
+   "source": null,
+   "since": "1.0.0"
+  },
+  {
+   "name": "2Miners Solo DE",
+   "host": "solo-btc.2miners.com",
+   "port": 2323,
+   "country": "DE",
+   "region": "Saarland",
+   "kind": "solo",
+   "source": "https://solo-btc.2miners.com/help",
+   "since": "1.0.0"
+  },
+  {
+   "name": "Parasite Pool",
+   "host": "parasite.wtf",
+   "port": 42069,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "shared",
+   "source": null,
+   "since": "1.0.0"
+  },
+  {
+   "name": "Mineshop Solo Finland",
+   "host": "solo.mineshop.eu",
+   "port": 3333,
+   "country": "FI",
+   "region": "Uusimaa",
+   "kind": "solo",
+   "source": "https://solo.mineshop.eu/"
+  },
+  {
+   "name": "SoloMining.de",
+   "host": "pool.solomining.de",
+   "port": 3333,
+   "country": "FR",
+   "region": "Ile-de-France",
+   "kind": "solo",
+   "source": null,
+   "since": "1.0.0"
+  },
+  {
+   "name": "SoloFury UK",
+   "host": "uk-btc.solofury.com",
+   "port": 6060,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloHash UK",
+   "host": "solo.solohash.co.uk",
+   "port": 3333,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": "https://solohash.co.uk/"
+  },
+  {
+   "name": "Braiins Solo",
+   "host": "solo.stratum.braiins.com",
+   "port": 3333,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": null,
+   "since": "1.0.0"
+  },
+  {
+   "name": "SpiderPool Hong Kong",
+   "host": "btc-as.spiderpool.com",
+   "port": 2309,
+   "country": "HK",
+   "region": "Kowloon",
+   "kind": "shared",
+   "source": "https://support.spiderpool.com/bitcoin-mining"
+  },
+  {
+   "name": "BitFuFu Hong Kong",
+   "host": "btc-as.bitfufu.com",
+   "port": 3333,
+   "country": "HK",
+   "region": "Kowloon",
+   "kind": "shared",
+   "source": "https://help.bitfufu.com/en/article/bitfufu-pool-mining-tutorial-1m68u73/"
+  },
+  {
+   "name": "Kryptex Hong Kong",
+   "host": "btc-hk.kryptex.network",
+   "port": 7014,
+   "country": "HK",
+   "region": "Kowloon",
+   "kind": "shared",
+   "source": "https://pool.kryptex.com/en/btc"
+  },
+  {
+   "name": "SoloLuck Jakarta",
+   "host": "sea.stratum.sololuck.io",
+   "port": 3333,
+   "country": "ID",
+   "region": "Jakarta",
+   "kind": "solo",
+   "source": "https://sololuck.io/connect"
+  },
+  {
+   "name": "SoloFury Tel Aviv",
+   "host": "me-btc.solofury.com",
+   "port": 6060,
+   "country": "IL",
+   "region": "Central District",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloFury Tokyo",
+   "host": "jp-btc.solofury.com",
+   "port": 6060,
+   "country": "JP",
+   "region": "Tokyo",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "EMCD Russia",
+   "host": "kz.emcd.network",
+   "port": 3333,
+   "country": "RU",
+   "region": "Moscow",
+   "kind": "shared",
+   "source": "https://help.emcd.io/en/articles/16613290-how-to-connect-to-the-emcd-pool-and-start-mining-bitcoin-btc"
+  },
+  {
+   "name": "Kryptex Russia",
+   "host": "btc-ru.kryptex.network",
+   "port": 7014,
+   "country": "RU",
+   "region": "Moscow",
+   "kind": "shared",
+   "source": "https://pool.kryptex.com/en/btc"
+  },
+  {
+   "name": "SECPOOL Russia",
+   "host": "ru.secpool.com",
+   "port": 3333,
+   "country": "RU",
+   "region": "Moscow",
+   "kind": "shared",
+   "source": "https://v3.secpool.com/"
+  },
+  {
+   "name": "CKPool Solo Singapore",
+   "host": "sgsolo.ckpool.org",
+   "port": 3333,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://solo.ckpool.org/"
+  },
+  {
+   "name": "2Miners Solo Singapore",
+   "host": "asia-solo-btc.2miners.com",
+   "port": 2323,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://solo-btc.2miners.com/help"
+  },
+  {
+   "name": "SoloPool.com Singapore",
+   "host": "asia.solopool.com",
+   "port": 3333,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloFury Singapore",
+   "host": "asia-btc.solofury.com",
+   "port": 6060,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloLuck Singapore",
+   "host": "sg.stratum.sololuck.io",
+   "port": 3333,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://sololuck.io/connect"
+  },
+  {
+   "name": "LetsMine.it",
+   "host": "sg1.letsmine.it",
+   "port": 3332,
+   "country": "SG",
+   "region": null,
+   "kind": "solo",
+   "source": "https://letsmine.it/solo/btc"
+  },
+  {
+   "name": "Trustpool",
+   "host": "btc.trustpool.cc",
+   "port": 3333,
+   "country": "SG",
+   "region": null,
+   "kind": "shared",
+   "source": "https://trustpool.cc/static/stratums_en.pdf"
+  },
+  {
+   "name": "SoloPool.com Dubai",
+   "host": "me.solopool.com",
+   "port": 3333,
+   "country": "AE",
+   "region": "Dubai",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloFury Johannesburg",
+   "host": "afr-btc.solofury.com",
+   "port": 6060,
+   "country": "ZA",
+   "region": "Gauteng",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "CKPool Solo US West",
+   "host": "uwsolo.ckpool.org",
+   "port": 3333,
+   "country": "US",
+   "region": "Oregon",
+   "kind": "solo",
+   "source": "https://solo.ckpool.org/"
+  },
+  {
+   "name": "CKPool Solo US East",
+   "host": "uesolo.ckpool.org",
+   "port": 3333,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "solo",
+   "source": "https://solo.ckpool.org/"
+  },
+  {
+   "name": "2Miners Solo US",
+   "host": "us-solo-btc.2miners.com",
+   "port": 2323,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "solo",
+   "source": "https://solo-btc.2miners.com/help"
+  },
+  {
+   "name": "Public Pool",
+   "host": "public-pool.io",
+   "port": 3333,
+   "country": "US",
+   "region": "New Hampshire",
+   "kind": "solo",
+   "source": "https://web.public-pool.io/"
+  },
+  {
+   "name": "SoloFury US Atlanta",
+   "host": "us-btc.solofury.com",
+   "port": 6060,
+   "country": "US",
+   "region": "Georgia",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloFury US Seattle",
+   "host": "pnw-btc.solofury.com",
+   "port": 6060,
+   "country": "US",
+   "region": "Washington",
+   "kind": "solo",
+   "source": "https://solofury.com/btc/"
+  },
+  {
+   "name": "SoloPool.com US Southwest",
+   "host": "ussw.solopool.com",
+   "port": 3333,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloPool.com US Northwest",
+   "host": "usnw.solopool.com",
+   "port": 3333,
+   "country": "US",
+   "region": "Oregon",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "SoloPool.com US East",
+   "host": "east.solopool.com",
+   "port": 3333,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "solo",
+   "source": "https://www.solopool.com/docs.html"
+  },
+  {
+   "name": "Bitcoin Merch",
+   "host": "pool.bitcoinmerch.com",
+   "port": 3333,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://pool.bitcoinmerch.com/"
+  },
+  {
+   "name": "SpiderPool US",
+   "host": "btc-us.spiderpool.com",
+   "port": 2309,
+   "country": "US",
+   "region": "California",
+   "kind": "shared",
+   "source": "https://support.spiderpool.com/bitcoin-mining"
+  },
+  {
+   "name": "BitFuFu US",
+   "host": "btc-us.bitfufu.com",
+   "port": 3333,
+   "country": "US",
+   "region": "California",
+   "kind": "shared",
+   "source": "https://help.bitfufu.com/en/article/bitfufu-pool-mining-tutorial-1m68u73/"
+  },
+  {
+   "name": "OCEAN",
+   "host": "mine.ocean.xyz",
+   "port": 3334,
+   "country": "US",
+   "region": "New Jersey",
+   "kind": "shared",
+   "source": "https://ocean.xyz/getstarted"
+  },
+  {
+   "name": "ViaBTC US",
+   "host": "btc.viabtc.cc",
+   "port": 3333,
+   "country": "US",
+   "region": "Washington",
+   "kind": "shared",
+   "source": "https://support.viabtc.com/hc/en-us/articles/14367481714191-Mining-Pools-Information"
+  },
+  {
+   "name": "AtlasPool",
+   "host": "solo.atlaspool.io",
+   "port": 3333,
+   "country": "US",
+   "region": "Washington",
+   "kind": "solo",
+   "source": null,
+   "since": "1.0.0"
+  },
+  {
+   "name": "AntPool",
+   "host": "ss.antpool.com",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://antpoolsupport-hc.zendesk.com/hc/en-us/articles/5984340865177-BTC-BCH-Mining-Tutorial"
+  },
+  {
+   "name": "ViaBTC (routed)",
+   "host": "btc.viabtc.io",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://support.viabtc.com/hc/en-us/articles/14367481714191-Mining-Pools-Information"
+  },
+  {
+   "name": "SECPOOL (routed)",
+   "host": "btc.secpool.com",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://www.secpool.com/help"
+  },
+  {
+   "name": "Poolin",
+   "host": "btc-va.ss.poolin.me",
+   "port": 443,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://help.poolin.me/hc/en-us/articles/360006872672-BTC-Mining-URL"
+  },
+  {
+   "name": "CloverPool",
+   "host": "us.ss.cloverpool.com",
+   "port": 1800,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://help.cloverpool.com/hc/en-us/articles/360038354832-Bitcoin-Mining-Tutorial"
+  },
+  {
+   "name": "EMCD (routed)",
+   "host": "eu.emcd.network",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://help.emcd.io/en/articles/16613290-how-to-connect-to-the-emcd-pool-and-start-mining-bitcoin-btc"
+  }
+ ]
+}
