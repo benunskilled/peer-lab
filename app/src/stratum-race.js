@@ -169,6 +169,19 @@ function syncConnections() {
       conn.on('notify', ({ prevhash, receivedAtHr, receivedAtMs, firstAfterConnect }) =>
         handleNotify(pool, prevhash, receivedAtHr, receivedAtMs, firstAfterConnect));
       conn.on('socketError', (err) => logger.debug('pool socket error', { label: pool.label, error: err.message }));
+      // Every lost connection, at info: who ended it and why, how long it
+      // stood. A block that falls into the gap is a race this pool cannot be
+      // timed in, and this is the line that says why (25.11.2026).
+      conn.on('disconnect', (info) => {
+        if (!info || info.reason === 'stopped') return;
+        logger.info('pool connection closed', {
+          label: pool.label,
+          reason: info.reason,
+          heldMinutes: Math.round(info.heldMs / 60000),
+          jobs: info.jobs,
+          nextTryMs: info.nextTryMs,
+        });
+      });
       conn.on('protocolError', (info) => logger.warn('pool sent something unusable', { label: pool.label, ...info }));
       conn.on('authorizeResult', ({ ok, error }) => {
         if (!ok) logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });

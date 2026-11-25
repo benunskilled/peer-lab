@@ -189,3 +189,56 @@ test('readySince is when the connection brought its first job, and only then', (
   conn.stop();
   assert.equal(conn.readySince, null, 'gone with the connection');
 });
+
+const notifyLine = (hash) => Buffer.from(`${JSON.stringify({ method: 'mining.notify', params: ['j', hash, '', '', [], '', '', '', false] })}\n`);
+
+test('a pool silent for four of its usual gaps, and at least a minute, counts as gone', () => {
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'test' });
+  const t0 = 1789900000000;
+  conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0);
+  conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0 + 20_000);
+  conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0 + 40_000);
+  assert.equal(conn.silenceLimitMs(), null, 'two gaps are not a rhythm yet');
+  conn._handleChunk(notifyLine('ab'.repeat(32)), process.hrtime.bigint(), t0 + 60_000);
+  assert.equal(conn.silenceLimitMs(), 80_000, 'every 20 s: four gaps');
+  assert.equal(conn.silentTooLong(t0 + 60_000 + 79_000), false);
+  assert.equal(conn.silentTooLong(t0 + 60_000 + 81_000), true);
+
+  // A pool that sends work only on a new block is given forty minutes.
+  const slow = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'slow' });
+  for (let i = 0; i < 4; i++) slow._handleChunk(notifyLine('cd'.repeat(32)), process.hrtime.bigint(), t0 + i * 600_000);
+  assert.equal(slow.silenceLimitMs(), 2_400_000);
+
+  // And a fast one never less than a minute.
+  const fast = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'fast' });
+  for (let i = 0; i < 4; i++) fast._handleChunk(notifyLine('ef'.repeat(32)), process.hrtime.bigint(), t0 + i * 1_000);
+  assert.equal(fast.silenceLimitMs(), 60_000);
+});
+
+test('a connection that held is dialled again at once, and the log says the pool closed it', async () => {
+  const net = require('net');
+  let accepted = 0;
+  const sockets = [];
+  const server = net.createServer((s) => { accepted += 1; sockets.push(s); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const conn = new StratumPoolConnection({ host: '127.0.0.1', port: server.address().port, label: 'local' });
+  const closed = [];
+  conn.on('disconnect', (info) => closed.push(info));
+  try {
+    conn.start();
+    await new Promise((r) => conn.once('connect', r));
+    for (let i = 0; i < 50 && accepted < 1; i++) await new Promise((r) => setTimeout(r, 10));
+    conn._connectedAt = Date.now() - 61_000; // it has stood for over a minute
+    const back = new Promise((r) => conn.once('connect', r));
+    sockets[0].end();
+    await back;
+    assert.equal(closed[0].reason, 'closed by the pool');
+    assert.equal(closed[0].nextTryMs, 0);
+    for (let i = 0; i < 50 && accepted < 2; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(accepted, 2, 'the server saw the second connection');
+  } finally {
+    conn.stop();
+    for (const s of sockets) s.destroy();
+    server.close();
+  }
+});

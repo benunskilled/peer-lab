@@ -45,10 +45,26 @@ const PREVHASH_RE = /^[0-9a-fA-F]{64}$/;
  *   'notify' ({ prevhash, cleanJobs, receivedAtHr }) - a parsed mining.notify
  *   'authorizeResult' ({ ok, error }) - response to our own mining.authorize
  *   'heartbeat' ({ connectedMs, notifyCount, authorized }) - periodic status
- *   'connect' / 'disconnect' (err?)
+ *   'connect' / 'disconnect' ({ reason, heldMs, jobs, nextTryMs })
  */
 // How long a connection has to last before the reconnect wait starts over.
 const HELD_MS = 60_000;
+
+// A connection that has gone quiet. Pools send fresh work on a rhythm of
+// their own - an owner's ckpool every 20 seconds, public pools every half
+// minute to a few minutes - so a connection silent for several of its own
+// rhythms is no longer working, whatever the socket says. Seen on a real node
+// (25.11.2026): a ckpool dropped this client while the socket looked open,
+// and it took two to three minutes until anything noticed - a block in that
+// window found the pool with its job ready and no way to send it here.
+// Replaced after four of its usual gaps, never sooner than a minute, and
+// only once a few gaps have been seen: a pool that sends work only on a new
+// block learns a ten-minute rhythm and is left alone for forty.
+const SILENCE_MIN_MS = 60_000;
+const SILENCE_FACTOR = 4;
+const SILENCE_GAPS_NEEDED = 3;
+const SILENCE_GAPS_KEPT = 20;
+const SILENCE_CHECK_MS = 10_000;
 
 class StratumPoolConnection extends EventEmitter {
   constructor({ host, port, label, idleTimeoutMs = 6 * 60 * 60 * 1000, authorizeAddress = '1BitcoinEaterAddressDontSendf59kuE' }) {
@@ -71,6 +87,13 @@ class StratumPoolConnection extends EventEmitter {
     this._connectedAt = null;
     this._readyAt = null;
     this._heartbeatTimer = null;
+    // Gaps between this pool's jobs (kept across reconnects: the rhythm is
+    // the pool's), and when the current connection last brought one.
+    this._gaps = [];
+    this._lastNotifyAt = null;
+    this._silenceTimer = null;
+    // Why the current connection ended, for the log: set by whoever ends it.
+    this._closeReason = null;
   }
 
   start() {
@@ -94,10 +117,26 @@ class StratumPoolConnection extends EventEmitter {
     return this._readyAt;
   }
 
+  // How long this pool may stay quiet before its connection is replaced,
+  // null while its rhythm is not known yet.
+  silenceLimitMs() {
+    if (this._gaps.length < SILENCE_GAPS_NEEDED) return null;
+    const sorted = [...this._gaps].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    return Math.max(SILENCE_MIN_MS, SILENCE_FACTOR * median);
+  }
+
+  silentTooLong(now = Date.now()) {
+    const limit = this.silenceLimitMs();
+    return limit != null && this._lastNotifyAt != null && now - this._lastNotifyAt > limit;
+  }
+
   stop() {
     this.stopped = true;
     this._connectedAt = null;
     this._readyAt = null;
+    clearInterval(this._silenceTimer);
+    this._silenceTimer = null;
     clearTimeout(this._reconnectTimer);
     if (this.socket) this.socket.destroy();
   }
@@ -134,6 +173,8 @@ class StratumPoolConnection extends EventEmitter {
       this.authorized = null;
       this._connectedAt = Date.now();
       this._readyAt = null;
+      this._lastNotifyAt = null;
+      this._closeReason = null;
       const subscribe = JSON.stringify({ id: 1, method: 'mining.subscribe', params: ['peer-lab/1.0'] });
       socket.write(`${subscribe}\n`);
       // Many stratum servers - solo-mining ckpool-based ones especially,
@@ -153,6 +194,12 @@ class StratumPoolConnection extends EventEmitter {
       socket.write(`${authorize}\n`);
       this.emit('connect');
       this._startHeartbeat();
+      this._silenceTimer = setInterval(() => {
+        if (!this.silentTooLong()) return;
+        this._closeReason = `silent for ${Math.round((Date.now() - this._lastNotifyAt) / 1000)} s, usually every ${Math.round(this.silenceLimitMs() / SILENCE_FACTOR / 1000)} s`;
+        socket.destroy();
+      }, SILENCE_CHECK_MS);
+      this._silenceTimer.unref?.();
     });
 
     // IMPORTANT: the timestamp is captured here, at the raw 'data' event,
@@ -168,19 +215,37 @@ class StratumPoolConnection extends EventEmitter {
     });
 
     socket.on('timeout', () => socket.destroy(new Error('idle timeout')));
-    socket.on('error', (err) => this.emit('socketError', err));
+    socket.on('error', (err) => {
+      if (!this._closeReason) this._closeReason = err.message;
+      this.emit('socketError', err);
+    });
+    socket.on('end', () => {
+      if (!this._closeReason) this._closeReason = 'closed by the pool';
+    });
     socket.on('close', () => {
       this._stopHeartbeat();
-      this.emit('disconnect');
+      clearInterval(this._silenceTimer);
+      this._silenceTimer = null;
+      const heldMs = this._connectedAt ? Date.now() - this._connectedAt : 0;
+      // A connection that held is dialled again at once: it worked a moment
+      // ago, and every second without it is a second a block can fall into.
+      // One that never held waits, longer each time, so a pool that accepts
+      // and drops at once is not redialled every few seconds.
+      const held = heldMs >= HELD_MS;
+      const waitMs = this.stopped ? null : held ? 0 : this.reconnectDelayMs;
+      this.emit('disconnect', {
+        reason: this._closeReason || (this.stopped ? 'stopped' : 'connection lost'),
+        heldMs,
+        jobs: this.notifyCount,
+        nextTryMs: waitMs,
+      });
       if (!this.stopped) {
-        // The wait starts over only after a connection that held: a pool that
-        // accepts and drops at once is otherwise redialled every 2 seconds.
-        if (this._connectedAt && Date.now() - this._connectedAt >= HELD_MS) this.reconnectDelayMs = 2000;
         this._connectedAt = null;
         this._readyAt = null;
+        this._lastNotifyAt = null;
         clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = setTimeout(() => this._connect(), this.reconnectDelayMs);
-        this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 1.5, 30000);
+        this._reconnectTimer = setTimeout(() => this._connect(), waitMs);
+        this.reconnectDelayMs = held ? 2000 : Math.min(this.reconnectDelayMs * 1.5, 30000);
       }
     });
   }
@@ -251,6 +316,11 @@ class StratumPoolConnection extends EventEmitter {
       }
       this.notifyCount += 1;
       if (this.notifyCount === 1) this._readyAt = receivedAtMs;
+      if (this._lastNotifyAt != null && receivedAtMs > this._lastNotifyAt) {
+        this._gaps.push(receivedAtMs - this._lastNotifyAt);
+        if (this._gaps.length > SILENCE_GAPS_KEPT) this._gaps.shift();
+      }
+      this._lastNotifyAt = receivedAtMs;
       this.emit('notify', {
         prevhash,
         cleanJobs: Boolean(cleanJobs),
