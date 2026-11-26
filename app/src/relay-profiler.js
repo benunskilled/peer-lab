@@ -148,7 +148,10 @@ function firstPeerWasHb(peers, detectedAtMs) {
 
 function recordRace({ blockHash, detectedAtMs, peers, height = null }) {
   const database = db.instance;
-  const firstHb = firstPeerWasHb(peers, detectedAtMs);
+  // The first peer's ping and high-bandwidth state from the same peers the
+  // credit is decided among: not one whose stamp was the block before's.
+  const fresh = peers.filter((p) => !creditedBefore(p));
+  const firstHb = firstPeerWasHb(fresh, detectedAtMs);
 
   const insertRace = database.prepare(
     `INSERT OR IGNORE INTO relay_race (block_hash, block_height, detected_at, first_count, nearest_delta_ms, first_ping_ms, first_hb)
@@ -174,7 +177,7 @@ function recordRace({ blockHash, detectedAtMs, peers, height = null }) {
       detectedAtMs,
       firstCount,
       nearestDeltaMs === null ? null : Math.round(nearestDeltaMs),
-      unclear ? null : firstPeerPingMs(peers, detectedAtMs),
+      unclear ? null : firstPeerPingMs(fresh, detectedAtMs),
       unclear ? null : firstHb,
     );
     if (info.changes === 0) {
