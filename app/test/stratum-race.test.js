@@ -418,15 +418,18 @@ test('a pool unticked while its race is open: the others move up, timed from the
   const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
   watchPools(a, b, c);
   const t0 = hr();
-  race.handleNotify(a, prevhash(3200), t0);
-  race.handleNotify(b, prevhash(3200), t0 + 20_000_000n);
-  race.handleNotify(c, prevhash(3200), t0 + 50_000_000n);
+  const t0Ms = Date.now();
+  race.handleNotify(a, prevhash(3200), t0, t0Ms);
+  race.handleNotify(b, prevhash(3200), t0 + 20_000_000n, t0Ms + 20);
+  race.handleNotify(c, prevhash(3200), t0 + 50_000_000n, t0Ms + 50);
   const saved = db.instance.prepare('SELECT * FROM stratum_pool WHERE id = 1').get();
   db.instance.prepare('DELETE FROM stratum_observation WHERE pool_id = 1').run();
   db.instance.prepare('DELETE FROM stratum_pool WHERE id = 1').run();
   try {
     await race.finalizeRace(prevhash(3200));
     assert.deepEqual(observationsFor(prevhash(3200)).map((r) => [r.poolId, Math.round(r.latencyMs), r.rank]), [[2, 0, 1], [3, 30, 2]]);
+    const startedAt = db.instance.prepare('SELECT created_at AS t FROM stratum_race WHERE prevhash = ?').get(prevhash(3200)).t;
+    assert.equal(startedAt, t0Ms + 20, 'the race starts at the first still there');
   } finally {
     const cols = Object.keys(saved);
     db.instance.prepare(`INSERT INTO stratum_pool (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map((k) => saved[k]));

@@ -284,3 +284,26 @@ test('a deeply nested error in the reply to our login is passed on as short text
   assert.equal(typeof got.error, 'string');
   assert.ok(got.error.length <= 200);
 });
+
+test('a connection closed for bringing no job waits longer each time, not dialled again at once', async () => {
+  const net = require('net');
+  const server = net.createServer(() => {}); // accepts, never answers
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const conn = new StratumPoolConnection({ host: '127.0.0.1', port: server.address().port, label: 'mute' });
+  const waits = [];
+  conn.on('disconnect', (d) => waits.push(d.nextTryMs));
+  conn.on('connect', () => {
+    conn._connectedAt = Date.now() - 10 * 60_000; // stood ten minutes, no job
+    conn._closeReason = 'no job for 600 s';
+    conn.socket.destroy();
+  });
+  try {
+    conn.start();
+    for (let i = 0; i < 50 && waits.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(waits[0] > 0, 'not at once, though it stood more than a minute');
+    assert.ok(conn.reconnectDelayMs >= 60_000, 'and the next wait is a minute or more');
+  } finally {
+    conn.stop();
+    server.close();
+  }
+});

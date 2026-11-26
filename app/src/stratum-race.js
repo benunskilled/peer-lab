@@ -38,6 +38,7 @@ const TOGGLE_CHECK_INTERVAL_MS = 30 * 1000;
 
 /** @type {Map<number, {conn: StratumPoolConnection, pool: object}>} */
 const active = new Map();
+const warnedLogin = new Set(); // pools whose refused login was already logged
 
 /**
  * Open races, keyed by prevhash: { createdAt, startHr, timer, reported, results }.
@@ -208,7 +209,12 @@ function syncConnections() {
         // A pool on the list known to refuse the login and send jobs anyway
         // (Braiins Pool): the warning would be wrong, so only at debug.
         if (catalog.find(pool.host, pool.port)?.loginRefused) logger.debug('pool refused the login, as it always does; jobs still come', { label: pool.label });
-        else logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
+        else if (!warnedLogin.has(pool.id)) {
+          // Once per pool and run: a pool that refuses and sends nothing is
+          // dialled again and again, and would say it each time.
+          warnedLogin.add(pool.id);
+          logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
+        }
       });
       // Per-pool proof of life, at debug: at one line per pool every 15
       // minutes, info would be ~32 lines an hour of "still fine", burying the
@@ -264,13 +270,37 @@ function writeRace(race, { misses }) {
   race.written = true;
   let s;
   let id;
+  let results;
+  let alive;
+  let createdAt = race.createdAt;
   try {
     if (race.createdAt <= resetAt()) {
       logger.debug('race from before a reset, not recorded', { prevhash: race.prevhash });
       return;
     }
     s = statements();
-    const info = s.openRace.run(race.prevhash, race.createdAt);
+    // A pool deleted while the race was open (an untick) is gone from the
+    // table: its row would fail, and the pool behind it would be saved as
+    // second with no first. The rest move up, timed from the first that is
+    // still there (R-2611-05).
+    results = race.results;
+    alive = null;
+    try {
+      alive = new Set(s.poolIds.all().map((r) => r.id));
+      const kept = results.filter((r) => alive.has(r.poolId));
+      if (kept.length < results.length && kept.length) {
+        const base = kept[0].elapsedMs;
+        results = kept.map((r, i) => ({ ...r, elapsedMs: r.elapsedMs - base, rank: i + 1 }));
+        // The race starts at the first still there: "Core to your pool" is
+        // measured from it.
+        createdAt += Math.round(base);
+      } else {
+        results = kept;
+      }
+    } catch (err) {
+      logger.debug('could not check which pools are still there', { error: err.message });
+    }
+    const info = s.openRace.run(race.prevhash, createdAt);
     if (info.changes === 0) {
       // Already in the database from an earlier run - the original start
       // instant is lost, so these offsets would mean nothing.
@@ -283,24 +313,6 @@ function writeRace(race, { misses }) {
     return;
   }
   race.id = id;
-
-  // A pool deleted while the race was open (an untick) is gone from the
-  // table: its row would fail, and the pool behind it would be saved as
-  // second with no first. The rest move up, timed from the first that is
-  // still there (R-2611-05).
-  let results = race.results;
-  try {
-    const alive = new Set(s.poolIds.all().map((r) => r.id));
-    const kept = results.filter((r) => alive.has(r.poolId));
-    if (kept.length < results.length && kept.length) {
-      const base = kept[0].elapsedMs;
-      results = kept.map((r, i) => ({ ...r, elapsedMs: r.elapsedMs - base, rank: i + 1 }));
-    } else {
-      results = kept;
-    }
-  } catch (err) {
-    logger.debug('could not check which pools are still there', { error: err.message });
-  }
 
   // One statement per row rather than all of them in one transaction.
   // `active` is only reconciled with stratum_pool every
@@ -325,6 +337,7 @@ function writeRace(race, { misses }) {
   // written minutes later, and a pool added in between was never in it.
   for (const poolId of race.watched || active.keys()) {
     if (race.reported.has(poolId) || race.excused.has(poolId)) continue;
+    if (alive && !alive.has(poolId)) continue; // removed meanwhile
     try {
       s.recordMiss.run(id, poolId);
     } catch (err) {
@@ -442,7 +455,7 @@ async function settleRace(race, attempt = 0) {
     pendingRaces.add(race);
     return undefined;
   }
-  if (known === null) {
+  if (known === null && !race.unknownToCore) {
     logger.warn('Core could not be asked about a race\'s block - recorded unchecked', { prevhash: race.prevhash });
     return writeRace(race, { misses: true });
   }

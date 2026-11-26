@@ -59,8 +59,15 @@ function start(db, service, logger, details, skip) {
   // `skip`: a beat may wait for the next one (the healthcheck allows four
   // intervals) - the stratum worker skips while a race is being timed, where
   // a write waiting on the database lock would delay the next job's stamp.
+  // Never two in a row: a pool keeping a race open all the time would
+  // otherwise starve the healthcheck and get the worker restarted in a loop.
+  let skipped = false;
   const timer = setInterval(() => {
-    if (typeof skip === 'function' && skip()) return;
+    if (!skipped && typeof skip === 'function' && skip()) {
+      skipped = true;
+      return;
+    }
+    skipped = false;
     beat();
   }, HEARTBEAT_INTERVAL_MS);
   timer.unref?.();

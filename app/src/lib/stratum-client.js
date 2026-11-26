@@ -265,7 +265,11 @@ class StratumPoolConnection extends EventEmitter {
       // ago, and every second without it is a second a block can fall into.
       // One that never held waits, longer each time, so a pool that accepts
       // and drops at once is not redialled every few seconds.
-      const held = heldMs >= HELD_MS;
+      // A connection closed for bringing no job did not hold, however long
+      // it stood: dialled again at once, a pool that never sends one would
+      // cost a connection every five minutes for good.
+      const noJob = this._lastNotifyAt == null && /^no job/.test(this._closeReason || '');
+      const held = heldMs >= HELD_MS && !noJob;
       const waitMs = this.stopped ? null : held ? 0 : this.reconnectDelayMs;
       this.emit('disconnect', {
         reason: this._closeReason || (this.stopped ? 'stopped' : 'connection lost'),
@@ -282,7 +286,9 @@ class StratumPoolConnection extends EventEmitter {
         // down) would otherwise retry in step for good.
         const jittered = waitMs ? Math.round(waitMs * (0.8 + 0.4 * Math.random())) : 0;
         this._reconnectTimer = setTimeout(() => this._connect(), jittered);
-        this.reconnectDelayMs = held ? 2000 : Math.min(this.reconnectDelayMs * 1.5, 30000);
+        this.reconnectDelayMs = held ? 2000
+          : noJob ? Math.min(Math.max(this.reconnectDelayMs * 2, 60_000), 30 * 60_000)
+            : Math.min(this.reconnectDelayMs * 1.5, 30000);
       }
     });
   }
