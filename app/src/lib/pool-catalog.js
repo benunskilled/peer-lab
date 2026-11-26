@@ -40,7 +40,9 @@ function withRows(rows) {
       kind: p.kind,
       routed: Boolean(p.routed),
       id: row ? row.id : null,
-      enabled: Boolean(row && row.enabled),
+      // Ticked: in the race table, running or paused by its switch there.
+      enabled: Boolean(row),
+      paused: Boolean(row && !row.enabled),
     };
   });
 }

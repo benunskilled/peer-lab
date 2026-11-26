@@ -1010,25 +1010,28 @@ const routes = {
   },
 
   // A tick in that list: { host, port, enabled }. Only a pool on the list;
-  // its name comes from the list. Unticking pauses it and keeps its history.
+  // its name comes from the list. A tick adds it, an untick removes it with
+  // its numbers (26.11.2026; it used to pause and stay in the table as
+  // "Off"). Pausing is the table's own switch, and a paused pool stays ticked.
   'POST /api/pools/catalog': async (req, res, url) => {
     const body = await readBody(req);
     const entry = poolCatalog.find(body.host, body.port);
     if (!entry) return sendJson(res, 400, { ok: false, error: 'not a pool on the list' });
     if (typeof body.enabled !== 'boolean') return sendJson(res, 400, { ok: false, error: 'enabled must be true or false' });
     const row = db.instance.prepare('SELECT id, enabled FROM stratum_pool WHERE lower(host) = lower(?) AND port = ?').get(entry.host, entry.port);
-    if (body.enabled && !(row && row.enabled) && enabledPools() >= MAX_POOLS) {
+    if (body.enabled && !row && enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - untick one first` });
     }
     try {
-      if (row) {
-        db.instance.prepare('UPDATE stratum_pool SET enabled = ? WHERE id = ?').run(body.enabled ? 1 : 0, row.id);
-      } else if (body.enabled) {
+      if (!body.enabled) {
+        if (row) queries.deletePool(row.id);
+      } else if (!row) {
         if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
         db.instance
           .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 1, ?)`)
           .run(entry.name, entry.host, entry.port, Date.now());
       }
+      // Ticked and already there (running or paused): nothing to do.
     } catch (err) {
       logger.error('changing a listed pool failed', { error: err.message });
       return sendJson(res, 500, { ok: false, error: 'internal error' });

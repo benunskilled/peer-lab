@@ -1449,7 +1449,7 @@ function renderPoolPick() {
     if (!racing) box.open = true;
   }
 
-  const options = [['all', 'All countries', pools.length], ['on', 'Switched on', ticked]]
+  const options = [['all', 'All countries', pools.length], ['on', 'Ticked', ticked]]
     .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
   if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
   setHtml('pool-pick-filter', options.map(([k, t, n]) =>
@@ -1467,11 +1467,11 @@ function renderPoolPick() {
     const off = full && !p.enabled;
     return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
       <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
-      <span class="w">${escapeHtml(where)}</span>
+      <span class="w">${p.paused ? '<b class="paused">Paused in the table</b> · ' : ''}${escapeHtml(where)}</span>
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
-  }).join('') : `<li class="hint">${cc === 'on' ? (q ? 'No pool switched on matches.' : 'None switched on yet.') : q ? 'No pool matches.' : 'No pool of this kind here.'}</li>`);
+  }).join('') : `<li class="hint">${cc === 'on' ? (q ? 'No ticked pool matches.' : 'None ticked yet.') : q ? 'No pool matches.' : 'No pool of this kind here.'}</li>`);
 }
 
 function setPoolKind(kind) {
@@ -2138,7 +2138,7 @@ document.body.addEventListener('change', async (e) => {
     actionsInFlight += 1;
     try {
       await api('/api/pools/catalog', { method: 'POST', body: JSON.stringify({ host: pick.dataset.host, port: Number(pick.dataset.port), enabled }) });
-      showToast(enabled ? 'Pool added to the race.' : 'Pool paused.', 'success');
+      showToast(enabled ? 'Pool added to the race.' : 'Pool removed from the race.', 'success');
       const row = pick.closest('label');
       if (row) row.classList.toggle('on', enabled);
     } catch (err) {
