@@ -1577,6 +1577,11 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .pool-pick > summary .pick-sum { font-weight: 400; font-size: 13px; color: var(--muted); }
 .pool-pick > summary::after { align-self: center; }
 .pool-pick .pick-kind { margin: 10px 0 0; }
+/* 16px: a smaller font makes the iPhone zoom in on a tap. */
+.pick-search { display: block; margin: 10px 0 0; max-width: 320px; }
+.pick-search input { box-sizing: border-box; width: 100%; font: inherit; font-size: 16px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+.pick-search input::placeholder { color: var(--muted); }
+.pick-search input:focus { outline: none; border-color: var(--muted); }
 .cc-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
 .cc-filter button { border: 1px solid var(--border); background: none; color: #c3ccd5; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .cc-filter button:hover { color: var(--text); border-color: var(--muted); }

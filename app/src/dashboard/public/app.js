@@ -1384,6 +1384,7 @@ const POOL_COUNTRY_KEY = 'peerlab.poolCountry';
 let poolCountry = (() => { try { return localStorage.getItem(POOL_COUNTRY_KEY) || 'all'; } catch { return 'all'; } })();
 const POOL_KIND_KEY = 'peerlab.poolKind';
 let poolKind = (() => { try { return localStorage.getItem(POOL_KIND_KEY) || 'all'; } catch { return 'all'; } })();
+let poolQuery = ''; // the search: not kept, a new visit starts with the whole list
 // A routed pool has no country: a globe and "Routed" instead.
 const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
 const pickCountry = (cc) => (cc ? countryName(cc) : 'Routed');
@@ -1415,8 +1416,11 @@ function setHtml(id, html) {
 function renderPoolPick() {
   const box = document.getElementById('pool-pick');
   if (!box || !poolPick) return;
-  // The kind first: the countries then count only pools of that kind.
-  const pools = poolPick.pools.filter((p) => poolKind === 'all' || p.kind === poolKind);
+  // The kind and the search first: the countries then count only pools that
+  // are left. The search looks in the name, the place and the address.
+  const q = poolQuery.trim().toLowerCase();
+  const pools = poolPick.pools.filter((p) => (poolKind === 'all' || p.kind === poolKind)
+    && (!q || [p.name, p.host, p.region, pickCountry(p.country), p.routed ? 'routed' : ''].some((t) => t && t.toLowerCase().includes(q))));
   const racing = poolPick.racing;
   for (const b of document.querySelectorAll('#pool-pick-kind button')) {
     const on = b.dataset.kind === poolKind;
@@ -1427,7 +1431,13 @@ function renderPoolPick() {
   const counts = new Map();
   for (const p of pools) counts.set(p.country || '', (counts.get(p.country || '') || 0) + 1);
   const countries = [...counts.keys()].filter(Boolean).sort((a, b) => pickCountry(a).localeCompare(pickCountry(b)));
-  if (poolCountry !== 'all' && poolCountry !== 'on' && !counts.has(poolCountry === 'routed' ? '' : poolCountry)) poolCountry = 'all';
+  // A country with nothing left shows all. While searching only for this
+  // draw: an empty search gives the country back.
+  let cc = poolCountry;
+  if (cc !== 'all' && cc !== 'on' && !counts.has(cc === 'routed' ? '' : cc)) {
+    cc = 'all';
+    if (!q) poolCountry = cc;
+  }
 
   document.getElementById('pool-pick-sum').textContent =
     `${racing} of ${poolPick.max} racing · ${poolPick.pools.length} public pools`;
@@ -1443,12 +1453,12 @@ function renderPoolPick() {
     .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
   if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
   setHtml('pool-pick-filter', options.map(([k, t, n]) =>
-    `<button type="button" data-action="pool-country" data-cc="${escapeHtml(k)}" class="${k === poolCountry ? 'on' : ''}" aria-pressed="${k === poolCountry}">${escapeHtml(t)}<small>${n}</small></button>`).join(''));
+    `<button type="button" data-action="pool-country" data-cc="${escapeHtml(k)}" class="${k === cc ? 'on' : ''}" aria-pressed="${k === cc}">${escapeHtml(t)}<small>${n}</small></button>`).join(''));
   setHtml('pool-pick-select', options.map(([k, t, n]) =>
-    `<option value="${escapeHtml(k)}"${k === poolCountry ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join(''));
+    `<option value="${escapeHtml(k)}"${k === cc ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join(''));
 
   const shown = pools
-    .filter((p) => poolCountry === 'all' || (poolCountry === 'on' ? p.enabled : poolCountry === 'routed' ? !p.country : p.country === poolCountry))
+    .filter((p) => cc === 'all' || (cc === 'on' ? p.enabled : cc === 'routed' ? !p.country : p.country === cc))
     .sort((a, b) => (a.country ? 0 : 1) - (b.country ? 0 : 1) || pickCountry(a.country).localeCompare(pickCountry(b.country)) || a.name.localeCompare(b.name));
   const full = racing >= poolPick.max;
   setHtml('pool-pick-list', shown.length ? shown.map((p) => {
@@ -1461,7 +1471,7 @@ function renderPoolPick() {
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
-  }).join('') : `<li class="hint">${poolCountry === 'on' ? 'None switched on yet.' : 'No pool of this kind here.'}</li>`);
+  }).join('') : `<li class="hint">${cc === 'on' ? (q ? 'No pool switched on matches.' : 'None switched on yet.') : q ? 'No pool matches.' : 'No pool of this kind here.'}</li>`);
 }
 
 function setPoolKind(kind) {
@@ -2092,6 +2102,20 @@ document.body.addEventListener('click', async (e) => {
       }
       flushDeferredRenders();
     }
+  }
+});
+
+// Every letter narrows the list at once; Escape empties the search.
+document.getElementById('pool-pick-search')?.addEventListener('input', (e) => {
+  poolQuery = e.target.value;
+  renderPoolPick();
+});
+document.getElementById('pool-pick-search')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && e.target.value) {
+    e.preventDefault();
+    e.target.value = '';
+    poolQuery = '';
+    renderPoolPick();
   }
 });
 
