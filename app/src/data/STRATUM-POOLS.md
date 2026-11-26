@@ -25,3 +25,5 @@ Collected 25.11.2026 from the pools' own pages (and two ChatGPT searches whose r
 26.11.2026: a third search, 18 more addresses tried; 12 new servers added (the rest led to servers already listed). Three of their pages (Ghosthour, NerdMiner.de, Bitronics) show the address only with JavaScript; it was read there in a browser. EMCD Russia (kz.emcd.network) taken out after failing on 25.11. and 26.11.; 75 on the list.
 
 26.11.2026, a search for big pools and the Americas: BTC-B2 Pools US East and West, PowerPool Solo US and EU, EMCD America (behind Cloudflare) and Braiins Pool (see `loginRefused`) added; 81 on the list. Foundry, F2Pool and Luxor still refuse an unregistered login, MARA Pool has no public endpoint, and Binance Pool, UltimusPool and SBI Crypto have closed.
+
+26.11.2026, from the pool list of another open-source race tool (proofofmike/stratum-race): Blitzpool (Switzerland), HeliosPool (France) and SoloHash Canada added after a live check. OCEAN taken out: its terms say a user must be mining and must hold the keys to the address used, and the race does neither. Anyone may still add it by hand. 83 on the list.

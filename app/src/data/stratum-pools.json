@@ -586,15 +586,6 @@
    "source": "https://help.bitfufu.com/en/article/bitfufu-pool-mining-tutorial-1m68u73/"
   },
   {
-   "name": "OCEAN",
-   "host": "mine.ocean.xyz",
-   "port": 3334,
-   "country": "US",
-   "region": "New Jersey",
-   "kind": "shared",
-   "source": "https://ocean.xyz/getstarted"
-  },
-  {
    "name": "ViaBTC US",
    "host": "btc.viabtc.cc",
    "port": 3333,
@@ -747,6 +738,33 @@
    "routed": true,
    "source": "https://academy.braiins.com/braiins-pool/quick-start",
    "loginRefused": true
+  },
+  {
+   "name": "Blitzpool",
+   "host": "blitzpool.yourdevice.ch",
+   "port": 3333,
+   "country": "CH",
+   "region": "Bern",
+   "kind": "solo",
+   "source": "https://blitzpool.yourdevice.ch/"
+  },
+  {
+   "name": "HeliosPool",
+   "host": "btc.heliospool.com",
+   "port": 3333,
+   "country": "FR",
+   "region": "Hauts-de-France",
+   "kind": "solo",
+   "source": "https://heliospool.com/"
+  },
+  {
+   "name": "SoloHash Canada",
+   "host": "solo-ca.solohash.co.uk",
+   "port": 3333,
+   "country": "CA",
+   "region": "Quebec",
+   "kind": "solo",
+   "source": "https://solohash.co.uk/"
   }
  ]
 }
