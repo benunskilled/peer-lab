@@ -233,6 +233,15 @@
    "source": "https://noderunners.network/en/pool"
   },
   {
+   "name": "PowerPool Solo EU",
+   "host": "btc.eu.stratum.solo.powerpool.io",
+   "port": 3333,
+   "country": "DE",
+   "region": "Bavaria",
+   "kind": "solo",
+   "source": "https://solo.powerpool.io/how-to-mine"
+  },
+  {
    "name": "Mineshop Solo Finland",
    "host": "solo.mineshop.eu",
    "port": 3333,
@@ -632,6 +641,33 @@
    "source": "https://luckyhash.ca/pages/pool"
   },
   {
+   "name": "BTC-B2 Pools US East",
+   "host": "east.btcb2pools.com",
+   "port": 6333,
+   "country": "US",
+   "region": "New Jersey",
+   "kind": "solo",
+   "source": "https://btcb2pools.com/coins/btc/"
+  },
+  {
+   "name": "BTC-B2 Pools US West",
+   "host": "btc.btcb2pools.com",
+   "port": 6333,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://btcb2pools.com/coins/btc/"
+  },
+  {
+   "name": "PowerPool Solo US",
+   "host": "btc.us.stratum.solo.powerpool.io",
+   "port": 3333,
+   "country": "US",
+   "region": "Missouri",
+   "kind": "solo",
+   "source": "https://solo.powerpool.io/how-to-mine"
+  },
+  {
    "name": "AntPool",
    "host": "ss.antpool.com",
    "port": 3333,
@@ -690,6 +726,27 @@
    "kind": "shared",
    "routed": true,
    "source": "https://help.emcd.io/en/articles/16613290-how-to-connect-to-the-emcd-pool-and-start-mining-bitcoin-btc"
+  },
+  {
+   "name": "EMCD America",
+   "host": "us.emcd.network",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://help.emcd.io/en/articles/16613290-how-to-connect-to-the-emcd-pool-and-start-mining-bitcoin-btc"
+  },
+  {
+   "name": "Braiins Pool",
+   "host": "stratum.braiins.com",
+   "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "routed": true,
+   "source": "https://academy.braiins.com/braiins-pool/quick-start",
+   "loginRefused": true
   }
  ]
 }
