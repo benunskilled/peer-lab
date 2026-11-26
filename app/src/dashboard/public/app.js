@@ -1459,7 +1459,7 @@ function renderPoolPick() {
       <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
       <span class="w">${escapeHtml(where)}</span>
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
-      <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' disabled' : ''} />
+      <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
   }).join('') : `<li class="hint">${poolCountry === 'on' ? 'None switched on yet.' : 'No pool of this kind here.'}</li>`);
 }
@@ -2103,6 +2103,13 @@ document.body.addEventListener('change', async (e) => {
   const pick = e.target.closest('input[data-action="pick-pool"]');
   if (pick) {
     const enabled = pick.checked;
+    // Full: the switch stays tappable, so a tap says why rather than doing
+    // nothing (a disabled one gave no word on a phone, 26.11.2026).
+    if (enabled && pick.classList.contains('full')) {
+      pick.checked = false;
+      showToast(`At most ${poolPick.max} pools race at once - switch one off first.`, 'error');
+      return;
+    }
     poolPickBusy += 1;
     actionsInFlight += 1;
     try {

@@ -1600,7 +1600,7 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .plist input[type="checkbox"]:checked { background: var(--accent); }
 .plist input[type="checkbox"]:checked::after { left: 17px; }
 .plist input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plist input[type="checkbox"]:disabled { opacity: .4; cursor: not-allowed; }
+.plist input[type="checkbox"].full { opacity: .4; cursor: not-allowed; }
 .plist li.hint { grid-column: 1 / -1; }
 .pick-own { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .pick-own .inline-form:last-child { margin-bottom: 0; }
