@@ -124,7 +124,9 @@ async function takeOverOutsideRemovals(existingAddrs, afterRestart) {
     fresh = new Set((await rpc.getAddedNodeInfo()).map((n) => keyOf(n.addednode)));
   } catch (err) {
     // Not confirmed either way: these are not handed back to Core this
-    // sync - the next one asks again (outside review, 26.11.2026).
+    // sync, and the next one still counts them as held before, so it asks
+    // again rather than taking them for new (outside review, 26.11.2026).
+    if (lastSync) lastSync.held = new Set([...lastSync.held, ...gone.map(keyOf)]);
     return new Set(gone.map(keyOf));
   }
   const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');

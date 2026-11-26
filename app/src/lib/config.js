@@ -40,7 +40,7 @@ module.exports = {
     rpcUser: bitcoinRpcUser,
     rpcPass: bitcoinRpcPass,
     network,
-    zmqHashBlockUrl: zmqExplicit || `tcp://${zmqHost}:${zmqPort}`,
+    zmqHashBlockUrl: zmqExplicit || `tcp://${zmqHost.includes(':') && !zmqHost.startsWith('[') ? `[${zmqHost}]` : zmqHost}:${zmqPort}`,
   },
   sqlitePath: pick(process.env.SQLITE_PATH, `${dataDir}/sqlite/peerlab.db`),
   dashboardPort: Number(pick(process.env.DASHBOARD_PORT, '8788')),

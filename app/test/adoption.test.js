@@ -335,3 +335,26 @@ test('when Core does not say its uptime, a missing manual peer is handed back', 
   await syncTrustedToAddnode([]);
   assert.deepEqual(added, ['add 198.51.100.9:8333']);
 });
+
+test('an outside removal Core could not confirm is not handed back, this sync or the next', async () => {
+  // Outside review, 26.11.2026: the second look at Core's list failed, the
+  // peer was handed back right away - and after the first fix, one sync later.
+  db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.71:8333', NULL, 0, 1)`).run();
+  const added = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
+  const startedAt = Date.now() - 1000 * 1000;
+  mock.method(rpc, 'call', async (method) => {
+    if (method === 'uptime') return Math.round((Date.now() - startedAt) / 1000);
+    throw new Error(`unexpected ${method}`);
+  });
+  await syncTrustedToAddnode([{ addednode: '198.51.100.71:8333' }]);
+  // Removed outside Peer Lab; the confirmation read fails.
+  mock.method(rpc, 'getAddedNodeInfo', async () => { throw new Error('timeout'); });
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, [], 'not handed back while unconfirmed');
+  // Core answers again: the removal is taken over, still nothing handed back.
+  mock.method(rpc, 'getAddedNodeInfo', async () => []);
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, [], 'nor one sync later');
+  assert.equal(db.instance.prepare(`SELECT COUNT(*) AS n FROM trusted_peer WHERE address = '198.51.100.71:8333'`).get().n, 0);
+});

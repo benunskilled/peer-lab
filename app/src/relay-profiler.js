@@ -75,6 +75,7 @@ const FIRST_WINDOW_MS = 2500;
 // cannot bring the next block too. Two blocks 1.3 s apart, the second not
 // from that peer, credited it twice (outside review, 26.11.2026).
 let lastCredit = null;
+let lastFirstCount = 0; // what recordRace counted, for its log line
 
 const creditedBefore = (peer) => Boolean(lastCredit && peer.addr === lastCredit.addr && peer.last_block === lastCredit.lastBlock);
 
@@ -198,6 +199,7 @@ function recordRace({ blockHash, detectedAtMs, peers, height = null }) {
   const credited = unclear ? [] : peers.filter(isNewFirst);
   const raceId = tx();
   if (raceId != null && credited.length === 1) lastCredit = { addr: credited[0].addr, lastBlock: credited[0].last_block };
+  lastFirstCount = firstCount;
   return raceId;
 }
 
@@ -486,7 +488,7 @@ async function handleHashBlock({ blockHash, detectedAtMs, t0 }) {
     return;
   }
 
-  const firstCount = peers.filter((p) => isFirstPeer(p, detectedAtMs)).length;
+  const firstCount = lastFirstCount; // as recordRace counted, so the log says what was stored
   logger.info('block race recorded', {
     blockHash,
     eligible: peers.length,
@@ -505,7 +507,7 @@ async function handleHashBlock({ blockHash, detectedAtMs, t0 }) {
     }
   }
 
-  backfillHeightAndPeerCounts(raceId, blockHash);
+  if (!(header && Number.isInteger(header.height))) backfillHeightAndPeerCounts(raceId, blockHash);
   template.then((t) => {
     if (t == null) return;
     try {
