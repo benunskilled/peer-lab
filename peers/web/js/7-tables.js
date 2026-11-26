@@ -338,8 +338,8 @@
     // The peer that brought the newest block, for as long as the star
     // is up - one rule for "just delivered", in the row and on the map.
     if (deliveredNow.has(p.addr)) tr.className = "delivered-now";
-    // A connection that has brought this node a block, at least once: its address in green, also on an orange row.
-    if (deliveredEver.has(p.addr) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
+    // A peer that has brought this node a block, at least once (by IP when inbound, like its "× first"): its address in green, also on an orange row.
+    if (hasDelivered(p) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
     if (p.no_relay || p.offline) tr.classList.add("weak");
     for (const c of COLS) {
       const td = document.createElement("td");

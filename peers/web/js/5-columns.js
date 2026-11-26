@@ -276,7 +276,7 @@
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
-          : deliveredEver.has(p.addr) ? "Has delivered a block first" : "";
+          : hasDelivered(p) ? "Has delivered a block first" : "";
         // Behind a proxy the address is the proxy's: said in words instead.
         const shownAddr = HIDDEN[p.network] ? HIDDEN[p.network].via : p.addr;
         fit(sub, shownAddr, got);

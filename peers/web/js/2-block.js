@@ -29,6 +29,14 @@
       : "Not connected right now. It still holds its manual slot" + (r.kept ? ", and it is locked." : "."),
   });
   const rankOf = (p) => dashboard().peer(p.addr);
+  // Has this peer brought a block first: the same count as its "× first",
+  // so an inbound peer back on a new port is green when its IP has delivered
+  // before (26.11.2026) - the port is chance, the IP is the peer.
+  const hasDelivered = (p) => {
+    if (deliveredEver.has(p.addr)) return true;
+    const r = dashboard() && rankOf(p);
+    return Boolean(r && r.first > 0);
+  };
 
   function deliveredSet() {
     const b = liveBlock();
