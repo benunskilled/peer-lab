@@ -53,7 +53,7 @@ function check(p) {
     // loginRefused: a pool known to say no to the login and send jobs anyway.
     const ok = (r.auth !== false || r.loginRefused) && r.prev === tip && r.jobs > 0;
     if (!ok) bad += 1;
-    const why = ok ? 'ok' : r.err || (r.auth === false ? 'login refused' : !r.jobs ? 'no job' : 'job on another block');
+    const why = ok ? 'ok' : r.err || (r.auth === false && !r.loginRefused ? 'login refused' : !r.jobs ? 'no job' : 'job on another block');
     console.log(`${ok ? '  ' : '✗ '}${r.name.padEnd(28)} ${r.ep.padEnd(36)} ${why} (${r.jobs} jobs)`);
   }
   console.log(`\n${results.length - bad} of ${results.length} pass.`);

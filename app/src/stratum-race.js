@@ -20,6 +20,7 @@ const toggle = require('./lib/stratum-race-toggle');
 const { canonical, encodings } = require('./lib/prevhash');
 const rpc = require('./lib/rpc');
 const live = require('./lib/stratum-live');
+const catalog = require('./lib/pool-catalog');
 
 // Pools only ever change through the dashboard, and a few minutes' delay in
 // noticing that is imperceptible - this used to run every 30 seconds, which
@@ -184,7 +185,11 @@ function syncConnections() {
       });
       conn.on('protocolError', (info) => logger.warn('pool sent something unusable', { label: pool.label, ...info }));
       conn.on('authorizeResult', ({ ok, error }) => {
-        if (!ok) logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
+        if (ok) return;
+        // A pool on the list known to refuse the login and send jobs anyway
+        // (Braiins Pool): the warning would be wrong, so only at debug.
+        if (catalog.find(pool.host, pool.port)?.loginRefused) logger.debug('pool refused the login, as it always does; jobs still come', { label: pool.label });
+        else logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
       });
       // Per-pool proof of life, at debug: at one line per pool every 15
       // minutes, info would be ~32 lines an hour of "still fine", burying the
