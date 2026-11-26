@@ -206,6 +206,24 @@
    "since": "1.0.0"
   },
   {
+   "name": "Parasite US Wisconsin",
+   "host": "msn.parasite.wtf",
+   "port": 42069,
+   "country": "US",
+   "region": "Wisconsin",
+   "kind": "shared",
+   "source": "https://msn.parasite.wtf/"
+  },
+  {
+   "name": "Parasite US Virginia",
+   "host": "iad.parasite.wtf",
+   "port": 42069,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "shared",
+   "source": "https://iad.parasite.wtf/"
+  },
+  {
    "name": "Ghosthour",
    "host": "pool.ghosthour.de",
    "port": 3333,
@@ -454,10 +472,11 @@
    "name": "Trustpool",
    "host": "btc.trustpool.cc",
    "port": 3333,
-   "country": "SG",
+   "country": null,
    "region": null,
    "kind": "shared",
-   "source": "https://trustpool.cc/static/stratums_en.pdf"
+   "source": "https://trustpool.cc/static/stratums_en.pdf",
+   "routed": true
   },
   {
    "name": "SoloPool.com Dubai",
