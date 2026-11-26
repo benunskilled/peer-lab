@@ -98,6 +98,9 @@ function probePort(host, port, timeoutMs = 3000) {
     const done = async (ok) => {
       if (settled) return;
       settled = true;
+      // Nothing more is read: a peer that keeps talking while Core is asked
+      // would grow the buffer for nothing (outside review, 26.11.2026).
+      socket.pause();
       // Open until Core has been asked: closed, the connection leaves its list.
       const self = ok && await answeredBySelf(mark);
       socket.destroy();
@@ -106,6 +109,7 @@ function probePort(host, port, timeoutMs = 3000) {
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => socket.write(versionMessage(magic, mark)));
     socket.on('data', (chunk) => {
+      if (settled) return;
       got = Buffer.concat([got, chunk]);
       if (got.length < 16) return;
       done(got.subarray(0, 4).toString('hex') === magic && got.subarray(4, 16).equals(Buffer.from('version\0\0\0\0\0', 'ascii')));
@@ -211,11 +215,12 @@ async function manualAddPeer(rawInput, label, { kept = false } = {}) {
  */
 // "999.1.1.1" or "2001:zz::1" is no IP at all; a name that is neither Tor nor
 // I2P has to resolve. "" when the address can be tested.
-async function invalidAddress(addr) {
+async function invalidAddress(addr, { lookup = true } = {}) {
   const bare = addr.replace(/^\[|\]$/g, '');
   if (net.isIP(bare)) return '';
   if (/^[\d.]+$/.test(bare) || bare.includes(':')) return `${addr} is not a valid IP address`;
   if (/\.(onion|i2p)$/i.test(bare)) return '';
+  if (!lookup) return '';
   try {
     await dns.lookup(bare);
     return '';
@@ -233,10 +238,17 @@ async function probePeer(rawInput) {
   // Wrong before any test: an IP with a number out of range, or a name that
   // does not exist. Both used to come back as "no node answering", which
   // reads like the network, not like a typo (21.11.2026).
-  const invalid = await invalidAddress(addr);
+  // The name is looked up only once Core is known to reach peers directly:
+  // with Tor in front, a lookup from here would tell the local resolver which
+  // peer is wanted (outside review, 26.11.2026).
+  const invalid = await invalidAddress(addr, { lookup: false });
   if (invalid) return { ok: false, error: invalid };
   const route = await routeOf(addr);
   if (route && route.refuse) return { ok: false, error: route.refuse };
+  if (!(route && route.via)) {
+    const unknown = await invalidAddress(addr);
+    if (unknown) return { ok: false, error: unknown };
+  }
   const own = ownAddress(addr);
   if (own) return { ok: false, error: own };
   // Reached through Tor or I2P: not tested from here, handed to Core as it is.

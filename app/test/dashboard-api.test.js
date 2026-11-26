@@ -286,7 +286,10 @@ test('POST /api/peers/probe answers without touching anything', async () => {
 
 // A typo is said as one: an IP with a number out of range, or a name that
 // does not exist, used to come back as "no node answering" (21.11.2026).
-test('POST /api/peers/probe calls an impossible IP or an unknown name invalid, not unreachable', async () => {
+test('POST /api/peers/probe calls an impossible IP or an unknown name invalid, not unreachable', async (t) => {
+  // A name is looked up only on a node that reaches peers directly: through
+  // Tor, the lookup would tell the local resolver (review 26.11.2026).
+  t.mock.method(require('../src/lib/rpc'), 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] }));
   for (const [host, want] of [['999.1.1.1', /not a valid IP address/], ['no-such-peer.invalid', /not a name that exists/]]) {
     const { status, body } = await api('/api/peers/probe', { method: 'POST', body: JSON.stringify({ host }) });
     assert.equal(status, 422);

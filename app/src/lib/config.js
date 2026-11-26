@@ -35,7 +35,8 @@ module.exports = {
   // lib/write-source.js.
   trustedProxyHost: pick(process.env.TRUSTED_PROXY_HOST, ''),
   bitcoin: {
-    rpcUrl: `http://${bitcoinHost}:${bitcoinRpcPort}/`,
+    // An IPv6 literal goes in brackets, in either spelling it is given.
+    rpcUrl: `http://${bitcoinHost.includes(':') && !bitcoinHost.startsWith('[') ? `[${bitcoinHost}]` : bitcoinHost}:${bitcoinRpcPort}/`,
     rpcUser: bitcoinRpcUser,
     rpcPass: bitcoinRpcPass,
     network,

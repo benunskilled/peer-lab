@@ -123,7 +123,9 @@ async function takeOverOutsideRemovals(existingAddrs, afterRestart) {
   try {
     fresh = new Set((await rpc.getAddedNodeInfo()).map((n) => keyOf(n.addednode)));
   } catch (err) {
-    return;
+    // Not confirmed either way: these are not handed back to Core this
+    // sync - the next one asks again (outside review, 26.11.2026).
+    return new Set(gone.map(keyOf));
   }
   const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
   for (const address of gone) {
@@ -166,7 +168,7 @@ async function syncTrustedToAddnode(knownAddedNodes, { afterRestart = false } = 
   } catch (err) {
     logger.warn('taking Core\'s spelling failed, next sync', { error: err.message });
   }
-  await takeOverOutsideRemovals(existingAddrs, afterRestart);
+  const holdBack = (await takeOverOutsideRemovals(existingAddrs, afterRestart)) || new Set();
   trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't
@@ -185,6 +187,7 @@ async function syncTrustedToAddnode(knownAddedNodes, { afterRestart = false } = 
   const wanted = (address) => Boolean(stillWanted.get(address));
   for (const { address } of trusted) {
     if (existingAddrs.has(keyOf(address))) continue;
+    if (holdBack.has(keyOf(address))) continue;
     if (slotsUsed >= config.maxManualPeers) {
       queued += 1;
       continue;
@@ -279,6 +282,7 @@ async function adoptExternalManualPeers() {
   let adopted = 0;
   const skipped = [];
   const pending = pendingRemovals();
+  const done = []; // removals finished here, and only these leave the list
   let pendingChanged = false;
   for (const { addednode } of addedNodes) {
     if (!addednode || known.has(keyOf(addednode))) continue;
@@ -288,11 +292,13 @@ async function adoptExternalManualPeers() {
       try {
         await rpc.addNode(addednode, 'remove');
         delete pending[keyOf(addednode)];
+        done.push(keyOf(addednode));
         pendingChanged = true;
         logger.info('retried addnode remove for a peer this app had dropped', { address: addednode });
       } catch (err) {
         if (notAdded(err)) {
           delete pending[keyOf(addednode)];
+          done.push(keyOf(addednode));
           pendingChanged = true;
         } else {
           logger.warn('addnode remove retry failed', { address: addednode, error: err.message });
@@ -334,7 +340,15 @@ async function adoptExternalManualPeers() {
     adopted += 1;
     logger.info('adopted externally-managed manual peer into trusted_peer', { address: addednode });
   }
-  if (pendingChanged) savePendingRemovals(pending);
+  // Read again before writing: the dashboard (another process) may have
+  // noted a removal of its own meanwhile, and writing back the list read
+  // before the awaits above dropped it - that peer came back, padlocked
+  // (outside review, 26.11.2026).
+  if (pendingChanged) {
+    const latest = pendingRemovals();
+    for (const k of done) delete latest[k];
+    savePendingRemovals(latest);
+  }
   if (skipped.length > 0) {
     logger.warn('manual peer limit reached, addnode entries not adopted', {
       max: config.maxManualPeers,
@@ -387,7 +401,10 @@ function liveNonManualSessionsForHost(peers, address) {
   return peers.filter(
     (p) => p.connection_type !== 'manual'
       && !((p.inbound || p.connection_type === 'inbound') && SHARED_PROXY_NETWORKS.has(String(p.network || '').toLowerCase()))
-      && hostFromAddress(p.addr) === host,
+      // An inbound one by its host (it dialled from a passing port); an
+      // outbound one by its whole address: another node may listen on the
+      // same IP (outside review, 26.11.2026).
+      && ((p.inbound || p.connection_type === 'inbound') ? hostFromAddress(p.addr) === host : keyOf(p.addr) === keyOf(address)),
   );
 }
 

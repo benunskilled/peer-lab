@@ -682,6 +682,13 @@ function restart(chain, now = Date.now()) {
 // Take a candidate out at once, trial or not: the slot fill was switched off
 // while this pass was adding it.
 async function abandon(address, now = Date.now()) {
+  // Given the padlock while this pass was adding: a person's decision, it
+  // stands - as in settleOne (outside review, 26.11.2026).
+  const row = db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(address);
+  if (row && row.kept) {
+    dropTrial(address);
+    return;
+  }
   await peerSync.removeTrustedPeer(address);
   dropTrial(address);
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });

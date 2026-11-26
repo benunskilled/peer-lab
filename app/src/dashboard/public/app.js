@@ -1081,7 +1081,8 @@ function slotStatusText(st, now, trial = st && st.trial) {
   switch (st.state) {
     case 'core':
     case 'catching_up':
-      return { state: 'core', head: 'Waiting for Bitcoin Core', rest: st.state === 'core' ? 'to respond.' : 'to catch up with the chain.', short: 'on · waiting for Core' };
+    case 'offline':
+      return { state: 'core', head: 'Waiting for Bitcoin Core', rest: { core: 'to respond.', offline: 'to connect to the network.' }[st.state] || 'to catch up with the chain.', short: 'on · waiting for Core' };
     case 'trial': {
       const t = trial;
       const where = t.country ? countryName(t.country) : t.region;

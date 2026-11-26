@@ -2210,3 +2210,37 @@ test('after many failed candidates in a row only one is tried at a time; a kept 
   await peerRotation.tick({ quick: true });
   assert.equal(limits.at(-1), 3, 'switched on again');
 });
+
+// Outside review, 26.11.2026: networking switched off in Core
+// (setnetworkactive false) made every manual peer look offline, and Slot Fill
+// retired them.
+test('with Core\'s networking switched off, an offline manual peer is not retired', async () => {
+  peerRotation.setEnabled(true);
+  const address = seedOfflineTrustedPeer({ address: '198.51.100.98:8333', offlineHours: 500, eligible: 500, first: 0 });
+  const restore = rpc.getNetworkInfo;
+  mock.method(rpc, 'getNetworkInfo', async () => ({ networkactive: false, networks: [{ name: 'ipv4', reachable: true, proxy: '' }] }));
+  try {
+    await peerRotation.tick();
+    assert.ok(ranking().find((p) => p.address === address)?.trusted, 'still manual');
+    assert.equal(peerRotation.readStatus().state, 'offline');
+  } finally {
+    rpc.getNetworkInfo = restore;
+    peerRotation.setEnabled(false);
+  }
+});
+
+test('a candidate padlocked while the pass was adding stays when the pass takes it out', async () => {
+  const address = '198.51.100.99:8333';
+  db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, NULL, 1, ?)').run(address, Date.now());
+  const removed = [];
+  const restore = rpc.addNode;
+  mock.method(rpc, 'addNode', async (a, c) => { removed.push(`${c} ${a}`); });
+  try {
+    await fill.abandon(address);
+    assert.ok(isManual(address), 'the padlock stands');
+    assert.deepEqual(removed, []);
+  } finally {
+    rpc.addNode = restore;
+    db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(address);
+  }
+});

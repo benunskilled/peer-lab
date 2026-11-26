@@ -241,6 +241,21 @@ async function pass({ quick = false } = {}) {
     writeStatus({ at: Date.now(), nextAt: nextCheckAt(fill.trials().length > 0, Date.now()), state: 'core' });
     return { ...idle, enabled: true };
   }
+  // Core answers but has its networking switched off (setnetworkactive
+  // false): every manual peer only looks offline. Counted like Core not
+  // answering, so nobody is retired for it and that time is not offline time
+  // (outside review, 26.11.2026).
+  let networkOff = false;
+  try {
+    networkOff = (await rpc.getNetworkInfo()).networkactive === false;
+  } catch (err) {
+    logger.debug('slot fill: getnetworkinfo failed', { error: err.message });
+  }
+  if (networkOff) {
+    clock.coreDown();
+    writeStatus({ at: Date.now(), nextAt: nextCheckAt(fill.trials().length > 0, Date.now()), state: 'offline' });
+    return { ...idle, enabled: true };
+  }
   // Core was down since the last pass, or the clock stepped: the trials
   // start over and nobody is retired this pass (clock.js).
   const gap = clock.passed();

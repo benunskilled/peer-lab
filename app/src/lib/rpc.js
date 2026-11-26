@@ -127,7 +127,9 @@ function request(method, params, timeoutMs) {
   return {
     body,
     options: {
-      hostname: url.hostname,
+      // Without the brackets of an IPv6 literal: http.request looks them up
+      // as a name.
+      hostname: url.hostname.replace(/^\[|\]$/g, ''),
       port: url.port,
       path: url.pathname,
       method: 'POST',
