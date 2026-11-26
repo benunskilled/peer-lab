@@ -270,7 +270,7 @@ class StratumPoolConnection extends EventEmitter {
       // cost a connection every five minutes for good.
       const noJob = this._lastNotifyAt == null && /^no job/.test(this._closeReason || '');
       const held = heldMs >= HELD_MS && !noJob;
-      const waitMs = this.stopped ? null : held ? 0 : this.reconnectDelayMs;
+      const waitMs = this.stopped ? null : held ? 0 : noJob ? Math.max(this.reconnectDelayMs, 60_000) : this.reconnectDelayMs;
       this.emit('disconnect', {
         reason: this._closeReason || (this.stopped ? 'stopped' : 'connection lost'),
         heldMs,
@@ -358,7 +358,11 @@ class StratumPoolConnection extends EventEmitter {
         return;
       }
       this.notifyCount += 1;
-      if (this.notifyCount === 1) this._readyAt = receivedAtMs;
+      if (this.notifyCount === 1) {
+        this._readyAt = receivedAtMs;
+        // It works again: a wait grown while it brought nothing is over.
+        this.reconnectDelayMs = 2000;
+      }
       if (this._lastNotifyAt != null && receivedAtMs - this._lastNotifyAt >= SILENCE_GAP_MIN_MS) {
         this._gaps.push(receivedAtMs - this._lastNotifyAt);
         if (this._gaps.length > SILENCE_GAPS_KEPT) this._gaps.shift();

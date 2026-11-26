@@ -300,7 +300,7 @@ test('a connection closed for bringing no job waits longer each time, not dialle
   try {
     conn.start();
     for (let i = 0; i < 50 && waits.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
-    assert.ok(waits[0] > 0, 'not at once, though it stood more than a minute');
+    assert.ok(waits[0] >= 60_000, 'a minute at least, though it stood more than a minute');
     assert.ok(conn.reconnectDelayMs >= 60_000, 'and the next wait is a minute or more');
   } finally {
     conn.stop();

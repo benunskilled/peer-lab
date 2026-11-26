@@ -297,6 +297,12 @@ function writeRace(race, { misses }) {
       } else {
         results = kept;
       }
+      // Everyone who reported was removed: a race with no one in it says
+      // nothing, and would only charge the rest a miss.
+      if (race.results.length && !kept.length) {
+        logger.debug('every pool that reported was removed - race not recorded', { prevhash: race.prevhash });
+        return;
+      }
     } catch (err) {
       logger.debug('could not check which pools are still there', { error: err.message });
     }
