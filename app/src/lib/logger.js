@@ -8,7 +8,16 @@ function make(scope) {
   const line = (level, msg, extra) => {
     if (LEVELS[level] > currentLevel) return;
     const ts = new Date().toISOString();
-    const suffix = extra !== undefined ? ` ${JSON.stringify(extra)}` : '';
+    // Never the line that ends a process: a value that cannot be written
+    // (too deep, a cycle) is said so instead.
+    let suffix = '';
+    if (extra !== undefined) {
+      try {
+        suffix = ` ${JSON.stringify(extra)}`;
+      } catch {
+        suffix = ' (details could not be written)';
+      }
+    }
     // Plain stdout/stderr - Docker/Umbrel capture this, no file logging.
     const stream = level === 'error' ? console.error : console.log;
     stream(`${ts} [${level.toUpperCase()}] [${scope}] ${msg}${suffix}`);

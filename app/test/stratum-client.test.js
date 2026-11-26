@@ -262,3 +262,25 @@ test('a connection that never brings a job is replaced too, after five minutes a
   assert.equal(conn.silentTooLong(t0 + 100_000 + 90_000), false, 'eighty seconds is its rhythm, but the first job may take longer');
   assert.equal(conn.silentTooLong(t0 + 100_000 + 301_000), true);
 });
+
+test('a pool new to this worker that never brings a job is replaced after five minutes too', () => {
+  // No rhythm learned yet: it used to be let off until the six-hour idle
+  // timeout (R-2611-05).
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'new and quiet' });
+  const t0 = 1789900000000;
+  conn._connectedAt = t0;
+  assert.equal(conn.silenceLimitMs(), null);
+  assert.equal(conn.silentTooLong(t0 + 299_000), false);
+  assert.equal(conn.silentTooLong(t0 + 301_000), true);
+});
+
+test('a deeply nested error in the reply to our login is passed on as short text', () => {
+  const conn = new StratumPoolConnection({ host: 'example.invalid', port: 3333, label: 'nested' });
+  let got;
+  conn.on('authorizeResult', (r) => { got = r; });
+  const depth = 50_000; // fits the line limit, parses, and overflowed the logger's JSON.stringify
+  conn._handleLine(`{"id":2,"result":false,"error":${'['.repeat(depth)}${']'.repeat(depth)}}`, process.hrtime.bigint(), Date.now());
+  assert.equal(got.ok, false);
+  assert.equal(typeof got.error, 'string');
+  assert.ok(got.error.length <= 200);
+});

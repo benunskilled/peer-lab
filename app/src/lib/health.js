@@ -43,8 +43,9 @@ function read(db, service) {
  * a container is reported healthy as soon as it is genuinely up rather than
  * after a first full interval. `details` is called on every beat and may
  * return small extra fields (e.g. whether the ZMQ socket is connected).
+ * `skip`, if given, is asked before each later beat.
  */
-function start(db, service, logger, details) {
+function start(db, service, logger, details, skip) {
   const beat = () => {
     try {
       write(db, service, typeof details === 'function' ? details() : undefined);
@@ -55,7 +56,13 @@ function start(db, service, logger, details) {
     }
   };
   beat();
-  const timer = setInterval(beat, HEARTBEAT_INTERVAL_MS);
+  // `skip`: a beat may wait for the next one (the healthcheck allows four
+  // intervals) - the stratum worker skips while a race is being timed, where
+  // a write waiting on the database lock would delay the next job's stamp.
+  const timer = setInterval(() => {
+    if (typeof skip === 'function' && skip()) return;
+    beat();
+  }, HEARTBEAT_INTERVAL_MS);
   timer.unref?.();
   return () => clearInterval(timer);
 }

@@ -378,6 +378,7 @@ const MAX_SSE_CLIENTS = 32;
 // current block is replayed on connect, and the page only plays the wave for
 // a block it had not seen. Overridable only so the tests need not wait.
 const SSE_MAX_AGE_MS = Number(process.env.SSE_MAX_AGE_MS) || 10 * 60 * 1000;
+const SSE_MAX_QUEUED_BYTES = 1024 * 1024;
 // The pool a block was mined by arrives a moment after the race itself (the
 // relay profiler reads the coinbase once the race is written), so the same
 // race is worth sending twice: once when it lands, once when it has a name.
@@ -389,6 +390,13 @@ function sseBroadcast(event, payload) {
   const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const res of sseClients) {
     try {
+      // A page that stopped reading (a tab asleep, a stalled proxy) would
+      // have everything queued for it in memory: past a megabyte it is cut.
+      if (res.writableLength > SSE_MAX_QUEUED_BYTES) {
+        sseClients.delete(res);
+        res.destroy();
+        continue;
+      }
       res.write(frame);
     } catch {
       sseClients.delete(res);
@@ -503,7 +511,9 @@ function handleEventStream(req, res) {
 
   const maxAge = setTimeout(() => {
     cleanup();
-    try { res.end(); } catch { /* client already gone */ }
+    // Ended politely when it has read everything; one with data still queued
+    // would hold its socket until that drained, which may be never.
+    try { if (res.writableLength > 0) res.destroy(); else res.end(); } catch { /* client already gone */ }
   }, SSE_MAX_AGE_MS);
   maxAge.unref?.();
 

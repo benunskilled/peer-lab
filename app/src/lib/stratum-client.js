@@ -25,6 +25,17 @@ const HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000;
 // sense, and it backs off on its own.
 const MAX_STRATUM_LINE_BYTES = 128 * 1024;
 
+// A value from a pool, for a log line: flat text, at most 200 characters.
+function shortText(v) {
+  let t;
+  try {
+    t = typeof v === 'string' ? v : JSON.stringify(v);
+  } catch {
+    t = '(unreadable)';
+  }
+  return String(t).slice(0, 200);
+}
+
 // Bitcoin block hashes are 32 bytes, and Stratum sends them as hex. Anything
 // else in the prevhash slot is not a block this node will ever hear about, and
 // letting it through means a stranger's socket can mint rows in stratum_race
@@ -139,11 +150,17 @@ class StratumPoolConnection extends EventEmitter {
   // A connection still waiting for its first job gets at least five minutes:
   // the same ckpool took up to two to authorise a new connection, and one cut
   // off in that wait would only start it over.
+  // The first-job wait does not need the rhythm: a pool new to this worker has
+  // none learned yet, and it used to be let off until the six-hour idle
+  // timeout - which any other line from the pool kept resetting (outside
+  // review R-2611-05, 26.11.2026).
   silentTooLong(now = Date.now()) {
     const limit = this.silenceLimitMs();
+    if (this._lastNotifyAt == null) {
+      return this._connectedAt != null && now - this._connectedAt > Math.max(limit || 0, SILENCE_FIRST_JOB_MS);
+    }
     if (limit == null) return false;
-    if (this._lastNotifyAt != null) return now - this._lastNotifyAt > limit;
-    return this._connectedAt != null && now - this._connectedAt > Math.max(limit, SILENCE_FIRST_JOB_MS);
+    return now - this._lastNotifyAt > limit;
   }
 
   stop() {
@@ -212,7 +229,8 @@ class StratumPoolConnection extends EventEmitter {
       this._silenceTimer = setInterval(() => {
         if (!this.silentTooLong()) return;
         const since = this._lastNotifyAt != null ? this._lastNotifyAt : this._connectedAt;
-        this._closeReason = `${this._lastNotifyAt != null ? 'silent' : 'no job'} for ${Math.round((Date.now() - since) / 1000)} s, usually every ${Math.round(this.silenceLimitMs() / SILENCE_FACTOR / 1000)} s`;
+        const usual = this.silenceLimitMs();
+        this._closeReason = `${this._lastNotifyAt != null ? 'silent' : 'no job'} for ${Math.round((Date.now() - since) / 1000)} s${usual != null ? `, usually every ${Math.round(usual / SILENCE_FACTOR / 1000)} s` : ''}`;
         socket.destroy();
       }, SILENCE_CHECK_MS);
       this._silenceTimer.unref?.();
@@ -260,7 +278,10 @@ class StratumPoolConnection extends EventEmitter {
         this._readyAt = null;
         this._lastNotifyAt = null;
         clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = setTimeout(() => this._connect(), waitMs);
+        // Spread a little: pools cut off together (this node's line went
+        // down) would otherwise retry in step for good.
+        const jittered = waitMs ? Math.round(waitMs * (0.8 + 0.4 * Math.random())) : 0;
+        this._reconnectTimer = setTimeout(() => this._connect(), jittered);
         this.reconnectDelayMs = held ? 2000 : Math.min(this.reconnectDelayMs * 1.5, 30000);
       }
     });
@@ -356,7 +377,9 @@ class StratumPoolConnection extends EventEmitter {
       // Some pools don't require it at all and notify regardless; a
       // rejection here is only useful for debugging, never fatal.
       this.authorized = Boolean(msg.result);
-      this.emit('authorizeResult', { ok: this.authorized, error: msg.error || null });
+      // The pool's error as short text: a deeply nested value parses fine and
+      // then overflows the stack when logged, which ended the worker (R-2611-05).
+      this.emit('authorizeResult', { ok: this.authorized, error: msg.error == null ? null : shortText(msg.error) });
     }
   }
 }

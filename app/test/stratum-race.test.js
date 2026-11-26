@@ -377,17 +377,60 @@ test('a flood of made-up prevhashes cannot open unlimited races', async () => {
   // The client only lets a well-formed 64-hex prevhash through, so this is the
   // second guard, for hashes that are shaped right and still invented. Without
   // it each one is a stratum_race row, an open race and a timer.
-  const a = fakePool(1, 'A');
-  watchPools(a);
+  // One pool fills only its own two (R-2611-05: ten from one pool kept a real
+  // block out); many pools together stop at ten.
+  const pools = [1, 2, 3, 4, 5, 6].map((id) => fakePool(id, `P${id}`));
+  watchPools(...pools);
 
-  for (let i = 0; i < 40; i += 1) {
-    race.handleNotify(a, prevhash(1000 + i), hr());
-  }
-
+  for (let i = 0; i < 40; i += 1) race.handleNotify(pools[0], prevhash(1000 + i), hr());
+  assert.equal(race.openRaces.size, 2, 'one pool: two at once');
+  for (const p of pools.slice(1)) for (let i = 0; i < 40; i += 1) race.handleNotify(p, prevhash(2000 + p.id * 100 + i), hr());
   assert.equal(race.openRaces.size, 10, 'the cap holds');
   await race.finalizeAllRaces();
   const opened = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_race').get().n;
   assert.equal(opened, 10, 'and nothing past it reached the database');
+});
+
+test('a real block still opens its race while one pool floods made-up ones', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  for (let i = 0; i < 40; i += 1) race.handleNotify(a, prevhash(3000 + i), hr());
+  const t0 = hr();
+  race.handleNotify(b, prevhash(3999), t0);
+  race.handleNotify(a, prevhash(3999), t0 + 5_000_000n);
+  assert.ok(race.openRaces.has(prevhash(3999)));
+  await race.finalizeRace(prevhash(3999));
+  assert.deepEqual(observationsFor(prevhash(3999)).map((r) => [r.poolId, r.rank]), [[1, 2], [2, 1]]);
+});
+
+test('a pool excused at reconnect is not timed on a later copy of the same job', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  const t0 = hr();
+  race.handleNotify(a, prevhash(3100), t0);
+  race.handleNotify(b, prevhash(3100), t0 + 1_000_000n, Date.now(), true); // B reconnected mid-race
+  race.handleNotify(b, prevhash(3100), t0 + 900_000_000n); // a template refresh
+  await race.finalizeRace(prevhash(3100));
+  assert.deepEqual(observationsFor(prevhash(3100)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+});
+
+test('a pool unticked while its race is open: the others move up, timed from the first still there', async () => {
+  const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  watchPools(a, b, c);
+  const t0 = hr();
+  race.handleNotify(a, prevhash(3200), t0);
+  race.handleNotify(b, prevhash(3200), t0 + 20_000_000n);
+  race.handleNotify(c, prevhash(3200), t0 + 50_000_000n);
+  const saved = db.instance.prepare('SELECT * FROM stratum_pool WHERE id = 1').get();
+  db.instance.prepare('DELETE FROM stratum_observation WHERE pool_id = 1').run();
+  db.instance.prepare('DELETE FROM stratum_pool WHERE id = 1').run();
+  try {
+    await race.finalizeRace(prevhash(3200));
+    assert.deepEqual(observationsFor(prevhash(3200)).map((r) => [r.poolId, Math.round(r.latencyMs), r.rank]), [[2, 0, 1], [3, 30, 2]]);
+  } finally {
+    const cols = Object.keys(saved);
+    db.instance.prepare(`INSERT INTO stratum_pool (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map((k) => saved[k]));
+  }
 });
 
 // An outside review held another connection's write lock for one second while
@@ -508,7 +551,7 @@ test('a race waiting for Core is written without misses when the worker stops', 
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
   watchPools(a, b);
-  race.setVerifier(async () => false);
+  race.setVerifier(async () => null); // Core could not be asked
 
   race.handleNotify(a, prevhash(96), hr());
   await race.finalizeRace(prevhash(96));
@@ -516,6 +559,20 @@ test('a race waiting for Core is written without misses when the worker stops', 
   race.abandonOpenRaces();
   assert.equal(race.pendingRaces.size, 0);
   assert.deepEqual(observationsFor(prevhash(96)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+});
+
+test('a race Core said it does not know is not written when the worker stops', async (t) => {
+  // R-2611-05: a made-up hash, pending its second check, won a race on stop.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  race.setVerifier(async () => false);
+
+  race.handleNotify(a, prevhash(97), hr());
+  await race.finalizeRace(prevhash(97));
+  assert.equal(race.pendingRaces.size, 1);
+  race.abandonOpenRaces();
+  assert.deepEqual(observationsFor(prevhash(97)), []);
 });
 
 test('races waiting for Core stop at a limit, so made-up prevhashes cannot pile up', async (t) => {

@@ -52,3 +52,8 @@ test('validatePool reports the specific problem and normalises the value', () =>
   assert.match(validatePool({ label: 'X', host: 'no spaces', port: 1 }).error, /host/);
   assert.match(validatePool({ label: 'X', host: 'a.b', port: 333333 }).error, /65535/);
 });
+
+test('a pool host is kept in lower case, so the same name cannot get a second row', () => {
+  const r = validatePool({ label: 'Mine', host: ' Pool.Example.COM ', port: 3333 });
+  assert.equal(r.value.host, 'pool.example.com');
+});
