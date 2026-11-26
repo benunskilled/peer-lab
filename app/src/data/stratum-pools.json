@@ -1,5 +1,5 @@
 {
- "checked": "2026-11-25",
+ "checked": "2026-11-26",
  "note": "Public Bitcoin stratum V1 endpoints (plain TCP) that send jobs to an unregistered username. Each was connected to and sent a job for the current block on the date above; country and region from the server address (geo/), not from the pool. See STRATUM-POOLS.md.",
  "pools": [
   {
@@ -30,6 +30,15 @@
    "source": "https://www.solopool.com/docs.html"
   },
   {
+   "name": "HF Pool",
+   "host": "stratum.hfpool.com.br",
+   "port": 3333,
+   "country": "BR",
+   "region": "Sao Paulo",
+   "kind": "shared",
+   "source": "https://hfpool.com.br/faq"
+  },
+  {
    "name": "SoloPool.org Canada",
    "host": "us1.solopool.org",
    "port": 8005,
@@ -37,6 +46,15 @@
    "region": "Quebec",
    "kind": "solo",
    "source": "https://btc.solopool.org/help"
+  },
+  {
+   "name": "soloBTC.cz",
+   "host": "solobtc.cz",
+   "port": 3333,
+   "country": "CZ",
+   "region": "Zlin",
+   "kind": "solo",
+   "source": "https://solobtc.cz/?lang=en"
   },
   {
    "name": "SoloFury DE",
@@ -188,6 +206,33 @@
    "since": "1.0.0"
   },
   {
+   "name": "Ghosthour",
+   "host": "pool.ghosthour.de",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://ghosthour.de/"
+  },
+  {
+   "name": "NerdMiner.de",
+   "host": "pool.nerdminer.de",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://pool.nerdminer.de/"
+  },
+  {
+   "name": "Noderunners",
+   "host": "pool.noderunners.network",
+   "port": 1337,
+   "country": "DE",
+   "region": "Bavaria",
+   "kind": "solo",
+   "source": "https://noderunners.network/en/pool"
+  },
+  {
    "name": "Mineshop Solo Finland",
    "host": "solo.mineshop.eu",
    "port": 3333,
@@ -195,6 +240,15 @@
    "region": "Uusimaa",
    "kind": "solo",
    "source": "https://solo.mineshop.eu/"
+  },
+  {
+   "name": "Bitronics",
+   "host": "pool.bitronics.store",
+   "port": 3333,
+   "country": "FI",
+   "region": "Uusimaa",
+   "kind": "solo",
+   "source": "https://pool.bitronics.store/"
   },
   {
    "name": "SoloMining.de",
@@ -205,6 +259,24 @@
    "kind": "solo",
    "source": null,
    "since": "1.0.0"
+  },
+  {
+   "name": "FindMyBlock",
+   "host": "eu.findmyblock.xyz",
+   "port": 3335,
+   "country": "FR",
+   "region": "Grand Est",
+   "kind": "solo",
+   "source": "https://findmyblock.xyz/guides/bitaxe"
+  },
+  {
+   "name": "NerdMiner.io",
+   "host": "pool.nerdminer.io",
+   "port": 3333,
+   "country": "FR",
+   "region": "Hauts-de-France",
+   "kind": "solo",
+   "source": "https://pool.nerdminer.io/"
   },
   {
    "name": "SoloFury UK",
@@ -233,6 +305,15 @@
    "kind": "solo",
    "source": null,
    "since": "1.0.0"
+  },
+  {
+   "name": "NerdMiners.org",
+   "host": "pool.nerdminers.org",
+   "port": 3333,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": "https://pool.nerdminers.org/"
   },
   {
    "name": "SpiderPool Hong Kong",
@@ -287,15 +368,6 @@
    "region": "Tokyo",
    "kind": "solo",
    "source": "https://solofury.com/btc/"
-  },
-  {
-   "name": "EMCD Russia",
-   "host": "kz.emcd.network",
-   "port": 3333,
-   "country": "RU",
-   "region": "Moscow",
-   "kind": "shared",
-   "source": "https://help.emcd.io/en/articles/16613290-how-to-connect-to-the-emcd-pool-and-start-mining-bitcoin-btc"
   },
   {
    "name": "Kryptex Russia",
@@ -531,6 +603,33 @@
    "kind": "solo",
    "source": null,
    "since": "1.0.0"
+  },
+  {
+   "name": "Solo Cat",
+   "host": "solo.cat",
+   "port": 3333,
+   "country": "US",
+   "region": "Arizona",
+   "kind": "solo",
+   "source": "https://solo.cat/"
+  },
+  {
+   "name": "LetsMine.it US",
+   "host": "us1.letsmine.it",
+   "port": 3332,
+   "country": "US",
+   "region": "New York",
+   "kind": "solo",
+   "source": "https://letsmine.it/en/posts/tutorial/faq"
+  },
+  {
+   "name": "LuckyHash",
+   "host": "pool.luckyhash.ca",
+   "port": 3333,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "solo",
+   "source": "https://luckyhash.ca/pages/pool"
   },
   {
    "name": "AntPool",
