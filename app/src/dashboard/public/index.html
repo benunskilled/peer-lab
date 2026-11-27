@@ -250,6 +250,41 @@
       <p class="hint" id="pool-no-miner" hidden>No miner needed: install a pool app on this Umbrel and race your own node against the solo pools.<br>
         Every pool app works right away, except DATUM: it needs a Bitcoin address first.</p>
       <div id="stratum-body">
+      <!-- Your own pool first, above the list (27.11.2026): a pool app on this
+           Umbrel, or any pool by hand. Below 128 rows it went unseen. -->
+      <div class="pick-own">
+      <div class="inline-form" id="pool-templates">
+        <span class="hint">Local Umbrel pool:</span>
+        <button type="button" class="secondary" data-action="fill-pool-template" data-template="gobrrr">GoBrrr</button>
+        <button type="button" class="secondary" data-action="fill-pool-template" data-template="bassin">Bassin</button>
+        <button type="button" class="secondary" data-action="fill-pool-template" data-template="public-pool">Public Pool</button>
+        <button type="button" class="secondary" data-action="fill-pool-template" data-template="datum">DATUM</button>
+        <button type="button" class="secondary" data-action="fill-pool-template" data-template="pogolo">Pogolo</button>
+      </div>
+      <form id="pool-add-form" class="inline-form">
+        <input type="text" id="pool-label" aria-label="Pool name" placeholder="Label" required />
+        <input
+          type="text"
+          id="pool-host"
+          aria-label="Pool host"
+          placeholder="Host"
+          title="A local Umbrel pool app isn't reached at umbrel.local - use its container name instead (e.g. gobrrr-pool_ckpool_1), same network as this app."
+          required
+        />
+        <input
+          type="number"
+          id="pool-port"
+          aria-label="Pool port"
+          placeholder="Port"
+          min="1"
+          max="65535"
+          title="The stratum port inside the pool's container, not the one your miner uses on your network. The buttons above fill it in."
+          required
+        />
+        <button type="submit">Add Pool</button>
+        <span id="pool-add-result" class="hint"></span>
+      </form>
+      </div>
       <!-- The public pools to race, by country (data/stratum-pools.json). A
            fresh install has none ticked; older installs see theirs ticked. -->
       <details class="pool-pick how" id="pool-pick">
@@ -265,42 +300,6 @@
         <label class="cc-select"><span class="sr-only">Country</span><select id="pool-pick-select"></select></label>
         <ul class="plist" id="pool-pick-list"></ul>
         <p class="hint">One open connection per pool, nothing is mined. An unticked pool keeps its numbers for when you tick it again.</p>
-        <!-- A pool app on this Umbrel, or any pool by hand: set up once, so
-             inside the fold too. A pool app found here is named in the
-             folded line. -->
-        <div class="pick-own">
-        <div class="inline-form" id="pool-templates">
-          <span class="hint">Local Umbrel pool:</span>
-          <button type="button" class="secondary" data-action="fill-pool-template" data-template="gobrrr">GoBrrr</button>
-          <button type="button" class="secondary" data-action="fill-pool-template" data-template="bassin">Bassin</button>
-          <button type="button" class="secondary" data-action="fill-pool-template" data-template="public-pool">Public Pool</button>
-          <button type="button" class="secondary" data-action="fill-pool-template" data-template="datum">DATUM</button>
-          <button type="button" class="secondary" data-action="fill-pool-template" data-template="pogolo">Pogolo</button>
-        </div>
-        <form id="pool-add-form" class="inline-form">
-          <input type="text" id="pool-label" aria-label="Pool name" placeholder="Label" required />
-          <input
-            type="text"
-            id="pool-host"
-            aria-label="Pool host"
-            placeholder="Host"
-            title="A local Umbrel pool app isn't reached at umbrel.local - use its container name instead (e.g. gobrrr-pool_ckpool_1), same network as this app."
-            required
-          />
-          <input
-            type="number"
-            id="pool-port"
-            aria-label="Pool port"
-            placeholder="Port"
-            min="1"
-            max="65535"
-            title="The stratum port inside the pool's container, not the one your miner uses on your network. The buttons above fill it in."
-            required
-          />
-          <button type="submit">Add Pool</button>
-          <span id="pool-add-result" class="hint"></span>
-        </form>
-        </div>
       </details>
       <!-- The range as a switch, like the one on the block card. -->
       <div class="rt-switch" id="stratum-range" role="group" aria-label="Range">
