@@ -7,7 +7,7 @@
 Public Bitcoin pools that send work to anyone over plain stratum V1 (TCP): they accept `mining.authorize` with a Bitcoin address they have never seen (`1BitcoinEaterAddressDontSendf59kuE.worker1`) and send `mining.notify` for the current block. Pools that need an account first (F2Pool, Foundry, Luxor, Kano at the time of checking) are not on it.
 
 - `name`: what the results table shows. Unique, so two servers of one pool can be told apart.
-- `country`, `region`: where the server address was on the day of checking, looked up by hand in Peer Lab's own `geo/` table, not what the pool says. `null` with `"routed": true` when the address belongs to a distributor in front of the pool and says nothing about where its servers are.
+- `country`, `region`: where the server address was on the day of checking, looked up by hand in Peer Lab's own `geo/` table, not what the pool says. `null` with `"routed": true` when the address picks the closest server for the user (a distributor in front of the pool, a different answer by location, or one anycast address) and so says nothing fixed about where the server is.
 - `kind`: `solo` (the finder gets the block) or `shared`.
 - `source`: the pool's own page that lists the address.
 - `loginRefused`: the pool answers the login with "no" and sends jobs all the same. Only Braiins Pool (shared), on trial since 26.11.2026: a big name, kept while its jobs keep coming.
