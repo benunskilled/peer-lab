@@ -22,6 +22,28 @@ func TestLibreRelayAndGarbageman(t *testing.T) {
 			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
 		}
 	}
+	// The short label survives the whole conversion, not only libreRelay().
+	for subver, label := range map[string]string{"/Satoshi:30.2.0/": "Libre Relay (Core fork)", "/Satoshi:28.1.0/": "Libre Relay or Garbageman"} {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+			Subver: subver, Transport: "v2", ServicesNames: bit}})[0]
+		if got.Label != label {
+			t.Errorf("%s: label %q, want %q", subver, got.Label, label)
+		}
+	}
+	dog := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:31.1.0/", Transport: "v2", ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^14]"}}})[0]
+	if dog.Label != "DOG Mode (Core fork)" {
+		t.Errorf("DOG Mode: label %q", dog.Label)
+	}
+	// Bit 26 beside 29 is Garbageman v28's full RBF; Libre Relay never sets it.
+	rbf := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:28.0.0/", Transport: "v2", ServicesNames: append(bit[:4:4], "UNKNOWN[2^26]", "UNKNOWN[2^29]")}})[0]
+	if rbf.Kind != fakeWalletKind || !strings.Contains(rbf.About, "Probably: Garbageman") {
+		t.Errorf("bits 26+29: got %q / %q", rbf.Kind, rbf.About)
+	}
+	if s := strings.Join(shownServices("/Satoshi:28.1.0/Knots:20250305/", []string{"UNKNOWN[2^1]", "UNKNOWN[2^4]", "UNKNOWN[2^24]", "UNKNOWN[2^26]"}), ","); s != "GETUTXO,XTHIN,UTREEXO_TMP,REPLACE_BY_FEE" {
+		t.Errorf("older bits shown as %q", s)
+	}
 	// Without the bit it is plain Core.
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 		Subver: "/Satoshi:30.2.0/", Transport: "v2", ServicesNames: bit[:4]}})[0]
@@ -42,9 +64,29 @@ func TestForkBits(t *testing.T) {
 		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
 		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
 	} {
-		if got, why := forkOf(c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
+		if got, why := forkOf("", c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
 			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
 		}
+	}
+	// The panel names the bits Core cannot; satd's 28 and 30 are its own.
+	shown := shownServices("/satd:0.7.2/", []string{"NETWORK_LIMITED", "UNKNOWN[2^28]", "UNKNOWN[2^30]", "UNKNOWN[2^31]"})
+	if strings.Join(shown, ",") != "NETWORK_LIMITED,INTACT_BLOCKS,NAP,UNKNOWN[2^31]" {
+		t.Errorf("satd shown %v", shown)
+	}
+	shown = shownServices("/Satoshi:29.4.1/Knots:20260508/", []string{"UNKNOWN[2^27]", "UNKNOWN[2^28]", "UNKNOWN[2^30]", "UNKNOWN[2^12]"})
+	if strings.Join(shown, ",") != "REDUCED_DATA,BLAKE2B,UNKNOWN[2^30],UTREEXO" {
+		t.Errorf("Knots shown %v", shown)
+	}
+	if shownServices("", nil) != nil || shownServices("", []string{}) == nil {
+		t.Error("nil and empty must stay apart")
+	}
+	// satd's bit 28 is NODE_INTACT_BLOCKS, not BLAKE2b; its bit 27 would still count.
+	intact := []string{"WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^28]"}
+	if got, _ := forkOf("/satd:0.7.2/", intact, "Node (other)", nil, 0); got != "" {
+		t.Errorf("satd with intact blocks: got %q", got)
+	}
+	if got, _ := forkOf("/Satoshi:29.4.1/Knots:20260508/", intact, "Node (Knots)", nil, 0); got != "BLAKE2b fork" {
+		t.Errorf("Knots with bit 28: got %q", got)
 	}
 	// Headers decide when they are known: at the tip it is this chain, stuck
 	// thousands of blocks back it is not, and -1 (not yet known) leaves the bit.
@@ -54,7 +96,7 @@ func TestForkBits(t *testing.T) {
 		want   string
 	}{{972597, ""}, {972591, ""}, {972590, "BIP110 fork"}, {961170, "BIP110 fork"}, {-1, "BIP110 fork"}} {
 		h := c.synced
-		if got, _ := forkOf(bip110, "Other", &h, 972597); got != c.want {
+		if got, _ := forkOf("", bip110, "Other", &h, 972597); got != c.want {
 			t.Errorf("synced %d at tip 972597: got %q, want %q", c.synced, got, c.want)
 		}
 	}
@@ -131,7 +173,7 @@ func TestPurityByBits(t *testing.T) {
 	purity := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "UNKNOWN[2^25]", "UNKNOWN[2^27]"}
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 		Subver: "/Satoshi:29.4/", Transport: "v2", ServicesNames: purity}})[0]
-	if got.Kind != "Other chain" || got.About != purityByBitsAbout || got.Label != "Probably Purity" || got.Fork != "BIP110 fork" {
+	if got.Kind != "Other chain" || got.About != purityByBitsAbout || got.Label != "Purity, bare Core name" || got.Fork != "BIP110 fork" {
 		t.Errorf("spoofed Purity: got %q / %q / %q", got.Kind, got.About, got.Label)
 	}
 	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
@@ -143,5 +185,22 @@ func TestPurityByBits(t *testing.T) {
 		Subver: "/Satoshi:32.1.0/", Transport: "v2", ServicesNames: purity[:4]}})[0]
 	if got.Kind == "Other chain" {
 		t.Errorf("bit 25 alone: got %q", got.Kind)
+	}
+}
+
+// Bitcoin DOG Mode says Core's name; only its service bit 14 tells it apart.
+func TestDogModeByItsBit(t *testing.T) {
+	bits := []string{"NETWORK_LIMITED", "WITNESS", "UNKNOWN[2^14]"}
+	if k, _, l := dogMode("/Satoshi:31.1.0/", bits); k != "Node (DOG Mode)" || l != "DOG Mode (Core fork)" {
+		t.Errorf("got %q %q", k, l)
+	}
+	if k, _, _ := dogMode("/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS"}); k != "" {
+		t.Errorf("no bit 14, got %q", k)
+	}
+	if k, _, _ := dogMode("/btcwire:0.5.0/", bits); k != "" {
+		t.Errorf("not a Core name, got %q", k)
+	}
+	if got := shownServices("/Satoshi:31.1.0/", bits)[2]; got != "DOG_MODE" {
+		t.Errorf("panel shows %q", got)
 	}
 }

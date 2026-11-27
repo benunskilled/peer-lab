@@ -25,6 +25,17 @@ const HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000;
 // sense, and it backs off on its own.
 const MAX_STRATUM_LINE_BYTES = 128 * 1024;
 
+// A value from a pool, for a log line: flat text, at most 200 characters.
+function shortText(v) {
+  let t;
+  try {
+    t = typeof v === 'string' ? v : JSON.stringify(v);
+  } catch {
+    t = '(unreadable)';
+  }
+  return String(t).slice(0, 200);
+}
+
 // Bitcoin block hashes are 32 bytes, and Stratum sends them as hex. Anything
 // else in the prevhash slot is not a block this node will ever hear about, and
 // letting it through means a stranger's socket can mint rows in stratum_race
@@ -45,10 +56,35 @@ const PREVHASH_RE = /^[0-9a-fA-F]{64}$/;
  *   'notify' ({ prevhash, cleanJobs, receivedAtHr }) - a parsed mining.notify
  *   'authorizeResult' ({ ok, error }) - response to our own mining.authorize
  *   'heartbeat' ({ connectedMs, notifyCount, authorized }) - periodic status
- *   'connect' / 'disconnect' (err?)
+ *   'connect' / 'disconnect' ({ reason, heldMs, jobs, nextTryMs })
  */
 // How long a connection has to last before the reconnect wait starts over.
 const HELD_MS = 60_000;
+
+// A connection that has gone quiet. Pools send fresh work on a rhythm of
+// their own - an owner's ckpool every 20 seconds, public pools every half
+// minute to a few minutes - so a connection silent for several of its own
+// rhythms is no longer working, whatever the socket says. Seen on a real node
+// (25.11.2026): a ckpool dropped this client while the socket looked open,
+// and it took two to three minutes until anything noticed - a block in that
+// window found the pool with its job ready and no way to send it here.
+// Replaced after four of its usual gaps, never sooner than a minute, and
+// only once a few gaps have been seen: a pool that sends work only on a new
+// block learns a ten-minute rhythm and is left alone for forty.
+const SILENCE_MIN_MS = 60_000;
+const SILENCE_FACTOR = 4;
+const SILENCE_GAPS_NEEDED = 3;
+const SILENCE_GAPS_KEPT = 20;
+const SILENCE_CHECK_MS = 10_000;
+// Several jobs within seconds of each other are one burst (a pool that sends
+// on a new block, then again as its template fills), not its rhythm: counted,
+// they made the median a few hundred ms and the limit the one-minute floor,
+// and such a pool was redialled after every block. Only gaps longer than this
+// teach the rhythm.
+const SILENCE_GAP_MIN_MS = 5_000;
+const SILENCE_FIRST_JOB_MS = 5 * 60_000;
+// After a first job, before the rhythm is learned (silentTooLong).
+const SILENCE_UNLEARNED_MS = 90 * 60 * 1000;
 
 class StratumPoolConnection extends EventEmitter {
   constructor({ host, port, label, idleTimeoutMs = 6 * 60 * 60 * 1000, authorizeAddress = '1BitcoinEaterAddressDontSendf59kuE' }) {
@@ -69,7 +105,15 @@ class StratumPoolConnection extends EventEmitter {
     this.notifyCount = 0;
     this.authorized = null; // null = no response yet, true/false = pool's answer
     this._connectedAt = null;
+    this._readyAt = null;
     this._heartbeatTimer = null;
+    // Gaps between this pool's jobs (kept across reconnects: the rhythm is
+    // the pool's), and when the current connection last brought one.
+    this._gaps = [];
+    this._lastNotifyAt = null;
+    this._silenceTimer = null;
+    // Why the current connection ended, for the log: set by whoever ends it.
+    this._closeReason = null;
   }
 
   start() {
@@ -83,9 +127,54 @@ class StratumPoolConnection extends EventEmitter {
     return this._connectedAt;
   }
 
+  // When the open connection brought its first job, null until it has. A
+  // connection is not working until then: a pool may accept the socket and
+  // take its time to authorise - ckpool took 20 seconds to two minutes on a
+  // real node (25.11.2026) - and a block inside that wait finds a pool that
+  // has the new job ready and no way yet to send it here. Charging that as a
+  // miss blamed the pool for this end's handshake.
+  get readySince() {
+    return this._readyAt;
+  }
+
+  // How long this pool may stay quiet before its connection is replaced,
+  // null while its rhythm is not known yet.
+  silenceLimitMs() {
+    if (this._gaps.length < SILENCE_GAPS_NEEDED) return null;
+    const sorted = [...this._gaps].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    return Math.max(SILENCE_MIN_MS, SILENCE_FACTOR * median);
+  }
+
+  // Measured from the last job, or, on a connection that has brought none
+  // yet, from when it opened: a pool that accepts the socket and never
+  // authorises would otherwise only be noticed by the six-hour idle timeout.
+  // A connection still waiting for its first job gets at least five minutes:
+  // the same ckpool took up to two to authorise a new connection, and one cut
+  // off in that wait would only start it over.
+  // The first-job wait does not need the rhythm: a pool new to this worker has
+  // none learned yet, and it used to be let off until the six-hour idle
+  // timeout - which any other line from the pool kept resetting (outside
+  // review R-2611-05, 26.11.2026).
+  silentTooLong(now = Date.now()) {
+    const limit = this.silenceLimitMs();
+    if (this._lastNotifyAt == null) {
+      return this._connectedAt != null && now - this._connectedAt > Math.max(limit || 0, SILENCE_FIRST_JOB_MS);
+    }
+    // A job came, but too few gaps yet to know the pool's rhythm: a long,
+    // finite wait instead of none, or a pool that sent one job and then only
+    // other lines was charged a miss for every block from then on (R-2711-10).
+    // Long enough for a pool that sends jobs only on a new block and a slow
+    // hour of blocks.
+    return now - this._lastNotifyAt > (limit == null ? SILENCE_UNLEARNED_MS : limit);
+  }
+
   stop() {
     this.stopped = true;
     this._connectedAt = null;
+    this._readyAt = null;
+    clearInterval(this._silenceTimer);
+    this._silenceTimer = null;
     clearTimeout(this._reconnectTimer);
     if (this.socket) this.socket.destroy();
   }
@@ -121,6 +210,9 @@ class StratumPoolConnection extends EventEmitter {
       this.notifyCount = 0;
       this.authorized = null;
       this._connectedAt = Date.now();
+      this._readyAt = null;
+      this._lastNotifyAt = null;
+      this._closeReason = null;
       const subscribe = JSON.stringify({ id: 1, method: 'mining.subscribe', params: ['peer-lab/1.0'] });
       socket.write(`${subscribe}\n`);
       // Many stratum servers - solo-mining ckpool-based ones especially,
@@ -140,6 +232,14 @@ class StratumPoolConnection extends EventEmitter {
       socket.write(`${authorize}\n`);
       this.emit('connect');
       this._startHeartbeat();
+      this._silenceTimer = setInterval(() => {
+        if (!this.silentTooLong()) return;
+        const since = this._lastNotifyAt != null ? this._lastNotifyAt : this._connectedAt;
+        const usual = this.silenceLimitMs();
+        this._closeReason = `${this._lastNotifyAt != null ? 'silent' : 'no job'} for ${Math.round((Date.now() - since) / 1000)} s${usual != null ? `, usually every ${Math.round(usual / SILENCE_FACTOR / 1000)} s` : ''}`;
+        socket.destroy();
+      }, SILENCE_CHECK_MS);
+      this._silenceTimer.unref?.();
     });
 
     // IMPORTANT: the timestamp is captured here, at the raw 'data' event,
@@ -155,18 +255,46 @@ class StratumPoolConnection extends EventEmitter {
     });
 
     socket.on('timeout', () => socket.destroy(new Error('idle timeout')));
-    socket.on('error', (err) => this.emit('socketError', err));
+    socket.on('error', (err) => {
+      if (!this._closeReason) this._closeReason = err.message;
+      this.emit('socketError', err);
+    });
+    socket.on('end', () => {
+      if (!this._closeReason) this._closeReason = 'closed by the pool';
+    });
     socket.on('close', () => {
       this._stopHeartbeat();
-      this.emit('disconnect');
+      clearInterval(this._silenceTimer);
+      this._silenceTimer = null;
+      const heldMs = this._connectedAt ? Date.now() - this._connectedAt : 0;
+      // A connection that held is dialled again at once: it worked a moment
+      // ago, and every second without it is a second a block can fall into.
+      // One that never held waits, longer each time, so a pool that accepts
+      // and drops at once is not redialled every few seconds.
+      // A connection closed for bringing no job did not hold, however long
+      // it stood: dialled again at once, a pool that never sends one would
+      // cost a connection every five minutes for good.
+      const noJob = this._lastNotifyAt == null && /^no job/.test(this._closeReason || '');
+      const held = heldMs >= HELD_MS && !noJob;
+      const waitMs = this.stopped ? null : held ? 0 : noJob ? Math.max(this.reconnectDelayMs, 60_000) : this.reconnectDelayMs;
+      this.emit('disconnect', {
+        reason: this._closeReason || (this.stopped ? 'stopped' : 'connection lost'),
+        heldMs,
+        jobs: this.notifyCount,
+        nextTryMs: waitMs,
+      });
       if (!this.stopped) {
-        // The wait starts over only after a connection that held: a pool that
-        // accepts and drops at once is otherwise redialled every 2 seconds.
-        if (this._connectedAt && Date.now() - this._connectedAt >= HELD_MS) this.reconnectDelayMs = 2000;
         this._connectedAt = null;
+        this._readyAt = null;
+        this._lastNotifyAt = null;
         clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = setTimeout(() => this._connect(), this.reconnectDelayMs);
-        this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 1.5, 30000);
+        // Spread a little: pools cut off together (this node's line went
+        // down) would otherwise retry in step for good.
+        const jittered = waitMs ? Math.round(waitMs * (0.8 + 0.4 * Math.random())) : 0;
+        this._reconnectTimer = setTimeout(() => this._connect(), jittered);
+        this.reconnectDelayMs = held ? 2000
+          : noJob ? Math.min(Math.max(this.reconnectDelayMs * 2, 60_000), 30 * 60_000)
+            : Math.min(this.reconnectDelayMs * 1.5, 30000);
       }
     });
   }
@@ -236,6 +364,16 @@ class StratumPoolConnection extends EventEmitter {
         return;
       }
       this.notifyCount += 1;
+      if (this.notifyCount === 1) {
+        this._readyAt = receivedAtMs;
+        // It works again: a wait grown while it brought nothing is over.
+        this.reconnectDelayMs = 2000;
+      }
+      if (this._lastNotifyAt != null && receivedAtMs - this._lastNotifyAt >= SILENCE_GAP_MIN_MS) {
+        this._gaps.push(receivedAtMs - this._lastNotifyAt);
+        if (this._gaps.length > SILENCE_GAPS_KEPT) this._gaps.shift();
+      }
+      this._lastNotifyAt = receivedAtMs;
       this.emit('notify', {
         prevhash,
         cleanJobs: Boolean(cleanJobs),
@@ -255,7 +393,9 @@ class StratumPoolConnection extends EventEmitter {
       // Some pools don't require it at all and notify regardless; a
       // rejection here is only useful for debugging, never fatal.
       this.authorized = Boolean(msg.result);
-      this.emit('authorizeResult', { ok: this.authorized, error: msg.error || null });
+      // The pool's error as short text: a deeply nested value parses fine and
+      // then overflows the stack when logged, which ended the worker (R-2611-05).
+      this.emit('authorizeResult', { ok: this.authorized, error: msg.error == null ? null : shortText(msg.error) });
     }
   }
 }

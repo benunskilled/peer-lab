@@ -106,7 +106,10 @@ function upsertSessions(peers, nowMs = Date.now()) {
   // the downtime was counted as connected time, and the whole historical
   // session was retroactively relabelled with the new connection type.
   const isSameSession = (stored, peer) => {
-    if (stored.core_peer_id != null && typeof peer.id === 'number') return stored.core_peer_id === peer.id;
+    // A different id is a different connection. The same id is not proof:
+    // Core counts from zero again after a restart, so the start time has to
+    // agree as well (outside review, 26.11.2026).
+    if (stored.core_peer_id != null && typeof peer.id === 'number' && stored.core_peer_id !== peer.id) return false;
     // No id to compare (older rows) - fall back to conntime, allowing a
     // second of slack for Core's own second-resolution rounding.
     if (typeof peer.conntime !== 'number') return true;

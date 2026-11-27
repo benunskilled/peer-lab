@@ -252,3 +252,15 @@ test('only deliverers that are connected now - the list must not grow with the h
   openSession('4.4.4.4:51234', at + 1000);
   assert.ok(!blocks.deliveredEver().includes('4.4.4.4:51234'));
 });
+
+test('one peer\'s block stamp is not credited for the next block as well', () => {
+  // Outside review, 26.11.2026: two blocks 1.3 s apart, the second not from
+  // that peer, and its unchanged last_block won both.
+  const at = 1_700_000_100_000;
+  const peer = { addr: '5.5.5.5:8333', last_block: at / 1000, minping: 0.02 };
+  const first = relay.recordRace({ blockHash: 'e1'.repeat(32), detectedAtMs: at, peers: [peer] });
+  const second = relay.recordRace({ blockHash: 'e2'.repeat(32), detectedAtMs: at + 1300, peers: [peer] });
+  const firsts = (id) => db.instance.prepare('SELECT SUM(first) AS n FROM relay_observation WHERE race_id = ?').get(id).n;
+  assert.equal(firsts(first), 1);
+  assert.equal(firsts(second), 0);
+});

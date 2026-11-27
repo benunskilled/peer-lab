@@ -23,8 +23,8 @@ func TestOtherAbouts(t *testing.T) {
 		{"/bitcoinj:0.17/", 70013, "bitcoinj, a Java library"},
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "Probably KIT Karlsruhe's Bitcoin network monitoring"},
 		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
-		{"/GlobalNodeMap:2.1/", 70016, "Names itself a node map; nothing public says whose"},
-		{"/pycoinnet/", 70016, "Named like pycoinnet"},
+		{"/GlobalNodeMap:2.1/", 70016, "Named like a node map; nothing public says whose"},
+		{"/pycoinnet/", 70016, "spruned, a Bitcoin client"},
 		{"/Notoshi/", 70016, "pycoinnet, Richard Kiss's Python library"},
 		{"/btcwire:0.5.0/bitfyn:0.1.0/", 70016, "bitfyn, a desktop wallet"},
 		{"/bitcoinj:0.14.7/PeerMonitor:1.0/", 70016, "Koyn's header tool"},
@@ -38,8 +38,17 @@ func TestOtherAbouts(t *testing.T) {
 		{"/mantle-discover:0.1.0/", 70016, "Mantle's peer finder"},
 		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
 		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
-		{"/jwrd.net:0.9.99.99/", 70016, "Named like JWRD Computing's own bitcoind"},
-		{"/curl:8.5.0/", 70015, "Names curl, the download tool"},
+		{"/btcwire:0.2.0/Satoshi:0.9.3/", 70002, "pbtc, CIRCL's"},
+		{"/btcwire:0.5.0/Satoshi:0.20/", 70016, "Probably a network monitor on btcd's library"},
+		{"/jwrd.net:0.9.99.99/", 70016, "JWRD Computing's own bitcoind"},
+		{"/therealbitcoin.org:0.9.99.99/", 99999, "The Real Bitcoin (TRB)"},
+		{"/exnode:0.1.0/", 70016, "exnode, a Bitcoin full node written in Elixir"},
+		{"/BitcoinEcho:0.1.0/", 70016, "Bitcoin Echo, a full node in plain C"},
+		{"/curl:8.5.0/", 70015, "Named like curl, the download tool"},
+		{"/Classic:1.2/", 70015, "Bitcoin Classic, a big-block client"},
+		{"/Classic:1.2.1/", 70015, "Bitcoin Classic, a big-block client"},
+		{"/Classic:1.20/", 70015, "Bitcoin Classic 1.3 or later"},
+		{"/Classic:1.3.8(EB8)/", 70015, "Bitcoin Classic 1.3 or later"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -241,14 +250,14 @@ func TestNoTxSaid(t *testing.T) {
 }
 
 // Every rule has a label that fits one line, 1000 px wide too, and keeps the rule's hedge: a
-// sentence that says "Probably" or "Names" does not turn into a fact.
+// sentence that says "Probably" or "Named like" does not turn into a fact.
 func TestLabelsFitAndKeepTheHedge(t *testing.T) {
 	for _, r := range aboutRules {
 		if r.label == "" || len(r.label) > 25 {
 			t.Errorf("%q: label %q (%d chars)", r.text, r.label, len(r.label))
 		}
-		for _, hedge := range []string{"Probably", "Names", "Named"} {
-			if strings.HasPrefix(r.text, hedge) && !strings.HasPrefix(r.label, hedge) && !strings.HasPrefix(r.label, "Borrowed") {
+		for _, hedge := range []string{"Probably", "Named like"} {
+			if strings.HasPrefix(r.text, hedge) && !strings.HasPrefix(r.label, hedge) {
 				t.Errorf("%q: label %q drops %q", r.text, r.label, hedge)
 			}
 		}
@@ -347,22 +356,22 @@ func TestKnotsSHA256About(t *testing.T) {
 
 func TestFutureBitApolloAbout(t *testing.T) {
 	ua := "/Satoshi:28.1.0(FutureBit-Apollo-Node)/"
-	if got := aboutOf(ua); !strings.HasPrefix(got, "Labelled by FutureBit Apollo") || kindOf(ua) != "Node (Core)" {
+	if got := aboutOf(ua); !strings.HasPrefix(got, "A node on FutureBit Apollo") || kindOf(ua) != "Node (Core)" {
 		t.Errorf("about %q, kind %q", got, kindOf(ua))
 	}
 }
 
 func TestNodeSetupLabels(t *testing.T) {
 	for ua, want := range map[string]string{
-		"/Satoshi:31.0.0(Samourai Dojo 1.29.3)/":         "Labelled by Samourai Dojo",
-		"/Satoshi:29.0.0(RoninDojo 2.3.0)/":              "Labelled by RoninDojo",
-		"/Satoshi:23.0.0(RoninDojo )/":                   "Labelled by RoninDojo",
-		"/Satoshi:31.1.0(MiniBolt node)/":                "Labelled by MiniBolt",
-		"/Satoshi:29.0.0(MiniBolt_Node)/":                "Labelled by MiniBolt",
-		"/Satoshi:32.0.0(Official MiniBolt node)/":       "Labelled by MiniBolt",
-		"/Satoshi:32.1.0(21M; MiniBolt node)/":           "Labelled by MiniBolt",
-		"/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/": "Labelled by MiniBolt",
-		"/Satoshi:29.0.0(bitcore)/":                      "Labelled bitcore",
+		"/Satoshi:31.0.0(Samourai Dojo 1.29.3)/":         "A node run by Samourai Dojo",
+		"/Satoshi:29.0.0(RoninDojo 2.3.0)/":              "A node run by RoninDojo",
+		"/Satoshi:23.0.0(RoninDojo )/":                   "A node run by RoninDojo",
+		"/Satoshi:31.1.0(MiniBolt node)/":                "A node set up with MiniBolt",
+		"/Satoshi:29.0.0(MiniBolt_Node)/":                "A node set up with MiniBolt",
+		"/Satoshi:32.0.0(Official MiniBolt node)/":       "A node set up with MiniBolt",
+		"/Satoshi:32.1.0(21M; MiniBolt node)/":           "A node set up with MiniBolt",
+		"/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/": "A node set up with MiniBolt",
+		"/Satoshi:29.0.0(bitcore)/":                      "Named like BitPay's Bitcore",
 	} {
 		if got := aboutOf(ua); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q", ua, got)
@@ -375,14 +384,16 @@ func TestNodeSetupLabels(t *testing.T) {
 
 // A word an operator put in the brackets does not describe the node: the
 // about rules read the bare name, as the kinds do, unless a rule asks for a
-// bracket itself ("Labelled by ...", 13.11.2026).
+// bracket itself (a setup's tag, 13.11.2026).
 func TestAboutReadsTheBareName(t *testing.T) {
 	for ua, want := range map[string]string{
 		"/Satoshi:29.0.0(my-monitor)/":                    "",
 		"/Satoshi:28.0.0(neutrino)/":                      "",
-		"/Satoshi:28.1.0(FutureBit-Apollo-Node)/":         "Labelled by FutureBit Apollo",
-		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/":   "Labelled PyBLOCK-POOL",
-		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "PyBLOCK, a node dashboard",
+		"/Satoshi:28.1.0(FutureBit-Apollo-Node)/":         "A node on FutureBit Apollo",
+		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/":   "Named like PyBLOCK",
+		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Named like PyBLOCK",
+		"/Satoshi:28.1.0(PyBLOCK Crew)/":                  "PyBLOCK, a node dashboard",
+		"/Satoshi:29.1.0/Knots:20250903/PyBLOCK":          "PyBLOCK, a node dashboard",
 		// No name: no sentence, whatever the version says.
 		"/:monitor/": "",
 		"/:electrs/": "",
@@ -390,6 +401,20 @@ func TestAboutReadsTheBareName(t *testing.T) {
 		got := aboutOf(ua)
 		if want == "" && got != "" || want != "" && !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", ua, got, want)
+		}
+	}
+}
+
+// The hedge of an about sentence must not end up inside the claim:
+// "Claims: the wallet Elastum", not "the wallet Named like Elastum".
+func TestWalletClaimDropsHedge(t *testing.T) {
+	for about, want := range map[string]string{
+		"Named like Elastum, a former exchange; talks to nodes through bitcoinj": "the wallet Elastum",
+		"Probably Foo, a wallet":                        "the wallet Foo",
+		"Bitcoin Wallet, the Android app by Schildbach": "the wallet Bitcoin Wallet",
+	} {
+		if got := walletClaim(about); got != want {
+			t.Errorf("walletClaim(%q) = %q, want %q", about, got, want)
 		}
 	}
 }

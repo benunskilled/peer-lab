@@ -250,7 +250,10 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 
 /* ---- map card: map, then "Not on the map" folded under it ---- */
 .map-card { display: flex; flex-direction: column; overflow: hidden; }
-.map-wrap { position: relative; flex: 1 1 auto; min-width: 0; touch-action: none; }
+/* One finger scrolls the page past the map at the world view; two fingers zoom it (pinch reaches the
+   script, the page itself does not zoom). Zoomed in, a finger moves the map. */
+.map-wrap { position: relative; flex: 1 1 auto; min-width: 0; touch-action: pan-y; }
+.map-wrap.zoomed { touch-action: none; }
 #map { display: block; width: 100%; height: auto; cursor: grab; user-select: none; }
 #map.dragging { cursor: grabbing; }
 .land { fill: var(--land); stroke: var(--land-edge); stroke-width: 0.6; }
@@ -763,6 +766,13 @@ body { padding-bottom: var(--bars-h, 0px); }
 /* First/Blocks: the count in the row's own weight. It outlasts ping and connected on a narrowing table and
    goes with the net; never on a phone card. */
 .peers td.k-first { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* "46 of 100" (21.11.2026). */
+.peers td.k-first .first-of { color: var(--muted); font-weight: 400; font-size: 12px; }
+/* A phone card: "82× first" under the end of the pill, on the address line's baseline (22.11.2026). Nowhere else in the kind cell. */
+.peers .kind-head > .kind-first { display: none; }
+.cards.cards table tr td.k-kind .kind-head > .kind-first { display: block; position: absolute; right: 0; top: calc(100% - 1.5px); font-size: 12px; line-height: 1.3; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The address line under it ends 8px short of it, and only where it would reach it (--addr-max, 7-tables.js). */
+.cards.cards table tr td.k-peer .who-text > small { max-width: var(--addr-max, none); }
 .scroll.scroll[data-drops="3"] .k-first, .scroll.scroll[data-drops="4"] .k-first,
 .cards.cards table tr td.k-first { display: none; }
 /* The buttons for a peer, under the three blocks of its panel, at the right. */
@@ -1418,6 +1428,18 @@ details.card.panel > *:not(summary) { margin-top: 14px; }
 :is(.panel, .pd-actions) button.link::after { content: ""; position: absolute; inset: -12px -8px; }
 :is(.panel, .pd-actions) .keep-star::after { content: ""; position: absolute; inset: -12px -4px -12px -10px; }
 .panel table button.secondary::after { content: ""; position: absolute; inset: -8px -2px; }
+/* The same for the other small controls (21.11.2026: under 32 px on a phone). Grown up and down only, so
+   buttons side by side do not take each other's taps. */
+.map-card .map-legend .legend-pick, .b-peer, .rt-switch > button, .region-pick, .panel button.secondary,
+.map-zoom button, #zoomIn, #zoomOut, #zoomReset, .pool-fold > summary, .footer-source { position: relative; }
+.map-card .map-legend .legend-pick::after { content: ""; position: absolute; inset: -8px 0; }
+.b-peer::after { content: ""; position: absolute; inset: -6px 0; }
+.rt-switch > button::after { content: ""; position: absolute; inset: -5px 0; }
+.region-pick::after { content: ""; position: absolute; inset: -5px 0; }
+.panel button.secondary:not(table button)::after { content: ""; position: absolute; inset: -4px 0; }
+#zoomIn::after, #zoomOut::after, #zoomReset::after { content: ""; position: absolute; inset: -3px; }
+.pool-fold > summary::after { content: ""; position: absolute; inset: -8px 0; }
+.footer-source::after { content: ""; position: absolute; inset: -9px 0; }
 /* Buttons change state softly. */
 :is(.panel, .pd-actions) button.secondary, :is(.panel, .pd-actions) .action-slot { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
 /* What the storage card opens fades in. */
@@ -1545,3 +1567,65 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .panel .region-pick.on { background: var(--accent); border-color: var(--accent); color: #1a1200; }
 .panel .region-pick.on b { color: #1a1200; }
 .panel .region-pick:disabled { opacity: .45; cursor: default; }
+
+/* Stratum Race: the public pools to pick from, by kind and country. Each
+   pool has the same switch as Slot Fill and the pool table: one control for
+   on and off across the page. The filters are grey like the range switch -
+   they change the view, not the setting. */
+.pool-pick { margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.pool-pick > summary { font-weight: 600; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.pool-pick > summary .pick-sum { font-weight: 400; font-size: 13px; color: var(--muted); }
+.pool-pick > summary::after { align-self: center; }
+.pool-pick .pick-kind { margin: 10px 0 0; flex-wrap: wrap; border-radius: 16px; }
+/* The count beside the name, as on Slot Fill's region pills. */
+.pool-pick .pick-kind button { white-space: nowrap; }
+.pool-pick .pick-kind button b { margin-left: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Four tabs with counts fit a 360 px phone only a little tighter. */
+@media (max-width: 420px) { .panel .pool-pick .pick-kind button { padding: 3px 7px; } .pool-pick .pick-kind button b { margin-left: 3px; } }
+/* 16px: a smaller font makes the iPhone zoom in on a tap. */
+.pick-search { display: block; margin: 10px 0 0; max-width: 320px; }
+.pick-search input { box-sizing: border-box; width: 100%; font: inherit; font-size: 16px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+.pick-search input::placeholder { color: var(--muted); }
+.pick-search input:focus { outline: none; border-color: var(--muted); }
+.cc-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.cc-filter button { border: 1px solid var(--border); background: none; color: #c3ccd5; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.cc-filter button:hover { color: var(--text); border-color: var(--muted); }
+.cc-filter button.on { background: var(--land-hot); color: var(--text); border-color: transparent; }
+.cc-filter button small { opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.cc-select { display: none; margin: 10px 0 12px; }
+.cc-select select { font: inherit; font-size: 15px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
+.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; }
+.plist label { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--panel-2); }
+.plist label:hover { border-color: var(--muted); }
+/* Ticked rows keep the plain frame (27.11.2026): under "Racing" every row is
+   ticked, and an orange frame on each was the only one in the app; the
+   switch already says it. */
+.plist .n { color: var(--text); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .w { grid-column: 1; color: var(--muted); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .w .paused { color: var(--accent); font-weight: 500; }
+.plist .tag { grid-row: 1 / 3; grid-column: 2; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.plist .tag.shared { color: var(--accent); }
+.plist input[type="checkbox"] {
+  grid-row: 1 / 3; grid-column: 3; appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
+  width: 34px; height: 20px; border-radius: 999px; background: #2a3541; position: relative; transition: background .15s;
+}
+.plist input[type="checkbox"]::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; }
+.plist input[type="checkbox"]:checked { background: var(--accent); }
+.plist input[type="checkbox"]:checked::after { left: 17px; }
+.plist input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plist input[type="checkbox"].full { opacity: .4; cursor: not-allowed; }
+.plist li.hint { grid-column: 1 / -1; }
+.pick-own { margin: 4px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.pick-own .inline-form:last-child { margin-bottom: 0; }
+/* The pool apps of this Umbrel as pills, like Slot Fill's regions; one found
+   here is filled orange like a picked one - a tap adds it. The line before
+   them is a sub-heading like the others in the panels. */
+.panel #pool-templates button.secondary { font-size: 13px; font-weight: 500; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.panel #pool-templates button.secondary:hover { color: var(--text); border-color: var(--muted); }
+.panel #pool-templates button[data-action="add-found-pool"] { color: #1a1200; background: var(--accent); border-color: var(--accent); }
+.panel #pool-templates .hint { color: var(--text); font-weight: 600; font-size: 13px; }
+.pool-pick > summary .pick-found { font-weight: 400; font-size: 13px; color: var(--accent); }
+@media (max-width: 600px) {
+  .cc-filter { display: none; }
+  .cc-select { display: block; }
+}

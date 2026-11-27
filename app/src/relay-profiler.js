@@ -71,6 +71,14 @@ const FIRST_WINDOW_MS = 2500;
  * peer in 99.93% of blocks and misses in none, which is the evidence that the
  * whole method works.
  */
+// The peer and last_block credited for the block before: the same stamp
+// cannot bring the next block too. Two blocks 1.3 s apart, the second not
+// from that peer, credited it twice (outside review, 26.11.2026).
+let lastCredit = null;
+let lastFirstCount = 0; // what recordRace counted, for its log line
+
+const creditedBefore = (peer) => Boolean(lastCredit && peer.addr === lastCredit.addr && peer.last_block === lastCredit.lastBlock);
+
 function isFirstPeer(peer, detectedAtMs) {
   if (typeof peer.last_block !== 'number') return false;
   const lastBlockMs = peer.last_block * 1000;
@@ -139,19 +147,23 @@ function firstPeerWasHb(peers, detectedAtMs) {
   return row && row.hbTo != null ? row.hbTo : null;
 }
 
-function recordRace({ blockHash, detectedAtMs, peers }) {
+function recordRace({ blockHash, detectedAtMs, peers, height = null }) {
   const database = db.instance;
-  const firstHb = firstPeerWasHb(peers, detectedAtMs);
+  // The first peer's ping and high-bandwidth state from the same peers the
+  // credit is decided among: not one whose stamp was the block before's.
+  const fresh = peers.filter((p) => !creditedBefore(p));
+  const firstHb = firstPeerWasHb(fresh, detectedAtMs);
 
   const insertRace = database.prepare(
     `INSERT OR IGNORE INTO relay_race (block_hash, block_height, detected_at, first_count, nearest_delta_ms, first_ping_ms, first_hb)
-     VALUES (?, NULL, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   const insertObservation = database.prepare(
     `INSERT OR IGNORE INTO relay_observation (race_id, peer_id, eligible, first) VALUES (?, ?, 1, ?)`,
   );
 
-  const firstCount = peers.filter((p) => isFirstPeer(p, detectedAtMs)).length;
+  const isNewFirst = (p) => isFirstPeer(p, detectedAtMs) && !creditedBefore(p);
+  const firstCount = peers.filter(isNewFirst).length;
   // More than one match is another block moments apart, not a shared
   // delivery (see isFirstPeer): nobody is credited.
   const unclear = firstCount > 1;
@@ -160,10 +172,13 @@ function recordRace({ blockHash, detectedAtMs, peers }) {
   const tx = database.transaction(() => {
     const info = insertRace.run(
       blockHash,
+      // From the header already asked for, when it came: asked again later
+      // only if not (outside review, 26.11.2026).
+      Number.isInteger(height) ? height : null,
       detectedAtMs,
       firstCount,
       nearestDeltaMs === null ? null : Math.round(nearestDeltaMs),
-      unclear ? null : firstPeerPingMs(peers, detectedAtMs),
+      unclear ? null : firstPeerPingMs(fresh, detectedAtMs),
       unclear ? null : firstHb,
     );
     if (info.changes === 0) {
@@ -173,7 +188,7 @@ function recordRace({ blockHash, detectedAtMs, peers }) {
     const raceId = info.lastInsertRowid;
     for (const peer of peers) {
       const peerRow = db.getOrCreatePeer(peer.addr);
-      const isFirst = !unclear && isFirstPeer(peer, detectedAtMs);
+      const isFirst = !unclear && isNewFirst(peer);
       // peer_relay_stats (the rollup peerRanking reads instead of aggregating
       // this table on every request) is updated by a database trigger on this
       // insert, in this same transaction - see db.js. Nothing to do here.
@@ -181,8 +196,11 @@ function recordRace({ blockHash, detectedAtMs, peers }) {
     }
     return raceId;
   });
-
-  return tx();
+  const credited = unclear ? [] : peers.filter(isNewFirst);
+  const raceId = tx();
+  if (raceId != null && credited.length === 1) lastCredit = { addr: credited[0].addr, lastBlock: credited[0].last_block };
+  lastFirstCount = firstCount;
+  return raceId;
 }
 
 async function backfillHeightAndPeerCounts(raceId, blockHash) {
@@ -291,7 +309,8 @@ async function catchUpAttribution() {
  */
 function timeTemplate(detectedAtMs) {
   return rpc
-    .timeCall('getblocktemplate', [{ rules: ['segwit'] }], { timeoutMs: 30000, count: '"txid"' })
+    // Signet's own rule too: Core refuses a signet template without it.
+    .timeCall('getblocktemplate', [{ rules: config.bitcoin.network === 'signet' ? ['segwit', 'signet'] : ['segwit'] }], { timeoutMs: 30000, count: '"txid"' })
     // How many transactions went into it: a pool spends time on every one, so
     // this is what makes one block's job slower than the next.
     .then(({ count }) => ({ ms: Date.now() - detectedAtMs, tx: count }))
@@ -451,7 +470,7 @@ async function handleHashBlock({ blockHash, detectedAtMs, t0 }) {
 
   let raceId;
   try {
-    raceId = recordRace({ blockHash, detectedAtMs, peers });
+    raceId = recordRace({ blockHash, detectedAtMs, peers, height: header && Number.isInteger(header.height) ? header.height : null });
   } catch (err) {
     // A SQLite write failing here (a lock held past busy_timeout, a full
     // disk) must not become an unhandled rejection and end the process - the
@@ -469,7 +488,7 @@ async function handleHashBlock({ blockHash, detectedAtMs, t0 }) {
     return;
   }
 
-  const firstCount = peers.filter((p) => isFirstPeer(p, detectedAtMs)).length;
+  const firstCount = lastFirstCount; // as recordRace counted, so the log says what was stored
   logger.info('block race recorded', {
     blockHash,
     eligible: peers.length,
@@ -488,7 +507,7 @@ async function handleHashBlock({ blockHash, detectedAtMs, t0 }) {
     }
   }
 
-  backfillHeightAndPeerCounts(raceId, blockHash);
+  if (!(header && Number.isInteger(header.height))) backfillHeightAndPeerCounts(raceId, blockHash);
   template.then((t) => {
     if (t == null) return;
     try {

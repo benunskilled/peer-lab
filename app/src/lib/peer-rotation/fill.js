@@ -37,7 +37,7 @@ const { addressKey, hostFromAddress, unreachableNetwork } = require('../address'
 const spread = require('./spread');
 const { pickedRegions } = require('./picks');
 const { bookEntries, usableNetworks, offeredNetworks, bannedMatcher, servesBlocks } = require('./addrbook');
-const { otherChainOf } = require('../queries/ranking-row');
+const { otherChainOf } = require('../peer-rules');
 
 const TRIAL_KEY = 'slot_fill_trial';
 // Candidates on trial at once. Each holds a slot while it runs, so never more
@@ -259,7 +259,7 @@ function disguised(session, peers) {
 }
 
 // A candidate that says it follows another chain - the service bits the
-// peer list marks as a fork (ranking-row.js otherChainOf), and not on our tip
+// peer list marks as a fork (peer-rules.js otherChainOf), and not on our tip
 // either: out at once, as a disguised one is (15.11.2026: a BLAKE2b-fork Knots
 // node held a slot three minutes for nothing).
 // Only with a height Core knows for it: before its first headers (-1, the
@@ -267,7 +267,7 @@ function disguised(session, peers) {
 function otherChain(session, chain) {
   if (!session || !(Number(session.synced_headers) >= 0)) return null;
   const names = Array.isArray(session.servicesnames) ? session.servicesnames.join(',') : '';
-  return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks));
+  return otherChainOf(names, Number(session.synced_headers), Number(chain.headers ?? chain.blocks), session.subver);
 }
 
 // The peer list's word on a peer (peers-service.js peerKinds: kind, fork),
@@ -682,6 +682,13 @@ function restart(chain, now = Date.now()) {
 // Take a candidate out at once, trial or not: the slot fill was switched off
 // while this pass was adding it.
 async function abandon(address, now = Date.now()) {
+  // Given the padlock while this pass was adding: a person's decision, it
+  // stands - as in settleOne (outside review, 26.11.2026).
+  const row = db.instance.prepare('SELECT kept FROM trusted_peer WHERE address = ?').get(address);
+  if (row && row.kept) {
+    dropTrial(address);
+    return;
+  }
   await peerSync.removeTrustedPeer(address);
   dropTrial(address);
   logger.info('slot fill: candidate taken out, switched off while adding', { address, at: now });

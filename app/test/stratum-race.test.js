@@ -12,6 +12,7 @@ process.env.DATA_DIR = tmpDir;
 process.env.LOG_LEVEL = 'error';
 
 const db = require('../src/lib/db');
+const { seedPools } = require('./helpers/pools');
 const race = require('../src/stratum-race');
 const toggle = require('../src/lib/stratum-race-toggle');
 
@@ -39,6 +40,7 @@ function observationsFor(hash) {
 
 test.before(() => {
   db.open();
+  seedPools(db);
 });
 
 test.beforeEach(async () => {
@@ -247,9 +249,8 @@ test('switching off abandons an open race instead of charging everyone a miss', 
   race.shutDownRace();
 
   assert.equal(race.openRaces.size, 0, 'the open race is gone');
-  const rows = observationsFor(prevhash(70));
-  assert.equal(rows.length, 1, 'only the pool that really reported has a row');
-  assert.ok(rows[0].latencyMs != null, 'and it is a real result, not a miss charged to the other pool');
+  // Not written: Core never vouched for its block (R-2711-10), and nobody is charged a miss.
+  assert.equal(observationsFor(prevhash(70)).length, 0);
 });
 
 test('shutting the process down abandons an open race instead of charging everyone a miss', async () => {
@@ -267,9 +268,7 @@ test('shutting the process down abandons an open race instead of charging everyo
   race.handleProcessShutdown();
 
   assert.equal(race.openRaces.size, 0, 'the open race is gone');
-  const rows = observationsFor(prevhash(71));
-  assert.equal(rows.length, 1, 'only the pool that really reported has a row');
-  assert.ok(rows[0].latencyMs != null, 'and B is not charged a miss for a restart it had no part in');
+  assert.equal(observationsFor(prevhash(71)).length, 0, 'no unverified win, and B is not charged a miss for a restart');
 });
 
 test('a race that really timed out still charges a miss', async () => {
@@ -375,17 +374,81 @@ test('a flood of made-up prevhashes cannot open unlimited races', async () => {
   // The client only lets a well-formed 64-hex prevhash through, so this is the
   // second guard, for hashes that are shaped right and still invented. Without
   // it each one is a stratum_race row, an open race and a timer.
-  const a = fakePool(1, 'A');
-  watchPools(a);
+  // One pool fills only its own two (R-2611-05: ten from one pool kept a real
+  // block out); many pools together stop at ten.
+  const pools = [1, 2, 3, 4, 5, 6].map((id) => fakePool(id, `P${id}`));
+  watchPools(...pools);
 
-  for (let i = 0; i < 40; i += 1) {
-    race.handleNotify(a, prevhash(1000 + i), hr());
-  }
-
+  for (let i = 0; i < 40; i += 1) race.handleNotify(pools[0], prevhash(1000 + i), hr());
+  assert.equal(race.openRaces.size, 2, 'one pool: two at once');
+  for (const p of pools.slice(1)) for (let i = 0; i < 40; i += 1) race.handleNotify(p, prevhash(2000 + p.id * 100 + i), hr());
   assert.equal(race.openRaces.size, 10, 'the cap holds');
   await race.finalizeAllRaces();
   const opened = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_race').get().n;
   assert.equal(opened, 10, 'and nothing past it reached the database');
+});
+
+test('a real block still opens its race while one pool floods made-up ones', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  for (let i = 0; i < 40; i += 1) race.handleNotify(a, prevhash(3000 + i), hr());
+  const t0 = hr();
+  race.handleNotify(b, prevhash(3999), t0);
+  race.handleNotify(a, prevhash(3999), t0 + 5_000_000n);
+  assert.ok(race.openRaces.has(prevhash(3999)));
+  await race.finalizeRace(prevhash(3999));
+  assert.deepEqual(observationsFor(prevhash(3999)).map((r) => [r.poolId, r.rank]), [[1, 2], [2, 1]]);
+});
+
+test('a pool excused at reconnect is not timed on a later copy of the same job', async () => {
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  const t0 = hr();
+  race.handleNotify(a, prevhash(3100), t0);
+  race.handleNotify(b, prevhash(3100), t0 + 1_000_000n, Date.now(), true); // B reconnected mid-race
+  race.handleNotify(b, prevhash(3100), t0 + 900_000_000n); // a template refresh
+  await race.finalizeRace(prevhash(3100));
+  assert.deepEqual(observationsFor(prevhash(3100)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+});
+
+test('a pool removed while its race is open: the others move up, timed from the first still there', async () => {
+  const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  watchPools(a, b, c);
+  const t0 = hr();
+  const t0Ms = Date.now();
+  race.handleNotify(a, prevhash(3200), t0, t0Ms);
+  race.handleNotify(b, prevhash(3200), t0 + 20_000_000n, t0Ms + 20);
+  race.handleNotify(c, prevhash(3200), t0 + 50_000_000n, t0Ms + 50);
+  const saved = db.instance.prepare('SELECT * FROM stratum_pool WHERE id = 1').get();
+  db.instance.prepare('DELETE FROM stratum_observation WHERE pool_id = 1').run();
+  db.instance.prepare('DELETE FROM stratum_pool WHERE id = 1').run();
+  try {
+    await race.finalizeRace(prevhash(3200));
+    assert.deepEqual(observationsFor(prevhash(3200)).map((r) => [r.poolId, Math.round(r.latencyMs), r.rank]), [[2, 0, 1], [3, 30, 2]]);
+    const startedAt = db.instance.prepare('SELECT created_at AS t FROM stratum_race WHERE prevhash = ?').get(prevhash(3200)).t;
+    assert.equal(startedAt, t0Ms + 20, 'the race starts at the first still there');
+  } finally {
+    const cols = Object.keys(saved);
+    db.instance.prepare(`INSERT INTO stratum_pool (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map((k) => saved[k]));
+  }
+});
+
+test('a pool unticked (kept) while its race is open: out of the race, no miss, the others move up', async () => {
+  const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  watchPools(a, b, c);
+  const t0 = hr();
+  const t0Ms = Date.now();
+  race.handleNotify(a, prevhash(3250), t0, t0Ms);
+  race.handleNotify(b, prevhash(3250), t0 + 20_000_000n, t0Ms + 20);
+  db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE id = 1').run();
+  try {
+    await race.finalizeRace(prevhash(3250));
+    const rows = observationsFor(prevhash(3250)).map((r) => [r.poolId, r.latencyMs == null ? null : Math.round(r.latencyMs), r.rank]);
+    assert.ok(!rows.some((r) => r[0] === 1), 'nothing for the unticked pool, not even a miss');
+    assert.deepEqual(rows.find((r) => r[0] === 2), [2, 0, 1]);
+  } finally {
+    db.instance.prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1 WHERE id = 1').run();
+  }
 });
 
 // An outside review held another connection's write lock for one second while
@@ -419,13 +482,13 @@ test('an open race writes nothing, so a locked database cannot delay a timestamp
 
 // Switching the race off mid-race charges nobody a miss, but what really did
 // report is kept - it was measured on a connection that was listening.
-test('an abandoned race keeps its reports and records no misses', async () => {
+test('an abandoned race is not written: no unverified win, no misses', async () => {
   const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
   watchPools(a, b);
   race.handleNotify(a, prevhash(78), hr());
   race.abandonOpenRaces();
   const rows = observationsFor(prevhash(78));
-  assert.deepEqual(rows.map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+  assert.deepEqual(rows, []);
 });
 
 test('the same prevhash in another spelling joins the race instead of opening a second one', async () => {
@@ -502,18 +565,32 @@ test('a pool added while a race waits for Core is not charged for it', async (t)
   assert.deepEqual(observationsFor(prevhash(95)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]]);
 });
 
-test('a race waiting for Core is written without misses when the worker stops', async (t) => {
+test('a race still waiting for Core is dropped when the worker stops', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
   watchPools(a, b);
-  race.setVerifier(async () => false);
+  race.setVerifier(async () => null); // Core could not be asked
 
   race.handleNotify(a, prevhash(96), hr());
   await race.finalizeRace(prevhash(96));
   assert.equal(race.pendingRaces.size, 1);
   race.abandonOpenRaces();
   assert.equal(race.pendingRaces.size, 0);
-  assert.deepEqual(observationsFor(prevhash(96)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+  assert.deepEqual(observationsFor(prevhash(96)), []);
+});
+
+test('a race Core said it does not know is not written when the worker stops', async (t) => {
+  // R-2611-05: a made-up hash, pending its second check, won a race on stop.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
+  watchPools(a, b);
+  race.setVerifier(async () => false);
+
+  race.handleNotify(a, prevhash(97), hr());
+  await race.finalizeRace(prevhash(97));
+  assert.equal(race.pendingRaces.size, 1);
+  race.abandonOpenRaces();
+  assert.deepEqual(observationsFor(prevhash(97)), []);
 });
 
 test('races waiting for Core stop at a limit, so made-up prevhashes cannot pile up', async (t) => {
@@ -623,4 +700,19 @@ test('a pool with no connection during the race is not charged a miss', async ()
   race.handleNotify(pools[0], prevhash(198), hr(), at);
   await race.finalizeRace(prevhash(198));
   assert.deepEqual(observationsFor(prevhash(198)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B connected and silent; C down, D came up late');
+});
+
+// The case behind two false misses of an owner's ckpool (25.11.2026): the
+// socket stood before the block, but the pool had not authorised us yet and
+// sent its first job only afterwards. Connected is not enough - it has to
+// have been working.
+test('a pool still authorising us when the block came is not charged a miss', async () => {
+  const at = Date.now();
+  const pools = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  race.active.clear();
+  const ready = { 1: at - 60_000, 2: at - 30_000, 3: null };
+  for (const p of pools) race.active.set(p.id, { conn: { stop() {}, connectedSince: at - 60_000, readySince: ready[p.id] }, pool: p });
+  race.handleNotify(pools[0], prevhash(199), hr(), at);
+  await race.finalizeRace(prevhash(199));
+  assert.deepEqual(observationsFor(prevhash(199)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]], 'B worked and stayed silent; C had no job yet');
 });

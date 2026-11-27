@@ -58,7 +58,7 @@
   // The mix under a heading counts what is in the table - and each count is
   // the way to those peers. Clicking "5 Pool node" shows exactly those five,
   // here and on the map; clicking it again puts everyone back.
-  const KIND_ORDER = ["Nodes", "Wallets", "Watchers", "Disguised", "No user agent", "Other"];
+  const KIND_ORDER = ["Nodes", "Wallets", "Watchers", "Disguised", "No name", "Other"];
   function renderKindMix(el, peers) {
     const n = new Map();
     // Altcoins are in the "other chain" chip beside these, not a group of their own.
@@ -215,7 +215,7 @@
   const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
     : p.region || (p.cc ? regionName(p.cc) : netLabel(p.network));
   const neverNote = (p) => !p.no_relay ? ""
-    : p.fork ? "On a chain of its own, not yours - it can never deliver one of your blocks first."
+    : p.fork ? "Probably on a chain of its own, not yours - then it cannot deliver one of your blocks first."
     : p.no_services ? "Offers no services, so your node never asks it for blocks - it will not deliver one first."
     : "Software that does not pass blocks on - this peer can never deliver one first.";
   const line = (cls, text) => {
@@ -225,6 +225,22 @@
     return e;
   };
 
+  // An inbound peer is counted over every port its IP came in from (byIp,
+  // the dashboard's peer()): it comes back from a new one almost every time.
+  const firstTitle = (r) => `First for ${r.first} of the ${r.eligible} blocks ` +
+    (r.byIp ? "this IP was connected for, over all its incoming connections." : "it was connected for.");
+  // How often a peer was first, on a phone card under its pill (22.11.2026):
+  // "82× first", which needs no key - a bar against the best peer did.
+  // Nothing for a peer never first.
+  function firstCount(p) {
+    const r = rankOf(p);
+    if (!r || !r.first) return null;
+    const e = document.createElement("span");
+    e.className = "kind-first";
+    e.textContent = r.first.toLocaleString("en-US") + "\u00d7 first";
+    e.title = firstTitle(r);
+    return e;
+  }
   const COLS = [
     {
       // Where it is on top, the country and the address under it. Sorted by
@@ -260,7 +276,7 @@
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
-          : deliveredEver.has(p.addr) ? "Has delivered a block first" : "";
+          : hasDelivered(p) ? "Has delivered a block first" : "";
         // Behind a proxy the address is the proxy's: said in words instead.
         const shownAddr = HIDDEN[p.network] ? HIDDEN[p.network].via : p.addr;
         fit(sub, shownAddr, got);
@@ -326,9 +342,9 @@
           // often the peer was first, then ping and time connected. Shown by
           // the card's width; all of it is in the opened row at any width.
           const r = rankOf(p);
-          const n = span("pc-x pc-first", r && r.eligible ? r.first + "/" + r.eligible : "\u2013");
+          const n = span("pc-x pc-first", r && r.eligible ? r.first + " of " + r.eligible : "\u2013");
           const s = span("pc-x pc-sub", "first/blocks");
-          if (r && r.eligible) n.title = s.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+          if (r && r.eligible) n.title = s.title = firstTitle(r);
           pc.append(n, s);
           pc.append(span("pc-y pc-ping", p.min_ping_ms == null ? "\u2013" : fmtPing(p.min_ping_ms)),
             span("pc-y pc-sub", p.offline ? "offline" : p.conntime ? ago(Date.now() / 1000 - p.conntime) : ""));
@@ -405,6 +421,9 @@
           pill.append(ico, " ");
         }
         pill.append(label);
+        // On a phone card, where First/Blocks has no column: how often, under the pill.
+        const count = firstCount(p);
+        if (count) head.append(count);
         fit(pill, label, [testing ? TRIAL_TITLE : "", p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
@@ -458,13 +477,17 @@
       },
     },
     {
-      key: "ping", label: "Ping", cls: "num", val: (p) => (p.min_ping_ms == null ? Infinity : p.min_ping_ms),
+      key: "ping", label: "Ping", cls: "num",
+      // The lowest Core measured on this connection, the line's own delay: what it is now can be far
+      // higher while the peer is busy (21.11.2026: a syncing peer showed 15 s here, 253 s right now).
+      title: "The lowest ping Core has measured on this connection",
+      val: (p) => (p.min_ping_ms == null ? Infinity : p.min_ping_ms),
       cell: (td, p) => {
         if (p.min_ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
         td.textContent = fmtPing(p.min_ping_ms);
       },
     },
-    { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => (p.offline ? "offline" + (p.offline_ms ? " " + ago(p.offline_ms / 1000) : "") : ago(Date.now() / 1000 - p.conntime)) },
+    { key: "conntime", label: "Connected", cls: "num", shownReversed: true, val: (p) => p.conntime, show: (p) => (p.offline ? "offline" + (p.offline_ms ? " " + ago(p.offline_ms / 1000) : "") : ago(Date.now() / 1000 - p.conntime)) },
   ];
   // How often a peer was first: "43/1693", blocks delivered first out of the
   // blocks it was connected for, counted for as long as it has been known. The
@@ -474,14 +497,20 @@
   const FIRST_TITLE = "Blocks this peer delivered first, out of the blocks it was connected for. The list is ordered by it.";
   const FIRST_COL = {
     key: "first", label: "First/Blocks", cls: "num", title: FIRST_TITLE,
+    // Sorted by the negated count: the smallest value is the most blocks first.
+    shownReversed: true,
     val: (p) => { const r = rankOf(p); return r && r.eligible ? -(r.first * 1e7) + r.eligible : Infinity; },
     cell: (td, p) => {
       const r = rankOf(p);
       if (!r || !r.eligible) { td.textContent = "\u2013"; td.classList.add("dim"); return; }
+      // "46 of 100" (21.11.2026: "46/100" had to be known to be read).
       const b = document.createElement("b");
-      b.textContent = r.first + "/" + r.eligible;
-      td.append(b);
-      td.title = `First for ${r.first} of the ${r.eligible} blocks it was connected for.`;
+      b.textContent = r.first;
+      const of = document.createElement("span");
+      of.className = "first-of";
+      of.textContent = " of " + r.eligible;
+      td.append(b, of);
+      td.title = firstTitle(r);
     },
   };
   COLS.splice(COLS.findIndex((c) => c.key === "ping"), 0, FIRST_COL);

@@ -1,5 +1,7 @@
 'use strict';
 
+const net = require('net');
+
 /**
  * Dashboard - HTTP API + static frontend. Read-only status/ranking data
  * comes straight from SQLite (written by the other three processes);
@@ -23,10 +25,12 @@ const config = require('./lib/config');
 const db = require('./lib/db');
 const rpc = require('./lib/rpc');
 const queries = require('./lib/queries');
+const stratumLive = require('./lib/stratum-live');
 const peerSync = require('./lib/peer-sync');
 const peersService = require('./lib/peers-service');
 const { proxyPeers } = require('./lib/peers-proxy');
 const localPools = require('./lib/local-pools');
+const poolCatalog = require('./lib/pool-catalog');
 const health = require('./lib/health');
 const processGuard = require('./lib/process-guard');
 const hashblock = require('./lib/hashblock-subscriber');
@@ -135,8 +139,16 @@ function sendBody(res, status, headers, body) {
   res.end(out);
 }
 
-// How many pools Stratum Race may hold, the default nine included.
+// How many pools may race at once: each one is a socket held open and a row
+// per block. Paused pools (enabled 0) and unticked ones (chosen 0, see the
+// list below) keep their rows and their history, and do not count;
+// the rows themselves are bounded too, at the public list plus this many.
 const MAX_POOLS = 20;
+const MAX_POOL_ROWS = poolCatalog.size + MAX_POOLS;
+const enabledPools = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE enabled = 1').get().n;
+// Rows in the table: a removed or unticked one (chosen 0) is only kept for its
+// numbers and goes with them, so it takes no place here - Remove frees one.
+const poolRows = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE chosen = 1').get().n;
 
 function sendJson(res, status, data) {
   sendBody(res, status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(data));
@@ -329,8 +341,8 @@ const sseClients = new Set();
 // false and a value that is unknown are left out: the page reads both as no.
 const PAGE_FIELDS = ['address', 'where', 'client', 'status', 'live', 'trusted', 'kept',
   'first', 'eligible', 'sessionsCount', 'offlineSinceMs', 'hb', 'hbFrom',
-  'localUmbrelPeer', 'sourceObscured', 'privateNetwork', 'offersNothing', 'otherChain',
-  'kind', 'noRelay', 'lion', 'fork'];
+  'localUmbrelPeer', 'sourceObscured', 'privateNetwork', 'offersNothing', 'otherChain', 'cannotRelay', 'misspelt',
+  'kind', 'noRelay', 'lion', 'fork', 'ipFirst', 'ipEligible'];
 function forThePage(row) {
   const out = {};
   for (const k of PAGE_FIELDS) {
@@ -369,6 +381,7 @@ const MAX_SSE_CLIENTS = 32;
 // current block is replayed on connect, and the page only plays the wave for
 // a block it had not seen. Overridable only so the tests need not wait.
 const SSE_MAX_AGE_MS = Number(process.env.SSE_MAX_AGE_MS) || 10 * 60 * 1000;
+const SSE_MAX_QUEUED_BYTES = 1024 * 1024;
 // The pool a block was mined by arrives a moment after the race itself (the
 // relay profiler reads the coinbase once the race is written), so the same
 // race is worth sending twice: once when it lands, once when it has a name.
@@ -380,6 +393,13 @@ function sseBroadcast(event, payload) {
   const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const res of sseClients) {
     try {
+      // A page that stopped reading (a tab asleep, a stalled proxy) would
+      // have everything queued for it in memory: past a megabyte it is cut.
+      if (res.writableLength > SSE_MAX_QUEUED_BYTES) {
+        sseClients.delete(res);
+        res.destroy();
+        continue;
+      }
       res.write(frame);
     } catch {
       sseClients.delete(res);
@@ -400,6 +420,46 @@ function broadcastLatestBlock() {
   if (key === lastBroadcastKey) return;
   lastBroadcastKey = key;
   sseBroadcast('block', race);
+  // The race may have started before Core had the block: now that the block
+  // is here, the live race can say where Core stood against it.
+  broadcastLiveStratum();
+}
+
+// The Stratum race while it is still open (lib/stratum-live.js): the race
+// worker leaves the pools that have reported so far in a file, this passes
+// them on. Laid next to the newest block, when it is the same one, for the
+// moment Core announced it.
+let lastLiveKey = null;
+function liveStratumPayload() {
+  const snap = stratumLive.read();
+  if (!snap) return null;
+  let detectedAt = null;
+  try {
+    const race = queries.latestBlock();
+    if (race && race.blockHash) {
+      const page = stratumLive.forPage(snap, null);
+      if (page && page.hashes.includes(String(race.blockHash).toLowerCase())) detectedAt = race.detectedAt;
+    }
+  } catch (err) {
+    logger.debug('could not read the latest block for the live race', { error: err.message });
+  }
+  return stratumLive.forPage(snap, detectedAt);
+}
+
+// The worker replaces the file after every pool that reports. A stat five
+// times a second, of one small file - the only way that sees a write from
+// another container reliably (fs.watch does not on every volume driver).
+function watchLiveStratum() {
+  fs.watchFile(stratumLive.FILE, { interval: 200, persistent: false }, () => broadcastLiveStratum());
+}
+
+function broadcastLiveStratum() {
+  const payload = liveStratumPayload();
+  if (!payload) return;
+  const key = JSON.stringify(payload);
+  if (key === lastLiveKey) return;
+  lastLiveKey = key;
+  sseBroadcast('stratum', payload);
 }
 
 function handleEventStream(req, res) {
@@ -431,6 +491,8 @@ function handleEventStream(req, res) {
   try {
     const race = queries.latestBlock();
     if (race) res.write(`event: block\ndata: ${JSON.stringify(race)}\n\n`);
+    const live = liveStratumPayload();
+    if (live) res.write(`event: stratum\ndata: ${JSON.stringify(live)}\n\n`);
   } catch (err) {
     logger.debug('initial block event failed', { error: err.message });
   }
@@ -452,7 +514,9 @@ function handleEventStream(req, res) {
 
   const maxAge = setTimeout(() => {
     cleanup();
-    try { res.end(); } catch { /* client already gone */ }
+    // Ended politely when it has read everything; one with data still queued
+    // would hold its socket until that drained, which may be never.
+    try { if (res.writableLength > 0) res.destroy(); else res.end(); } catch { /* client already gone */ }
   }, SSE_MAX_AGE_MS);
   maxAge.unref?.();
 
@@ -948,8 +1012,56 @@ const routes = {
   },
 
   'GET /api/pools/local': async (req, res, url) => {
-    const configured = db.instance.prepare('SELECT host, port FROM stratum_pool').all();
+    // A removed one (chosen 0) can be added again from its button.
+    const configured = db.instance.prepare('SELECT host, port FROM stratum_pool WHERE chosen = 1').all();
     return sendJson(res, 200, await localPools.list(configured));
+  },
+
+  // The public pools to pick from, each with its tick.
+  'GET /api/pools/catalog': async (req, res, url) => {
+    const rows = db.instance.prepare('SELECT id, host, port, enabled, chosen FROM stratum_pool').all();
+    return sendJson(res, 200, { checked: poolCatalog.checked, max: MAX_POOLS, racing: enabledPools(), pools: poolCatalog.withRows(rows) });
+  },
+
+  // A tick in that list: { host, port, enabled }. Only a pool on the list;
+  // its name comes from the list. A tick adds it, an untick takes it out of
+  // the race and the table but keeps its numbers: chosen 0, so a tick
+  // later brings them back (27.11.2026; until then an untick deleted them,
+  // and before 26.11. it paused). About 3 MB a pool a year, pruned with the
+  // races after a year. Pausing is the table's own switch, and a paused pool
+  // stays ticked. Remove in the table keeps them too; "Reset pool history" deletes.
+  'POST /api/pools/catalog': async (req, res, url) => {
+    const body = await readBody(req);
+    const entry = poolCatalog.find(body.host, body.port);
+    if (!entry) return sendJson(res, 400, { ok: false, error: 'not a pool on the list' });
+    if (typeof body.enabled !== 'boolean') return sendJson(res, 400, { ok: false, error: 'enabled must be true or false' });
+    // Case-insensitively, and the chosen one first: a 1.0 database may hold the
+    // same address twice in two spellings (R-2711-10).
+    const row = db.instance.prepare('SELECT id, enabled, chosen FROM stratum_pool WHERE lower(host) = lower(?) AND port = ? ORDER BY chosen DESC, id').get(entry.host, entry.port);
+    const back = row && !row.chosen;
+    if (body.enabled && (!row || back) && enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - untick one first` });
+    }
+    try {
+      if (!body.enabled) {
+        if (row) db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE lower(host) = lower(?) AND port = ?').run(entry.host, entry.port);
+      } else if (back) {
+        // Back in the table takes a place there, like a new one.
+        if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
+        // Under the list's name of today, should it have changed since.
+        db.instance.prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1, label = ? WHERE id = ?').run(entry.name, row.id);
+      } else if (!row) {
+        if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
+        db.instance
+          .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 1, ?)`)
+          .run(entry.name, entry.host, entry.port, Date.now());
+      }
+      // Ticked and already there (running or paused): nothing to do.
+    } catch (err) {
+      logger.error('changing a listed pool failed', { error: err.message });
+      return sendJson(res, 500, { ok: false, error: 'internal error' });
+    }
+    return sendJson(res, 200, { ok: true, enabled: body.enabled, racing: enabledPools() });
   },
 
   'GET /api/pools': async (req, res, url) => {
@@ -966,14 +1078,42 @@ const routes = {
     const parsed = validatePool(body);
     if (!parsed.ok) return sendJson(res, 400, { error: parsed.error });
     // Every pool is a socket held open and a row per block; without a limit
-    // the form could open them until the app ran out of either.
-    if (db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n >= MAX_POOLS) {
-      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools` });
+    // the form could open them until the app ran out of either. Checked before
+    // anything else, the name lookup included: a name that cannot be added is
+    // not sent to a resolver either (R-2711-10).
+    if (enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - pause one first` });
     }
+    const { label, host, port } = parsed.value;
     try {
+      // The address in any spelling, the chosen one first (a 1.0 database may
+      // hold it twice, R-2711-10). In the table already: said so. Removed or
+      // unticked before: back in the race, numbers and all - exactly that one
+      // row. Added by hand now, so the owner's own under the name typed, unless
+      // it is a pool on the list, whose past races must not turn into "Your pool".
+      const row = db.instance.prepare('SELECT id, chosen FROM stratum_pool WHERE lower(host) = lower(?) AND port = ? ORDER BY chosen DESC, id').get(host, port);
+      if (row && row.chosen) return sendJson(res, 409, { ok: false, error: 'a pool with this host and port already exists' });
+      if (poolRows() >= MAX_POOL_ROWS) {
+        return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
+      }
+      if (row) {
+        const own = poolCatalog.find(host, port) ? 'is_default' : '0';
+        db.instance.prepare(`UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = ${own}, label = ? WHERE id = ?`).run(label, row.id);
+        return sendJson(res, 200, { ok: true });
+      }
+      // A host that does not exist would only ever show dashes, with nothing to
+      // say why (21.11.2026: "qa-unreachable.invalid" was taken). An IP is
+      // taken as it is: whether a pool answers there is the race's to show.
+      if (!net.isIP(host)) {
+        try {
+          await require('dns').promises.lookup(host);
+        } catch {
+          return sendJson(res, 400, { error: `${host} is not a name that exists` });
+        }
+      }
       db.instance
         .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 0, ?)`)
-        .run(parsed.value.label, parsed.value.host, parsed.value.port, Date.now());
+        .run(label, host, port, Date.now());
       return sendJson(res, 200, { ok: true });
     } catch (err) {
       // Only UNIQUE(host, port) means a duplicate. A full disk or a locked
@@ -1013,14 +1153,17 @@ const routes = {
 
 };
 
-// /api/pools/<id>: switch a pool on or off, or delete it.
+// /api/pools/<id>: switch a pool on or off, or take it out of the table.
+// Remove keeps its numbers like an untick in the list (chosen 0): adding or
+// ticking it again brings them back. Deleting is "Reset pool history" under
+// Data, on purpose (27.11.2026).
 async function poolRoute(req, res, id) {
   if (req.method === 'DELETE') {
     let removed;
     try {
-      removed = queries.deletePool(id);
+      removed = db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE id = ? AND chosen = 1').run(id).changes;
     } catch (err) {
-      logger.error('deleting a pool failed', { id, error: err.message });
+      logger.error('removing a pool failed', { id, error: err.message });
       return sendJson(res, 500, { ok: false, error: 'internal error' });
     }
     if (!removed) return sendJson(res, 404, { ok: false, error: 'no such pool' });
@@ -1032,8 +1175,15 @@ async function poolRoute(req, res, id) {
   if (typeof body.enabled !== 'boolean') {
     return sendJson(res, 400, { error: 'enabled must be true or false' });
   }
+  if (body.enabled) {
+    const row = db.instance.prepare('SELECT enabled FROM stratum_pool WHERE id = ? AND chosen = 1').get(id);
+    if (row && !row.enabled && enabledPools() >= MAX_POOLS) {
+      return sendJson(res, 409, { error: `at most ${MAX_POOLS} pools race at once - pause one first` });
+    }
+  }
+  // Not an unticked one (chosen 0): that is the list's to bring back.
   const updated = db.instance
-    .prepare(`UPDATE stratum_pool SET enabled = ? WHERE id = ?`)
+    .prepare(`UPDATE stratum_pool SET enabled = ? WHERE id = ? AND chosen = 1`)
     .run(body.enabled ? 1 : 0, id);
   if (updated.changes === 0) return sendJson(res, 404, { error: `no pool with id ${id}` });
   return sendJson(res, 200, { ok: true, enabled: body.enabled });
@@ -1120,6 +1270,7 @@ function main() {
       }
       sseClients.clear(); // so a late broadcast cannot write to an ended stream
       server.close();
+      fs.unwatchFile(stratumLive.FILE);
     },
   });
 
@@ -1145,6 +1296,8 @@ function main() {
   safetyTimer = setInterval(() => broadcastLatestBlock(), 20_000);
   safetyTimer.unref?.();
 
+  watchLiveStratum();
+
   server.on('error', (err) => {
     // Previously an EADDRINUSE surfaced as a bare stack trace with no
     // indication of which port or why.
@@ -1159,4 +1312,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { server, main, acceptsGzip, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };
+module.exports = { server, main, acceptsGzip, watchLiveStratum, setWriteSourceForTest: (check) => { writeAllowedFrom = check; } };

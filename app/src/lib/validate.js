@@ -42,7 +42,9 @@ function validatePool({ label, host, port }) {
   if (cleanLabel.length > 64) return { ok: false, error: 'label must be 64 characters or fewer' };
   if (!isValidHost(host)) return { ok: false, error: 'host must be a valid hostname or IP address' };
   if (!isValidPort(port)) return { ok: false, error: 'port must be a whole number between 1 and 65535' };
-  return { ok: true, value: { label: cleanLabel, host: String(host).trim(), port: Number(port) } };
+  // Lower case: names are the same in any case, and the table's UNIQUE(host,
+  // port) is not - "Pool.Example" got a second row next to the listed one.
+  return { ok: true, value: { label: cleanLabel, host: String(host).trim().toLowerCase(), port: Number(port) } };
 }
 
 module.exports = { isValidPort, isValidHost, validatePool };

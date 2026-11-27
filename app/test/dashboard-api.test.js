@@ -26,6 +26,12 @@ const { server } = require('../src/dashboard-server');
 let baseUrl;
 
 test.before(async () => {
+  // No network in the tests: names resolve unless they end in .invalid
+  // (RFC 6761), which never does - as the pool form and the probe now check.
+  require('dns').promises.lookup = async (host) => {
+    if (/\.invalid$/i.test(host)) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+    return { address: '192.0.2.1', family: 4 };
+  };
   db.open();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -97,6 +103,12 @@ test('POST /api/pools answers 409 only for a duplicate, 500 for any other databa
   } finally {
     db.instance.pragma('query_only = OFF');
   }
+});
+
+test('POST /api/pools refuses a host name that does not exist', async () => {
+  const res = await fetch(`${baseUrl}/api/pools`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: 'Typo', host: 'pool.typo.invalid', port: 3333 }) });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /not a name that exists/);
 });
 
 test('POST /api/pools stops at twenty pools', async () => {
@@ -268,8 +280,21 @@ test('POST /api/peers/probe answers without touching anything', async () => {
     body: JSON.stringify({ host: 'not a host at all !!' }),
   });
   assert.equal(status, 422, 'unreachable is an answer, not a server error');
-  assert.match(body.error, /invalid host/i);
+  assert.match(body.error, /not a valid address/i);
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM trusted_peer').get().n, before, 'probing is never an action');
+});
+
+// A typo is said as one: an IP with a number out of range, or a name that
+// does not exist, used to come back as "no node answering" (21.11.2026).
+test('POST /api/peers/probe calls an impossible IP or an unknown name invalid, not unreachable', async (t) => {
+  // A name is looked up only on a node that reaches peers directly: through
+  // Tor, the lookup would tell the local resolver (review 26.11.2026).
+  t.mock.method(require('../src/lib/rpc'), 'getNetworkInfo', async () => ({ networks: [{ name: 'ipv4', limited: false, reachable: true, proxy: '' }, { name: 'ipv6', limited: false, reachable: true, proxy: '' }] }));
+  for (const [host, want] of [['999.1.1.1', /not a valid IP address/], ['no-such-peer.invalid', /not a name that exists/]]) {
+    const { status, body } = await api('/api/peers/probe', { method: 'POST', body: JSON.stringify({ host }) });
+    assert.equal(status, 422);
+    assert.match(body.error, want);
+  }
 });
 
 test('a malformed body is the callers mistake, not a 500', async () => {

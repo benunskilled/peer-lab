@@ -1,0 +1,1493 @@
+{
+  "note": "Written by peers/peer_rules_test.go (UPDATE_PEER_RULES=1 go test -run TestPeerRulesFile) from peers/clients.go and peers/forks.go. Do not edit.",
+  "emptyName": "^/*$|^/:[^/]*/$",
+  "bracketed": "\\([^)]*\\)",
+  "mempoolWord": "mempool",
+  "mempoolWordFlags": "i",
+  "kinds": [
+    {
+      "kind": "Disguised",
+      "pattern": "^/Sat0shi:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Disguised",
+      "pattern": "^/Satoshi[0-9X]+:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Disguised",
+      "pattern": "^Satoshi:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Disguised",
+      "pattern": "^/Satoshi:[^/]*$",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "ckpool",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/ckp2p:",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/CKCoinD:",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "\\([^)]*pool[^)]*\\)",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/P2Pool:",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/[^:/(]*pool[^:/(]*:",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/miningcore-btc-solo:",
+      "flags": "i",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/boo:",
+      "flags": "",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (Knots)",
+      "pattern": "^/GrayersDad:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Pool node",
+      "pattern": "^/node-stratum/",
+      "flags": "",
+      "reads": "no-mempool",
+      "relays": true
+    },
+    {
+      "kind": "Node (BitcoinRocks)",
+      "pattern": "^/BitcoinRocks:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/EMPORION:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/wuji-headers:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/pcoc-bari:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/SYMMARTYS:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/bitcoin-peers:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/logos-peer-list:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/bip110-observer:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (Ghost)",
+      "pattern": "^/Ghost:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/satd:[^/(]*\\(crawler",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/blueberry:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/winnow:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/BitcoinKit:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/WalletKit:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Ladybug:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^Yuki /",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/VerifiedX:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^libbtc ",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/haskoin-btc:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/btcwire:[^/]*/bitfyn:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/twotbit:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/bitc:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^MagicalBitcoinWallet$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^Wallet v0\\.1$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/BitcoinSPV:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/Notoshi/$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/pyspv:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/chainhorn:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/Murmel:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/enginecore:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/BitcoinWallet:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/rust-spv:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/BitcoinSwift:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Aurum:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Floptoshi:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/BTokenCore:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/Bitflash:btc-light/",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/pynode:([1-9]|0\\.[1-9]|0\\.0\\.([02-9]|1[0-9]))",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/dexcash-nodes:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/btcwire:[^/]*/Satoshi:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "^/symphony:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/bip324-probe:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/p2p-observer:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/p2p-extractor:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "^NBXplorer-",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/bitcoin-s:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^Stacks/",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/nakamoto:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/connector/$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/nodes\\.mom\\.market:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/btcwire:[^/]*/bitcoinstats\\.com:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^StratisNode:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/open-nodes:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/btz:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^fluxture$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/buidl-bootcamp/",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/topology-probe:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/Coinscope-GH:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/JBS:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/BitcoinUnlimited:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Bitcoin Interest:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Bitcoin Clashic",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/Classic:(0\\.|1\\.[0-2]([./]|$))",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/Classic:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "Bitcoin ABC",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "BUCash",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "Bitcoin SV",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "BCH ?Unlimited",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "Bitcoin XT",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "OracleKnots:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "UASF-BIP110:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "\\(EB[0-9]",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "SuperBitcoin",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "iriumd",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "vds[_ ]",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "/Purity:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Other chain",
+      "pattern": "^/Satoshi-BTF\\(",
+      "flags": "i",
+      "reads": "whole",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^.*kit\\.edu",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "dsn\\.tm",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "dsn\\.kastel",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "\\.ac\\.",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "uni-",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/rske-research:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/acsrg-research:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "^/dataforge-observer:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Research scanner",
+      "pattern": "/UU-Network-Research:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "/PeerMonitor:",
+      "flags": "",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "bitnodes",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "bluematt-tokio-client",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "metrika",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "nodemap",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "crawl",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "scan",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "seeder",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "census",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "monitor",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "observatory",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "sonar",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "scout",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "nebula",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "watch",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "listener",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "argus",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "readonly",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "bitdash",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "logosnaut",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "dnsseed",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "survey",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "lionseed",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "gnoban",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/p2p-probe:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/probe:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/BTC-Nodes:[^/]*/Probe/",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "^/btc-peers:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Crawler",
+      "pattern": "/HTTPSeed:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "electrs",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "electrum",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "esplora",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Indexer",
+      "pattern": "/mempool",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "bitcoinj",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "breadwallet",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "/bread:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "bither",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "multibit",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "wasabi",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "Bitcoin Wallet",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "/hodlwallet:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "/spvwallet:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Wallet",
+      "pattern": "^/btcwire:[^/]*/(CaribouSPV|BisonSPV):",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Lightning wallet",
+      "pattern": "/neutrino:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Lightning wallet",
+      "pattern": "/lit:v",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Lightning wallet",
+      "pattern": "^/btcwire:[^/]*/zap-(desktop|ios):",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "BIP-157",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/bip157-fetch:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "kyoto",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "^/pycoinnet/$",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Other light client",
+      "pattern": "/bitcoin-net:",
+      "flags": "i",
+      "reads": "bare",
+      "relays": false
+    },
+    {
+      "kind": "Node (Floresta)",
+      "pattern": "floresta",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (btcd)",
+      "pattern": "btcd:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (libbitcoin)",
+      "pattern": "libbitcoin",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (bcoin)",
+      "pattern": "/bcoin:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (Gocoin)",
+      "pattern": "gocoin",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|bitcoinpr|btclib|Bitcoin Commons|bitcoin-spec-node|Forseti|SwiftBitcoin|BitcoinWolfe|Subcoin|rust_bitcoin_node|bitcoin-ruby|Prometheus|bridge|exnode|therealbitcoin\\.org|Natasha):",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (other)",
+      "pattern": "/utreexod:",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (Knots)",
+      "pattern": "Knots",
+      "flags": "i",
+      "reads": "whole",
+      "relays": true
+    },
+    {
+      "kind": "Node (Core)",
+      "pattern": "^/Satoshi:",
+      "flags": "",
+      "reads": "whole",
+      "relays": true
+    }
+  ],
+  "forkKinds": [
+    "Other",
+    "Node (Knots)",
+    "Node (BitcoinRocks)",
+    "Node (Ghost)",
+    "Node (other)",
+    "Node (Floresta)",
+    "Node (btcd)",
+    "Node (libbitcoin)",
+    "Node (bcoin)",
+    "Node (Gocoin)",
+    "Node (Core)"
+  ],
+  "forkTipSlack": 6,
+  "forkBits": [
+    {
+      "service": "UNKNOWN[2^28]",
+      "fork": "BLAKE2b fork",
+      "exceptAgent": "/satd:"
+    },
+    {
+      "service": "UNKNOWN[2^27]",
+      "fork": "BIP110 fork"
+    }
+  ],
+  "examples": {
+    "/21datalab-crawler:0.1/": "Crawler",
+    "/21datalab-crawler:1.0/": "Crawler",
+    "/:crawler:1/": "No name",
+    "/:electrs/": "No name",
+    "/:monitor/": "No name",
+    "/AgenticBitcoin:0.1.0/": "Other",
+    "/Aurum:0.12.4/": "Other chain",
+    "/BCH Unlimited:2.0.0.1(EB32; AD12)/": "Other chain",
+    "/BCHUnlimited:1.0/": "Other chain",
+    "/BCHUnlimited:1.10.0/": "Other chain",
+    "/BTC-Nodes:1.0/Probe/": "Crawler",
+    "/BTC-Nodes:2026-07-14/Sonar/": "Crawler",
+    "/BTC-Nodes:2026-09-24/Sonar/": "Crawler",
+    "/BTokenCore:0.0.0/": "Wallet",
+    "/BUCash:1.9.0/": "Other chain",
+    "/BitArgus:0.1/": "Crawler",
+    "/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
+    "/Bitcoin ABC:28.0.0/": "Other chain",
+    "/Bitcoin Clashic ABCD:0.16.1(EB8.0)/": "Other chain",
+    "/Bitcoin Commons:0.1.92/": "Node (other)",
+    "/Bitcoin Interest:0.16.1.1/": "Other chain",
+    "/Bitcoin SV:1.0.16/": "Other chain",
+    "/Bitcoin SV:1.1.0/": "Other chain",
+    "/Bitcoin Wallet:9.0/": "Wallet",
+    "/Bitcoin XT:0.11.0/": "Other chain",
+    "/BitcoinEcho:0.1.0/": "Node (other)",
+    "/BitcoinKit:0.1.0/": "Wallet",
+    "/BitcoinMachineCode:0.1.0/": "Node (other)",
+    "/BitcoinRocks:31.1.1/": "Node (BitcoinRocks)",
+    "/BitcoinSPV:0.7/": "Wallet",
+    "/BitcoinSwift:0.0.1/": "Other light client",
+    "/BitcoinUnlimited:1.0.3(EB16; AD12)/": "Node (other)",
+    "/BitcoinWallet:1.3/": "Wallet",
+    "/BitcoinWolfe:0.1.0/": "Node (other)",
+    "/Bitflash:btc-light/": "Other light client",
+    "/Bither:1.3.8/": "Wallet",
+    "/BlockSail:0.1/": "Other",
+    "/CKCoinD:1.0/": "Pool node",
+    "/CKCoinD:31.1.0/": "Pool node",
+    "/CamlCoin:0.1.0/": "Node (other)",
+    "/Classic:0.11.2/": "Node (other)",
+    "/Classic:1.2/": "Node (other)",
+    "/Classic:1.3.4(EB8)/": "Node (other)",
+    "/Classic:1.3.8(EB8)/": "Node (other)",
+    "/Coinscope-GH:0.2/": "Research scanner",
+    "/Cornell-Falcon-Network:0.1.0/": "Other",
+    "/DCTRL-YVR-seed-monitor:0.1.0/": "Crawler",
+    "/Denovo:0.7.0/": "Other",
+    "/EMPORION:0.3/": "Other light client",
+    "/FavillaKEY:0.1/": "Other",
+    "/Floptoshi:2.0.0/": "Other chain",
+    "/Floresta:0.9.1/": "Node (Floresta)",
+    "/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
+    "/Forseti:0.2.0/": "Node (other)",
+    "/Ghost:1.11.42/": "Node (Ghost)",
+    "/GlobalNodeMap:2.1/": "Crawler",
+    "/Gnostr:0.1.0/": "Other",
+    "/Gocoin:1.10.0pre/": "Node (Gocoin)",
+    "/Gocoin:1.10.3/": "Node (Gocoin)",
+    "/GrayersDad:08.08.2026RDTS-in-Spirit (Node 1)/": "Node (Knots)",
+    "/Haskoin:0.1.0/": "Node (other)",
+    "/JBS:0.0.3/": "Research scanner",
+    "/Knots:29.4.2/PATUM:1.0.0(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": "Node (Knots)",
+    "/Ladybug:0.8.6/": "Other chain",
+    "/Libbitcoin:4.0.0/": "Node (libbitcoin)",
+    "/LionSeed:0.1.0/": "Crawler",
+    "/Liviano:0.1.0/hodlwallet:2.0/": "Wallet",
+    "/LunarBlock:0.1.0/": "Node (other)",
+    "/Metrika-Bitnodes:0.1/": "Crawler",
+    "/MultiBit:0.5.18/": "Wallet",
+    "/MultiBit:0.5/": "Wallet",
+    "/Murmel:0.2.1/": "Other light client",
+    "/MyWasabi:1.0/": "Wallet",
+    "/NBitcoin:9.0.0/": "Other",
+    "/Natasha:0.2.0/": "Node (other)",
+    "/NodeWatch-BTC:0.2/": "Crawler",
+    "/Notoshi/": "Other light client",
+    "/OpenBitcoin-crawler:0.1/": "Crawler",
+    "/OracleKnots:29.5.0/OracleKnots:20260508/": "Other chain",
+    "/P2Pool:17.0/": "Pool node",
+    "/Prometheus:30.4.1/": "Node (other)",
+    "/RESET-Headers:1.0/": "Other",
+    "/RelayNetworkClient:42/": "Other",
+    "/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Other light client",
+    "/SYMMARTYS:0.3/": "Other light client",
+    "/Sat0shi:31.0.0/": "Disguised",
+    "/Sat0shi:31.0.0/crawler:1/": "Disguised",
+    "/Satoshi-BTF(BitcoinFinance)-Main-DCR:0.15.1/": "Other chain",
+    "/Satoshi2:0.18.3/": "Disguised",
+    "/Satoshi:0.12.1(bitcore)/": "Node (Core)",
+    "/Satoshi:0.14.2(EB8; AD6)/": "Other chain",
+    "/Satoshi:0.14.2/UASF-Segwit:1.0(BIP148)/": "Node (Core)",
+    "/Satoshi:1.15.1(2x)/": "Node (Core)",
+    "/Satoshi:25.0.0(node.cs.ac.uk)/": "Node (Core)",
+    "/Satoshi:27.0.0(mempool.guide)/electrs:0.10.0/": "Indexer",
+    "/Satoshi:28.0.0(mempool.space)/": "Node (Core)",
+    "/Satoshi:28.0.0(neutrino)/": "Node (Core)",
+    "/Satoshi:28.1.0(FutureBit-Apollo-Node)/": "Node (Core)",
+    "/Satoshi:28.1.0(PyBLOCK Crew)/": "Node (Core)",
+    "/Satoshi:28.1.0/Knots:20250903/": "Node (Knots)",
+    "/Satoshi:29.0.0(MiniBolt_Node)/": "Node (Core)",
+    "/Satoshi:29.0.0(RoninDojo 2.3.0)/": "Node (Core)",
+    "/Satoshi:29.0.0(bitcore)/": "Node (Core)",
+    "/Satoshi:29.0.0(electrum-backend)/": "Node (Core)",
+    "/Satoshi:29.0.0(lit:v1)/": "Node (Core)",
+    "/Satoshi:29.0.0(my-monitor)/": "Node (Core)",
+    "/Satoshi:29.0.0/": "Node (Core)",
+    "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
+    "/Satoshi:29.1.0/Knots:20250903/PyBLOCK": "Node (Knots)",
+    "/Satoshi:29.3.0/Knots:20260210+bip110-v0.4.1/UASF-BIP110:0.4/": "Other chain",
+    "/Satoshi:29.3.0/Knots:20261124/": "Node (Knots)",
+    "/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
+    "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": "Node (Knots)",
+    "/Satoshi:29.4/Purity:1.1.0/": "Other chain",
+    "/Satoshi:29.5.0(mempool.guide)/Knots:20260508/": "Node (Knots)",
+    "/Satoshi:29.5.1/Knots:20260508/Plumb:15/": "Node (Knots)",
+    "/Satoshi:31.0.0(Samourai Dojo 1.29.3)/": "Node (Core)",
+    "/Satoshi:31.1.0/KnotsSHA256:20261018/": "Node (Knots)",
+    "/Satoshi:32.1.0(@wiz)/": "Node (Core)",
+    "/SatoshiSharp:0.1.0/": "Other",
+    "/SatoshiX:0.18.0/": "Disguised",
+    "/Subcoin:0.1.0/": "Node (other)",
+    "/SuperBitcoin:0.16.0.2/": "Other chain",
+    "/SwiftBitcoin:0.1.0/": "Node (other)",
+    "/VerifiedX:9.0.1/": "Other light client",
+    "/WalletKit:0.1.0/": "Wallet",
+    "/Wasabi:2.0.0.0/": "Wallet",
+    "/Wasabi:2.0/": "Wallet",
+    "/WasabiClient:2.0.0.0/": "Wallet",
+    "/WasabiCoordinator:1/": "Wallet",
+    "/alt-bitnodes:0.1/": "Crawler",
+    "/atlas-scout:0.1/": "Crawler",
+    "/aver-btc-listener:0.1/": "Crawler",
+    "/backbone-alpha:0.0.1/": "Other",
+    "/bcoin:v1.0.0-beta.14/": "Node (bcoin)",
+    "/beamchain:0.1.0/": "Node (other)",
+    "/bip110-crawler:0.1.0/": "Crawler",
+    "/bip110-observer:0.1/": "Crawler",
+    "/bip157-fetch:0.1/": "Other light client",
+    "/bip324-probe:0.1.0/": "Crawler",
+    "/bip324-ts:0.0.1/": "Other",
+    "/bitc:0.1.0": "Wallet",
+    "/bitcoin-node-scanner:0.1.0/": "Crawler",
+    "/bitcoin-peers:0.1.0/": "Crawler",
+    "/bitcoin-peers:0.2.0/": "Crawler",
+    "/bitcoin-rs:0.1.0/": "Node (other)",
+    "/bitcoin-ruby:0.0.8/": "Node (other)",
+    "/bitcoin-s:1.9.12/": "Other light client",
+    "/bitcoin-seeder:0.01/": "Crawler",
+    "/bitcoin-spec-node:0.1.0/": "Node (other)",
+    "/bitcoin@dsn.tm.kit.edu/": "Research scanner",
+    "/bitcoinj:0.13.6/SmartContract.com:0.1/": "Wallet",
+    "/bitcoinj:0.14.3/Bitcoin Wallet:1.0.5/": "Wallet",
+    "/bitcoinj:0.14.3/Bitcoin Wallet:4.58.1-btcx/": "Wallet",
+    "/bitcoinj:0.14.4/Bitcoin Wallet:5.18/": "Wallet",
+    "/bitcoinj:0.14.4/Bitcoin Wallet:5.21-blackberry/": "Wallet",
+    "/bitcoinj:0.14.4/Bitcoin:1.075/": "Wallet",
+    "/bitcoinj:0.14.4/WalletTemplate:1.0/": "Wallet",
+    "/bitcoinj:0.14.4/WalletTool:1.0/": "Wallet",
+    "/bitcoinj:0.14.5/": "Wallet",
+    "/bitcoinj:0.14.7/PeerMonitor:1.0/": "Other light client",
+    "/bitcoinj:0.14.7/UU-Network-Research:0.1/": "Research scanner",
+    "/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/": "Wallet",
+    "/bitcoinj:0.15.6/HTTPSeed:1.2(seed.example)/": "Crawler",
+    "/bitcoinj:0.15/": "Wallet",
+    "/bitcoinj:0.15/email bitcoin:0.1/": "Wallet",
+    "/bitcoinj:0.16.3/Elastum:0.1z/": "Wallet",
+    "/bitcoinj:0.17.1/Schildbach Bitcoin Wallet:1.0.2/": "Wallet",
+    "/bitcoinkernel-node:0.1.0/": "Node (other)",
+    "/bitcoinpr:0.1.114/": "Node (other)",
+    "/bitcore:1.1.0/": "Other",
+    "/bither/": "Wallet",
+    "/bitnodes.earn.com:0.1/": "Crawler",
+    "/bitnodes.io:0.1/": "Crawler",
+    "/bitnodes.io:0.3/": "Crawler",
+    "/blockbrew:0.1.0/": "Node (other)",
+    "/blueberry:2026.08.17/": "Wallet",
+    "/boo:0.1.0/": "Crawler",
+    "/bread:": "Wallet",
+    "/bread:2.1/": "Wallet",
+    "/breadwallet:0.6.5/": "Wallet",
+    "/breadwallet:1.0/": "Wallet",
+    "/bridge:0.1.3/": "Node (other)",
+    "/bridge:2.0/": "Node (other)",
+    "/btc-crawl:0.1.2/": "Crawler",
+    "/btc-crawler:0.2/": "Crawler",
+    "/btc-dnsseed:0.2/": "Crawler",
+    "/btc-mempool:1/": "Other",
+    "/btc-node-observatory:0.1.0/": "Crawler",
+    "/btc-peers:0.1/": "Crawler",
+    "/btc-range-scan:0.1.0/": "Crawler",
+    "/btclib:2026.11.12/": "Node (other)",
+    "/btcwire:0.2.0/Satoshi:0.9.3/": "Research scanner",
+    "/btcwire:0.4.0/peer:1.0.0/": "Other",
+    "/btcwire:0.4.1/Satoshi:0.19/": "Research scanner",
+    "/btcwire:0.4.1/lit:v0.1/": "Lightning wallet",
+    "/btcwire:0.5.0/": "Other",
+    "/btcwire:0.5.0/:/": "Other",
+    "/btcwire:0.5.0/BisonSPV:0.0.1-beta/": "Wallet",
+    "/btcwire:0.5.0/CaribouSPV:0.0.1-beta/": "Wallet",
+    "/btcwire:0.5.0/DNN-Node:0.1.0/": "Other",
+    "/btcwire:0.5.0/Satoshi:0.20/": "Research scanner",
+    "/btcwire:0.5.0/Symbiosis Bitcoin Bridge:1.0/": "Other",
+    "/btcwire:0.5.0/bitcoinstats.com:0.1/": "Crawler",
+    "/btcwire:0.5.0/bitcoinstats.com:0.2/": "Crawler",
+    "/btcwire:0.5.0/bitfyn:0.1.0/": "Wallet",
+    "/btcwire:0.5.0/btcd:0.24.2/": "Node (btcd)",
+    "/btcwire:0.5.0/btcd:0.25.0/": "Node (btcd)",
+    "/btcwire:0.5.0/btcpost-neutrino:0.17.1/": "Other",
+    "/btcwire:0.5.0/hemi-soak:1.0/": "Other",
+    "/btcwire:0.5.0/neutrino:0.11.0-beta/": "Lightning wallet",
+    "/btcwire:0.5.0/neutrino:0.12.0-beta/": "Lightning wallet",
+    "/btcwire:0.5.0/neutrino:0.17.1/": "Lightning wallet",
+    "/btcwire:0.5.0/peer:1.0.0/": "Other",
+    "/btcwire:0.5.0/spvwallet:0.1.0/": "Wallet",
+    "/btcwire:0.5.0/utreexod:0.5.0/": "Node (other)",
+    "/btcwire:0.5.0/zap-desktop:0.7.7-beta/": "Lightning wallet",
+    "/btcwire:0.5.0/zap-ios:0.5.4-1/": "Lightning wallet",
+    "/btz:0.1.0/": "Crawler",
+    "/buidl-bootcamp/": "Crawler",
+    "/census:0.1.7/": "Crawler",
+    "/cf-package-relay:0.3.0/": "Other",
+    "/chainhorn:0.04/": "Other light client",
+    "/ckp2p:1.0/": "Pool node",
+    "/ckp2p:2.0/": "Pool node",
+    "/ckpool/": "Pool node",
+    "/clearbit:0.1.0/": "Node (other)",
+    "/connector/": "Research scanner",
+    "/crawler:0.1/": "Crawler",
+    "/crawlrs:0.2.0/": "Crawler",
+    "/cryptexplorer:0.1.0/": "Other",
+    "/curl:8.5.0/": "Other",
+    "/dexcash-nodes:0.1.0/": "Other chain",
+    "/dns-monitor:0.1.0/": "Crawler",
+    "/dsn.kastel.kit.edu/bitcoin:28.0.0/": "Research scanner",
+    "/dsn.kastel:1/": "Research scanner",
+    "/electrs:0.10.0/": "Indexer",
+    "/electrs:0.11.1/": "Indexer",
+    "/electrumx:1.16/": "Indexer",
+    "/enginecore:0.1.0/": "Wallet",
+    "/esplora/": "Indexer",
+    "/exnode:0.1.0/": "Node (other)",
+    "/generic-seeder/": "Crawler",
+    "/getaddr.bitnodes.io:0.1/": "Crawler",
+    "/gnoban:1.3.1/": "Crawler",
+    "/go-bitnode-monitor:firstseen/": "Crawler",
+    "/haskoin-btc:1.2.2/": "Other light client",
+    "/hotbuns:0.1.0/": "Node (other)",
+    "/iriumd:1.0/": "Other chain",
+    "/iriumd:1.9.66/": "Other chain",
+    "/jwrd.net:0.9.99.99/": "Other",
+    "/kernel-node:0.1.0/": "Node (other)",
+    "/libbitcoin:4.0.0/": "Node (libbitcoin)",
+    "/logos-peer-list:0.1.0/": "Crawler",
+    "/logos-peer-list:0.1/": "Crawler",
+    "/mako:0.0.0/": "Node (other)",
+    "/mantle-discover:0.1.0/": "Other",
+    "/mantle-rank-peers:0.1.0/": "Other",
+    "/mantle-replay-iouring:0.1.0/": "Other",
+    "/mantle:0.1.0/": "Node (other)",
+    "/mempool.space:1.0/": "Indexer",
+    "/mempool/": "Indexer",
+    "/metrika:1.0/": "Crawler",
+    "/miningcore-btc-solo:1.1.1/": "Pool node",
+    "/mrm-census:0.2/": "Crawler",
+    "/multiseed:0.1/": "Other",
+    "/nakamoto:0.3.0/": "Other light client",
+    "/nebula:v3.0.0-20261019105927-e59406bbe71e/": "Crawler",
+    "/nebula:v3.0.0-…/": "Crawler",
+    "/neutrino-checker:0.1/": "Other",
+    "/neutrino:0.2.0/": "Lightning wallet",
+    "/new-p2p-crawler:0.1.0/": "Crawler",
+    "/nimrod:0.1.0/": "Node (other)",
+    "/node-stratum/": "Pool node",
+    "/node.cs.ac.uk:1.0/": "Research scanner",
+    "/node.js:22.11.0/bitcoin-net:5.2.0/": "Other light client",
+    "/nodemap/": "Crawler",
+    "/nodes.mom.market:0.1/": "Crawler",
+    "/nodes.mom.market:0.2/": "Crawler",
+    "/open-nodes:0.1/": "Crawler",
+    "/ouroboros:0.1.0/": "Node (other)",
+    "/p2aburn:1.0/": "Other",
+    "/p2p-extractor:0.1.0/": "Crawler",
+    "/p2p-extractor:0.1/": "Crawler",
+    "/p2p-observer:0.1.0/": "Crawler",
+    "/p2p-probe:0.1/": "Crawler",
+    "/pcoc-bari:0.6.8/": "Other light client",
+    "/portscanner/": "Crawler",
+    "/probe:1.0/": "Crawler",
+    "/programmingbitcoin:0.1/": "Other",
+    "/pycoinnet/": "Other light client",
+    "/pynode:0.0.1/": "Other",
+    "/pynode:0.1.0/": "Node (other)",
+    "/pyspv:0.0.1-alpha1/": "Other light client",
+    "/python-bitcoinlib:0.12.2/": "Other",
+    "/rbitcoin:0.1.0/": "Node (other)",
+    "/rbtc:0.1.0/": "Node (other)",
+    "/rust-bitcoin:0.18/bluematt-tokio-client:0.1/": "Crawler",
+    "/rust-sha2-p2p-client/": "Other",
+    "/rust-spv:0.1.0/": "Other light client",
+    "/rust_bitcoin_node:0.1.0/": "Node (other)",
+    "/rustoshi:0.1.0/": "Node (other)",
+    "/sashimi:0.1.0/": "Other",
+    "/satd:0.2.1/": "Node (other)",
+    "/satd:0.7.2(crawler)/": "Crawler",
+    "/some-crawler:2/": "Crawler",
+    "/symphony:0.0.1/": "Indexer",
+    "/tbcd:2.1.0-dev/": "Node (other)",
+    "/therealbitcoin.org:0.9.99.99/": "Node (other)",
+    "/topology-probe:0.1/": "Crawler",
+    "/trinetra:0.1/": "Other",
+    "/twotbit:0.1.0/": "Wallet",
+    "/txecho:0.1.0/": "Other",
+    "/uni-goettingen.de/": "Research scanner",
+    "/wasabi:2.0/": "Wallet",
+    "/winnow:0.1.0/": "Wallet",
+    "/wuji-headers:0.1/": "Other light client",
+    "/your-fork:0.1/": "Other",
+    "BTC RPC Proxy (test)": "Other",
+    "BTC RPC Proxy v0.8.1": "Other",
+    "Crawly": "Crawler",
+    "MagicalBitcoinWallet": "Wallet",
+    "NBXplorer-48211": "Indexer",
+    "Satoshi:22.0.0": "Disguised",
+    "Stacks/2.1": "Other light client",
+    "StratisNode:3.0.6 (70012)": "Node (other)",
+    "VDS 0.9.9.1": "Other chain",
+    "Wallet v0.1": "Wallet",
+    "Yuki / 0.0.1": "Other light client",
+    "bitdash.io": "Crawler",
+    "bloXroute Gateway 2.108.2": "Other",
+    "fluxture": "Crawler",
+    "libbtc 0.1": "Other light client",
+    "nebula/2.4.1-65580d4": "Crawler",
+    "nebula/2.4.1-85b3e43": "Crawler",
+    "urbit": "Other",
+    "vds_0.9.53": "Other chain"
+  }
+}

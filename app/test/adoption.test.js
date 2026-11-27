@@ -15,7 +15,7 @@ process.env.MAX_MANUAL_PEERS = '2';
 
 const db = require('../src/lib/db');
 const rpc = require('../src/lib/rpc');
-const { adoptExternalManualPeers, syncTrustedToAddnode } = require('../src/lib/peer-sync');
+const { adoptExternalManualPeers, syncTrustedToAddnode, removeTrustedPeer } = require('../src/lib/peer-sync');
 
 test.before(() => {
   db.open();
@@ -53,6 +53,54 @@ test('adoption stops at the manual-peer limit and leaves the rest alone', async 
   assert.equal(rows().length, 2, 'never more rows than MAX_MANUAL_PEERS');
   // Core's own list is handed on untouched; nothing was removed from it.
   assert.equal(result.addedNodes.length, 4);
+});
+
+test('a slot taken by the other process during the round is not overbooked', async () => {
+  // `known` is read before Core is asked to drop a peer removed earlier; while
+  // that RPC runs, Slot Fill (the other process) fills the last slot. The
+  // adoption after it must count again, or the set holds three of two.
+  db.instance
+    .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.1:8333', NULL, 0, 1)`)
+    .run();
+  db.instance
+    .prepare(`INSERT INTO meta (key, value) VALUES ('pending_addnode_removal', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(JSON.stringify({ '198.51.100.20:8333': Date.now() }));
+  mock.method(rpc, 'getAddedNodeInfo', async () => [
+    { addednode: '198.51.100.20:8333' },
+    { addednode: '198.51.100.21:8333' },
+  ]);
+  mock.method(rpc, 'addNode', async () => {
+    db.instance
+      .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('203.0.113.2:8333', NULL, 0, 2)`)
+      .run();
+  });
+  const result = await adoptExternalManualPeers();
+  assert.equal(result.adopted, 0);
+  assert.equal(rows().length, 2, 'never more rows than MAX_MANUAL_PEERS');
+});
+
+test('a removal cut off before Core is told is finished by the next sync, not adopted back', async () => {
+  // The row goes, then Core is asked: if the app stops in between, Core still
+  // holds the addnode. The lasting mark is written with the delete, so the
+  // next round removes it from Core instead of taking it back padlocked.
+  db.instance
+    .prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.30:8333', NULL, 0, 1)`)
+    .run();
+  let release;
+  const calls = [];
+  mock.method(rpc, 'addNode', (addr, cmd) => { calls.push(cmd); return cmd === 'remove' && calls.length === 1 ? new Promise((r) => { release = r; }) : Promise.resolve(); });
+  const removing = removeTrustedPeer('198.51.100.30:8333', { disconnect: false });
+  // The app "stops" here: the row is gone, Core was not told yet.
+  assert.equal(rows().length, 0);
+  const mark = db.instance.prepare("SELECT value FROM meta WHERE key = 'pending_addnode_removal'").get();
+  assert.ok(mark && JSON.parse(mark.value)['198.51.100.30:8333'], 'the lasting mark is written before Core is asked');
+  mock.method(rpc, 'getAddedNodeInfo', async () => [{ addednode: '198.51.100.30:8333' }]);
+  const result = await adoptExternalManualPeers();
+  assert.equal(result.adopted, 0);
+  assert.equal(rows().length, 0, 'not adopted back');
+  release();
+  await removing;
 });
 
 test('the same node in another spelling is not adopted a second time', async () => {
@@ -286,4 +334,27 @@ test('when Core does not say its uptime, a missing manual peer is handed back', 
   await syncTrustedToAddnode([{ addednode: '198.51.100.9:8333' }]);
   await syncTrustedToAddnode([]);
   assert.deepEqual(added, ['add 198.51.100.9:8333']);
+});
+
+test('an outside removal Core could not confirm is not handed back, this sync or the next', async () => {
+  // Outside review, 26.11.2026: the second look at Core's list failed, the
+  // peer was handed back right away - and after the first fix, one sync later.
+  db.instance.prepare(`INSERT INTO trusted_peer (address, label, kept, created_at) VALUES ('198.51.100.71:8333', NULL, 0, 1)`).run();
+  const added = [];
+  mock.method(rpc, 'addNode', async (addr, cmd) => { added.push(`${cmd} ${addr}`); });
+  const startedAt = Date.now() - 1000 * 1000;
+  mock.method(rpc, 'call', async (method) => {
+    if (method === 'uptime') return Math.round((Date.now() - startedAt) / 1000);
+    throw new Error(`unexpected ${method}`);
+  });
+  await syncTrustedToAddnode([{ addednode: '198.51.100.71:8333' }]);
+  // Removed outside Peer Lab; the confirmation read fails.
+  mock.method(rpc, 'getAddedNodeInfo', async () => { throw new Error('timeout'); });
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, [], 'not handed back while unconfirmed');
+  // Core answers again: the removal is taken over, still nothing handed back.
+  mock.method(rpc, 'getAddedNodeInfo', async () => []);
+  await syncTrustedToAddnode([]);
+  assert.deepEqual(added, [], 'nor one sync later');
+  assert.equal(db.instance.prepare(`SELECT COUNT(*) AS n FROM trusted_peer WHERE address = '198.51.100.71:8333'`).get().n, 0);
 });

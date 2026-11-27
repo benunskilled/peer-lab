@@ -9,8 +9,9 @@
  * Matching either against a public list is how block explorers attribute
  * blocks, and it is the only way to do it without asking a service.
  *
- * The list is `src/data/mining-pools.json` from bitcoin-data/mining-pools
- * (MIT), plus `mining-pools-extra.json`. See src/data/MINING-POOLS.md for the licence and how to refresh it.
+ * The list is `src/data/mining-pools.json` from mempool/mining-pools, plus
+ * `mining-pools-extra.json`; what only bitcoin-data/mining-pools still holds
+ * (both MIT) sits in its "fallback" part and is asked last. See src/data/MINING-POOLS.md for the licence and how to refresh it.
  *
  * Two honest limits. The payout address is checked first because it is the
  * stronger claim - it is where the money actually went - but a pool that pays
@@ -29,15 +30,25 @@ const extra = require('../data/mining-pools-extra.json');
 
 const ADDRESSES = { ...(pools.payout_addresses || {}), ...(extra.payout_addresses || {}) };
 const TAGS = { ...(pools.coinbase_tags || {}), ...(extra.coinbase_tags || {}) };
+// bitcoin-data's leftovers, not rebuilt since June 2026. Asked only when the
+// maintained list has no answer at all: in November 2026 three of its
+// addresses beat a pool's own tag in 15 of 1,005 blocks - a TrustPool block
+// paying an address it still files under ViaBTC, an OCEAN block paying one of
+// 33 miners it files under CleanIncentive, a CloverPool block paying an old
+// BTC.com address. Its "ckpool" stays useful: a solo CKPool block says nothing
+// else.
+const FALLBACK_ADDRESSES = (pools.fallback && pools.fallback.payout_addresses) || {};
+const FALLBACK_TAGS = (pools.fallback && pools.fallback.coinbase_tags) || {};
 
 // Longest first: "Foundry USA Pool" has to win against any shorter tag that
 // happens to sit inside the same coinbase.
-const TAG_LIST = Object.keys(TAGS).sort((a, b) => b.length - a.length);
 // Tags are matched as bytes against the raw script, not against
 // coinbaseText(): a few are not ASCII - F2Pool's "🐟", "七彩神仙鱼" - and
 // would never survive the printable-only text. For an ASCII tag it is the
 // same match, since a tag's bytes cannot come out of a non-printable one.
-const TAG_BYTES = TAG_LIST.map((tag) => [tag, Buffer.from(tag, 'utf8')]);
+const tagBytes = (tags) => Object.keys(tags).sort((a, b) => b.length - a.length).map((tag) => [tag, Buffer.from(tag, 'utf8')]);
+const TAG_BYTES = tagBytes(TAGS);
+const FALLBACK_TAG_BYTES = tagBytes(FALLBACK_TAGS);
 
 /**
  * The printable text inside a coinbase input script. Non-printable bytes
@@ -59,20 +70,23 @@ function coinbaseText(hex) {
  * script. Returns null when neither matches - an unknown pool, a solo miner,
  * or a pool the list has not caught up with.
  */
-function identify({ coinbaseHex = '', addresses = [] } = {}) {
+function match(addresses, script, addressList, tags, tagBytesList) {
   for (const address of addresses) {
-    const hit = ADDRESSES[address];
+    const hit = addressList[address];
     if (hit) return { name: hit.name, source: 'address', tag: null };
   }
-  if (typeof coinbaseHex !== 'string' || !/^[0-9a-fA-F]*$/.test(coinbaseHex) || coinbaseHex.length % 2 !== 0) return null;
-  const script = Buffer.from(coinbaseHex, 'hex');
-  for (const [tag, bytes] of TAG_BYTES) {
-    if (script.includes(bytes)) {
-      const hit = TAGS[tag];
-      return { name: hit.name, source: 'tag', tag };
-    }
+  if (!script) return null;
+  for (const [tag, bytes] of tagBytesList) {
+    if (script.includes(bytes)) return { name: tags[tag].name, source: 'tag', tag };
   }
   return null;
+}
+
+function identify({ coinbaseHex = '', addresses = [] } = {}) {
+  const script = typeof coinbaseHex === 'string' && /^[0-9a-fA-F]*$/.test(coinbaseHex) && coinbaseHex.length % 2 === 0
+    ? Buffer.from(coinbaseHex, 'hex') : null;
+  return match(addresses, script, ADDRESSES, TAGS, TAG_BYTES)
+    || match(addresses, script, FALLBACK_ADDRESSES, FALLBACK_TAGS, FALLBACK_TAG_BYTES);
 }
 
 // Most blocks come from a handful of pools, but not all of them do, and a
@@ -114,7 +128,10 @@ function coinbaseLabel(hex) {
 
 /** What the embedded list holds, for the startup log line. */
 function size() {
-  return { addresses: Object.keys(ADDRESSES).length, tags: TAG_LIST.length };
+  return {
+    addresses: Object.keys(ADDRESSES).length + Object.keys(FALLBACK_ADDRESSES).length,
+    tags: TAG_BYTES.length + FALLBACK_TAG_BYTES.length,
+  };
 }
 
 module.exports = { identify, coinbaseText, coinbaseLabel, size };

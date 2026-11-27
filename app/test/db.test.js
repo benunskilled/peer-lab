@@ -13,6 +13,7 @@ process.env.SQLITE_PATH = path.join(tmpDir, 'test.db');
 process.env.DATA_DIR = tmpDir;
 
 const db = require('../src/lib/db');
+const { seedPools } = require('./helpers/pools');
 const queries = require('../src/lib/queries');
 
 test.before(() => {
@@ -30,37 +31,16 @@ function openSession(peerId, { direction = 'outbound', connectionType = 'outboun
     .run(peerId, direction, connectionType, Date.now() - 3600000);
 }
 
-test('seeds the default stratum pool list exactly once', () => {
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 8);
-
-  // Counting after a single open() proves nothing: the seed uses INSERT OR
-  // IGNORE against a unique (host, port), so the count would be 8 with or
-  // without the pools_seeded guard. What the guard is actually for is the
-  // first boot, where all four processes race open() and the loser used to die
-  // on a meta primary-key conflict. So: seed again, and assert both that
-  // nothing is duplicated AND that a user's own edits survive it.
-  db.instance.prepare(`UPDATE stratum_pool SET enabled = 0 WHERE label = 'AtlasPool'`).run();
-  db.instance.prepare(`DELETE FROM stratum_pool WHERE label = 'Parasite Pool'`).run();
-
+test('a fresh install starts with no pool, and opening again adds none', () => {
+  // Since 25.11.2026 the user picks pools from the list (lib/pool-catalog.js).
+  // The flag still guards the first boot, where all four processes race
+  // open(): the losers used to die on a meta primary-key conflict.
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 0);
+  assert.ok(db.instance.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get());
   db.seedDefaultPools();
-
-  assert.equal(
-    db.instance.prepare(`SELECT COUNT(*) AS n FROM stratum_pool WHERE label = 'Parasite Pool'`).get().n,
-    0,
-    'a default pool the user deleted must stay deleted - re-seeding must not resurrect it',
-  );
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 7, 'and nothing is duplicated');
-  assert.equal(
-    db.instance.prepare(`SELECT enabled FROM stratum_pool WHERE label = 'AtlasPool'`).get().enabled,
-    0,
-    'nor undo what the user changed about one they kept',
-  );
-
-  // Leave the fixture as found for the tests that follow.
-  db.instance
-    .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES ('Parasite Pool','parasite.wtf',42069,1,1,?)`)
-    .run(Date.now());
-  db.instance.prepare(`UPDATE stratum_pool SET enabled = 1 WHERE label = 'AtlasPool'`).run();
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, 0);
+  // The tests below rank pools: eight, as an older install has them.
+  seedPools(db);
 });
 
 test('getOrCreatePeer is idempotent by address', () => {
@@ -188,6 +168,24 @@ test('REGRESSION: the all-time stratum ranking forgets races the prune took out'
   queries.pruneOldData({ stratumHistoryRetentionDays: 365 });
 
   assert.equal(winsOfA(), before - 1);
+});
+
+test('an unticked pool (chosen 0) goes with the prune once its numbers have aged out', () => {
+  const insertPool = db.instance.prepare(
+    `INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 0, 1, ?)`,
+  );
+  const old = insertPool.run('Unticked old', 'unticked-old.example', 3333, Date.now()).lastInsertRowid;
+  const kept = insertPool.run('Unticked kept', 'unticked-kept.example', 3333, Date.now()).lastInsertRowid;
+  db.instance.prepare('UPDATE stratum_pool SET chosen = 0 WHERE id IN (?, ?)').run(old, kept);
+  const insertRace = db.instance.prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)');
+  const insertObs = db.instance.prepare('INSERT INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, ?, ?)');
+  insertObs.run(insertRace.run('unticked-aged', Date.now() - 400 * 24 * 60 * 60 * 1000).lastInsertRowid, old, 0, 1);
+  insertObs.run(insertRace.run('unticked-recent', Date.now()).lastInsertRowid, kept, 0, 1);
+  queries.pruneOldData({ stratumHistoryRetentionDays: 365 });
+  const has = (id) => Boolean(db.instance.prepare('SELECT 1 FROM stratum_pool WHERE id = ?').get(id));
+  assert.equal(has(old), false, 'nothing left to keep');
+  assert.equal(has(kept), true, 'still has numbers');
+  assert.ok(!queries.stratumRanking('all').some((p) => p.id === kept), 'never in the table');
 });
 
 test('deletePool removes a pool that already has observation history without throwing', () => {
@@ -879,9 +877,10 @@ test('resetPeerData leaves the delete trigger in place, so the rollup stays main
   assert.equal(db.instance.prepare('SELECT eligible AS e FROM peer_relay_stats WHERE peer_id = ?').get(peer.id).e, 0, 'the trigger still counts down');
 });
 
-test('resetPoolHistory clears the races but keeps the configured pools', () => {
-  const pool = db.instance.prepare('SELECT id FROM stratum_pool LIMIT 1').get();
-  const poolsBefore = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n;
+test('resetPoolHistory clears the races, keeps the pools in the table, drops the ones kept only for their numbers', () => {
+  const pool = db.instance.prepare('SELECT id FROM stratum_pool WHERE chosen = 1 LIMIT 1').get();
+  db.instance.prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at, chosen) VALUES ('Gone', 'reset-gone.example', 3333, 0, 1, 1, 0)`).run();
+  const poolsBefore = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE chosen = 1').get().n;
   const raceId = db.instance
     .prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)')
     .run('reset-pool-prevhash', Date.now()).lastInsertRowid;
@@ -891,7 +890,7 @@ test('resetPoolHistory clears the races but keeps the configured pools', () => {
 
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_race').get().n, 0);
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_observation').get().n, 0);
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, poolsBefore, 'the pool list is configuration, not history');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, poolsBefore, 'the pools in the table stay, the kept ones go');
 });
 
 // One host has one spelling: brackets and ports go, so an IPv6 peer is never

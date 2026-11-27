@@ -29,7 +29,7 @@ Your node talks to strangers all day. Each one says what software it runs, but i
 
 Every new block reaches your node through one of these peers. Peer Lab notes for every block who was first, and each peer carries its count, like 43 of 1,693 blocks. Open a peer to see everything else: its traffic, what it announced, and the buttons to keep it or let it go.
 
-Core has eight manual slots it never fills on its own. Slot Fill uses them for spread: other regions, other providers. Stratum Race times how fast your own pool turns a new block into fresh work, next to public solo pools. Both are off by default, and Peer Lab sends no peer address to any outside service.
+Core has eight manual slots it never fills on its own. Slot Fill uses them for spread: other regions, other providers. Stratum Race times how fast your own pool turns a new block into fresh work, next to public pools. Both are off by default, and Peer Lab sends no peer address to any outside service.
 
 <p align="center">
   <a href="#who-they-are">Who they are</a> ·
@@ -49,6 +49,11 @@ Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawl
 ![Inbound peers filtered to the disguised ones. The open one claims to be Bitcoin Core 0.16.1, but speaks a protocol that version never did, and is on 0xB10C's LinkingLion list.](docs/images/disguised.png)
 
 It is a best guess from what one node can see, so a label can be wrong. Know better about one? [Open an issue](https://github.com/benunskilled/peer-lab/issues) and I will happily fix it.
+
+How sure a label is shows in its first words:
+- No prefix: the name is in the project's own code or setup.
+- "Probably": something technical points there, but the name alone is no proof.
+- "Named like": only the name matches.
 
 ## Where they are
 
@@ -80,11 +85,11 @@ The padlock keeps a peer even when it goes offline, once Core has connected to i
 
 ## Stratum Race
 
-Switch on Stratum Race and add your own pool. If GoBrrr, Bassin, Public Pool, DATUM or Pogolo runs on your Umbrel, Peer Lab offers to add it for you. By default, eight public solo pools race alongside. No miner needed.
+Switch on Stratum Race and add your own pool. If GoBrrr, Bassin, Public Pool, DATUM or Pogolo runs on your Umbrel, Peer Lab offers to add it for you. Public pools, solo and shared, from around the world race alongside, up to 20 at once. No miner needed.
 
 For every new block, the first pool to send fresh work sets the reference time and the others are timed against it. You see who wins, how far behind the rest are, and whether your own pool gets faster as you tune your setup. Peer Lab connects like a miner but never submits shares.
 
-![Stratum Race over the last ten blocks: the local GoBrrr pool against eight public solo pools](docs/images/stratum.png)
+![Stratum Race over the last ten blocks: public pools from around the world, with the local pool apps above](docs/images/stratum.png)
 
 ## Quiet and local
 
@@ -126,6 +131,6 @@ MIT, see [LICENSE](LICENSE).
 - Geolocation and operators: [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0
 - World map: [Natural Earth](https://www.naturalearthdata.com), public domain
 - Tor exits: the Tor Project's [bulk exit list](https://check.torproject.org/torbulkexitlist)
-- Mining pools: [bitcoin-data/mining-pools](https://github.com/bitcoin-data/mining-pools), MIT
+- Mining pools: [mempool/mining-pools](https://github.com/mempool/mining-pools) and [bitcoin-data/mining-pools](https://github.com/bitcoin-data/mining-pools), MIT
 
 Versions and update steps: [peers/geo/SOURCE.md](peers/geo/SOURCE.md), [peers/asn/SOURCE.md](peers/asn/SOURCE.md), [peers/torexit/SOURCE.md](peers/torexit/SOURCE.md), [app/src/data/](app/src/data/).

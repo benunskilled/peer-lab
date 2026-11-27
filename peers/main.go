@@ -95,7 +95,8 @@ func loadConfig() (config, error) {
 	if p, err := strconv.Atoi(port); err != nil || p < 1 || p > 65535 {
 		return c, fmt.Errorf("APP_BITCOIN_RPC_PORT=%q is not a port number", port)
 	}
-	c.rpcURL = "http://" + net.JoinHostPort(host, port) + "/"
+	// An IPv6 literal may come with its brackets or without.
+	c.rpcURL = "http://" + net.JoinHostPort(strings.Trim(host, "[]"), port) + "/"
 	return c, nil
 }
 

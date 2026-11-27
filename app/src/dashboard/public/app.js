@@ -92,84 +92,10 @@ function fmtBytes(bytes) {
 // Deliberately NOT in here: block-relay-only peers. They refuse transactions
 // and pass blocks on, which is the opposite of this list.
 //
-// These are the peers service's kindRules (peers/kinds.go), same patterns in
-// the same order, and it has to stay that way. The peer list and the ranking
-// show the same node's peers, and a peer that is marked in one and not the
-// other is worse than no marking at all. The Go side names each family; here only
-// the answer to "can this thing pass a block on" is needed, so a family that
-// relays carries a null reason and is simply a stop.
-//
-// Order is load-bearing, exactly as it is there: first match wins, so a pool
-// node is recognised before anything else gets to read its user agent. A
-// solo-pool operator who puts the pool's name in the bracketed comment -
-// "/Satoshi:29.1.0(mempool-pool)/" and the like - is running a relaying node,
-// and without that rule first the word inside the brackets would have it
-// painted as an indexer.
-const KIND_RULES = [
-  // Core's name misspelt ("/Sat0shi:", "/Satoshi2:"): Disguised in the peer list.
-  // What it runs is unknown, so it is not struck - and it comes first, so the
-  // rest of its agent is not read as a crawler or a wallet either.
-  [/^\/Sat0shi:|^\/Satoshi[0-9X]+:|^Satoshi:|^\/Satoshi:[^/]*$/, null, 'whole'],
-  // Mining pool software speaking p2p, or a node whose operator says in the
-  // bracketed comment that it belongs to a pool. Relays.
-  [/ckpool|^\/ckp2p:|^\/CKCoinD:|\([^)]*pool[^)]*\)|^\/P2Pool:|^\/[^:/(]*pool[^:/(]*:|^\/miningcore-btc-solo:/i, null, 'no-mempool'],
-  // Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
-  // Irium and VDS are forks and altcoins of their own. Bitcoin Purity, a hard
-  // fork of Knots, says "/Satoshi:29.4/Purity:1.1.0/".
-  // Bitcoin Unlimited's old Bitcoin edition: a node of this chain, before
-  // its "(EB16)" reads as another one's.
-  [/^\/BitcoinUnlimited:/i, null, 'whole'],
-  [/Bitcoin ABC|BUCash|Bitcoin SV|BCH ?Unlimited|Bitcoin XT|OracleKnots:|UASF-BIP110:|^\/Bitcoin Interest:|^\/Bitcoin Clashic|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^\/Aurum:|^\/Ladybug:|\/Purity:|^\/dexcash-nodes:/i, 'a client of another chain', 'whole'],
-  // Scanners run as a service and scanners run by universities - the second
-  // kind announces itself with its department's domain.
-  [/kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^\/btcwire:[^/]*\/Satoshi:|^\/rske-research:|^\/acsrg-research:|^\/dataforge-observer:|^\/connector\/$|^\/Coinscope-GH:|^\/JBS:|\/UU-Network-Research:/i, 'a research scanner'],
-  // Koyn's header tool, on bitcoinj: a light client, not a crawler.
-  [/\/PeerMonitor:/, 'a light client'],
-  // Crawlers, seeders and node counters, including the ones that only say
-  // "scan", "seeder", "census" or "monitor".
-  [/bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^\/p2p-observer:|^\/p2p-extractor:|^\/bip324-probe:|^\/topology-probe:|^\/p2p-probe:|^\/probe:|^\/BTC-Nodes:[^/]*\/Probe\/|^\/btc-peers:|^\/bitcoin-peers:|^\/logos-peer-list:|^\/bip110-observer:|^\/nodes\.mom\.market:|^\/btcwire:[^/]*\/bitcoinstats\.com:|^\/open-nodes:|^\/btz:|^fluxture$|^\/buidl-bootcamp\/|\/HTTPSeed:/i, 'a network crawler'],
-  // Address indexers for wallets: they follow the chain and relay nothing.
-  [/electrs|electrum|esplora|\/mempool|^NBXplorer-|^\/symphony:/i, 'an address indexer'],
-  [/bitcoinj|breadwallet|\/bread:|bither|multibit|wasabi|Bitcoin Wallet|^\/blueberry:|^\/winnow:|^\/BitcoinKit:|^\/WalletKit:|\/hodlwallet:|\/spvwallet:|^\/btcwire:[^/]*\/bitfyn:|^\/twotbit:|^\/bitc:|^MagicalBitcoinWallet$|^Wallet v0\.1$|^\/BitcoinSPV:|^\/enginecore:|^\/BitcoinWallet:/i, 'a wallet'],
-  // Lightning wallets on lnd, which follow the chain through neutrino.
-  [/\/neutrino:|\/lit:v/i, 'a Lightning wallet'],
-  // Other BIP157 light clients: Kyoto, which says "Rust BIP-157". VerifiedX
-  // validators follow the chain the same way for a chain of their own: headers,
-  // some blocks, no transactions.
-  // EMPORION and its new name SYMMARTYS fetch headers for OpenTimestamps
-  // verification (bitcoin_headers.py in alexar76/emporion). Bitflash's
-  // wallet loads only headers and filter hashes (docs.bitflash.network).
-  [/BIP-157|^\/wuji-headers:|^\/bip157-fetch:|kyoto|^Yuki \/|^\/VerifiedX:|^\/nakamoto:|^\/bitcoin-s:|^Stacks\/|\/CaribouSPV:|^\/EMPORION:|^\/SYMMARTYS:|^\/Bitflash:btc-light\/|^\/Notoshi\/$|^\/pyspv:|^\/chainhorn:|^\/Murmel:|^\/BitcoinSwift:|^\/haskoin-btc:|^libbtc |\/bitcoin-net:|^\/rust-spv:|^\/pcoc-bari:/i, 'a light client'],
-];
-
-// Rules marked 'whole' read the whole agent: a pool or another chain may be
-// named in the brackets (the pool rule without the word "mempool"). The rest read only the name outside them - a word
-// like "monitor" or "electrs" in an operator's label does not make a Core
-// node a crawler or an indexer. The peers service's classify does the same.
-// The first rule that names this client, as its place in KIND_RULES, or -1.
-// Nothing but slashes, or a version with no name before it ("/:1.1.0/"):
-// nothing said, as with no agent at all - kinds.go emptyName.
-const EMPTY_NAME = /^\/*$|^\/:[^/]*\/$/;
-function kindRuleIndex(client) {
-  if (!client || EMPTY_NAME.test(client)) return -1;
-  const bare = client.replace(/\([^)]*\)/g, '');
-  // "pool" inside "mempool" is no pool: "(mempool.guide)" is a node's label.
-  const noMempool = client.replace(/mempool/gi, '');
-  return KIND_RULES.findIndex(([re, , reads]) => re.test(reads === 'whole' ? client : reads === 'no-mempool' ? noMempool : bare));
-}
-// The rule the ranking marks a peer by when the peers service has no word on it.
-const MISSPELT_RULE = 0;
-
-function cannotRelayReason(client) {
-  const i = kindRuleIndex(client);
-  return i < 0 ? null : KIND_RULES[i][1];
-}
-
-// Whether any rule names this client at all. The peer list flags a fork only
-// on nodes and unknown software, not on a peer it already named as something
-// else (a pool, a misspelt Core), so the ranking asks the same.
-const namedByKindRule = (client) => kindRuleIndex(client) >= 0;
-const otherChainShown = (p) => (p.otherChain && !namedByKindRule(p.client) ? p.otherChain : null);
+// What a peer's name alone says - its kind, whether that kind can pass a
+// block on, and the fork its service bits name - comes with each ranking row
+// from the server (cannotRelay, misspelt, otherChain), which reads the peers
+// service's own rules (lib/peer-rules.js). The page holds no rules of its own.
 
 const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 // subver (Client) is fully attacker-controlled - any P2P peer can set an
@@ -345,9 +271,22 @@ function drawTiles({ inbound, outbound, manual }) {
     ['Outbound', outbound, 'outbound'],
     ['Manual', manual, 'manual', used > manual ? `${used}/${MAX_MANUAL_PEERS} slots used` : `of ${MAX_MANUAL_PEERS}`],
   ];
-  document.getElementById('live-stats').innerHTML = stats
-    .map(([label, n, k, sub]) => `<div class="stat${k ? ' s-' + k : ''}"><div class="l">${label}</div><div class="n">${n}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`)
-    .join('');
+  // The tiles are built once; after that only a number or line that changed
+  // is written. Built anew every ten seconds, an iPhone could show it
+  // (22.11.2026).
+  const grid = document.getElementById('live-stats');
+  if (grid.children.length !== stats.length) {
+    grid.innerHTML = stats
+      .map(([label, , k]) => `<div class="stat${k ? ' s-' + k : ''}"><div class="l">${label}</div><div class="n"></div><div class="s" hidden></div></div>`)
+      .join('');
+  }
+  stats.forEach(([, n, , sub], i) => {
+    const tile = grid.children[i];
+    const num = tile.querySelector('.n'), line = tile.querySelector('.s');
+    if (num.textContent !== String(n)) num.textContent = String(n);
+    if (line.textContent !== (sub || '')) line.textContent = sub || '';
+    if (line.hidden !== !sub) line.hidden = !sub;
+  });
 }
 
 // Shared by the status poll and the live block event, so whichever learns of
@@ -378,7 +317,8 @@ function setBlockHeight(height, { at = Date.now(), fromCore = false } = {}) {
   heightAt = at;
 
   heightEl.classList.remove('waiting');
-  heightEl.textContent = height.toLocaleString('en-US');
+  const shown = height.toLocaleString('en-US');
+  if (heightEl.textContent !== shown) heightEl.textContent = shown;
   if (lastKnownHeight != null && height > lastKnownHeight) {
     heightEl.classList.remove('bump');
     void heightEl.offsetWidth; // restart the animation
@@ -398,6 +338,10 @@ function setBlockPool(race) {
   const known = race && race.pool;
   const raw = race && !known && race.poolTag ? race.poolTag : null;
   const unknown = race && !known && !raw && race.poolSource === 'none';
+  // The same answer again leaves the line as it is.
+  const key = JSON.stringify([known && (race.poolName || race.pool), raw, unknown]);
+  if (el.dataset.drawn === key && (known || raw || unknown)) return;
+  el.dataset.drawn = key;
   el.classList.toggle('raw', Boolean(raw));
   el.textContent = '';
   if (known || raw || unknown) {
@@ -497,7 +441,7 @@ function actionsCell(p, { lock = '' } = {}) {
   // hold a manual slot Slot Fill then has to free again; a disguised one
   // is not to be trusted with it.
   // The peers service's word where it has one, the name rules otherwise.
-  const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : kindRuleIndex(p.client) === MISSPELT_RULE);
+  const disguised = p.lion || (p.kind ? p.kind === 'Disguised' : Boolean(p.misspelt));
   // A Tor or I2P peer this node dialled carries its own address, and Core
   // reaches it again by itself (15.11.2026): it can be added. One that
   // dialled in carries the proxy's address, and CJDNS no proxy at all.
@@ -697,7 +641,13 @@ window.addEventListener('peerlab:list', (ev) => {
 // click on one is refused here as well, so no action goes out twice.
 const pendingPeers = new Set();
 window.peerLab = {
-  peer: (address) => rankingByAddress.get(address) || null,
+  // A live inbound peer's blocks counted over every port its IP came in from
+  // (ipFirst/ipEligible, peer-ranking.js); the ranking keeps its own.
+  peer: (address) => {
+    const r = rankingByAddress.get(address);
+    if (!r) return null;
+    return r.ipEligible ? { ...r, first: r.ipFirst || 0, eligible: r.ipEligible, byIp: true } : r;
+  },
   // The candidate Slot Fill is testing: the ranking says so (TESTING), on
   // the same clock as the list.
   onTrial: (address) => (rankingByAddress.get(address) || {}).status === 'TESTING',
@@ -880,18 +830,18 @@ document.addEventListener('selectionchange', () => {
 // "never first", and gets no "Add as Manual". The peer list marks the same
 // peers with ⊘.
 function neverFirstReason(p) {
-  const own = cannotRelayReason(p.client) || (p.offersNothing ? 'it offers no services' : null);
+  const own = p.cannotRelay || (p.offersNothing ? 'it offers no services' : null);
   // The peers service's word where it has one, for a connected peer - the
   // same word the peer list shows: a "wallet" that offers blocks is a
   // disguise that may well pass them on, whatever its name says, and the
   // chain is the one it found.
   if (p.kind) {
-    if (p.fork) return `it is on a chain of its own (${p.fork}), not yours`;
+    if (p.fork) return `it is probably on a chain of its own (${p.fork}), not yours`;
     return p.noRelay ? own || 'its software passes no blocks on' : null;
   }
   // Without it - not connected, or the peers service is down - by name and
   // service bits, as recorded.
-  const chain = otherChainShown(p) ? `it is on a chain of its own (${otherChainShown(p)}), not yours` : null;
+  const chain = p.otherChain ? `it is probably on a chain of its own (${p.otherChain}), not yours` : null;
   return own || chain;
 }
 
@@ -1073,10 +1023,10 @@ function lastTryText(st) {
   // above a candidate in Australia still being tested (17.11.2026).
   return ` An earlier peer${where ? ` in ${where}` : ''} ${whyText(l.reason)}.`;
 }
-// "8 of 8 slots used", then "Pick from 4,812 addresses" with a button per
+// "8 of 8 slots used", then "Pick from" with "Auto 4,812" and a button per
 // region to pick it (15.11.2026; always shown since 17.11.2026). A region with none shows 0 on
 // its button; the line does not repeat it (16.11.2026).
-const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
+const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North & Central America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
 function renderSlotBook() {
   const box = document.getElementById('slot-book');
   if (!box) return;
@@ -1101,10 +1051,13 @@ function renderSlotBook() {
   const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
   const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
   document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing}`;
-  document.getElementById('slot-book-pick').textContent = `Pick from ${n(b.total)} address${b.total === 1 ? '' : 'es'}`;
+  document.getElementById('slot-book-pick').textContent = 'Pick from';
   // Each region a switch (15.11.2026): picked, the next free slots go there.
   // One with nothing to pick from cannot be picked, but stays to be unpicked.
-  const html = buttons.map(([r, c]) => {
+  // "Auto" first (27.11.2026): every address Slot Fill can use, chosen while
+  // no region is; a tap on it drops all picked regions at once.
+  const auto = !picked.length;
+  const html = `<button type="button" class="region-pick${auto ? ' on' : ''}" data-region="AUTO" aria-pressed="${auto}"${picksSending ? ' disabled' : ''}>Auto <b>${n(b.total)}</b></button>` + buttons.map(([r, c]) => {
     const on = picked.includes(r);
     return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${(!c && !on) || picksSending ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
   }).join('');
@@ -1131,7 +1084,8 @@ function slotStatusText(st, now, trial = st && st.trial) {
   switch (st.state) {
     case 'core':
     case 'catching_up':
-      return { state: 'core', head: 'Waiting for Bitcoin Core', rest: st.state === 'core' ? 'to respond.' : 'to catch up with the chain.', short: 'on · waiting for Core' };
+    case 'offline':
+      return { state: 'core', head: 'Waiting for Bitcoin Core', rest: { core: 'to respond.', offline: 'to connect to the network.' }[st.state] || 'to catch up with the chain.', short: 'on · waiting for Core' };
     case 'trial': {
       const t = trial;
       const where = t.country ? countryName(t.country) : t.region;
@@ -1145,7 +1099,21 @@ function slotStatusText(st, now, trial = st && st.trial) {
       };
     }
     case 'full': {
-      const off = slots.offline || [];
+      // The pass that wrote this can be ten minutes old; the manual list is
+      // not. A slot freed since (a removal by hand) or a peer back online
+      // shows at once, so the line agrees with the tile and the slot count
+      // beside it (21.11.2026: three places said three things for a while).
+      // (Guarded: the tests run this function on its own, without the page.)
+      const ranking = typeof lastPeerRanking !== 'undefined' ? lastPeerRanking : null;
+      const gone = typeof justGone !== 'undefined' ? justGone : new Map();
+      const usedNow = ranking ? ranking.filter((p) => p.trusted && !gone.has(p.address)).length : slots.used;
+      if (usedNow < slots.max) {
+        return { state: 'full', head: `${usedNow} of ${slots.max} slots in use.`, rest: 'Slot Fill fills the free one at its next pass.', short: 'on · a slot is free' };
+      }
+      const off = (slots.offline || []).filter((o) => {
+        const row = ranking && ranking.find((p) => p.address === o.address);
+        return !row || (row.trusted && !row.live && !gone.has(o.address));
+      });
       // freesInMs is from the pass that wrote the status, up to ten minutes ago.
       const since = st.at ? Math.max(0, now - st.at) : 0;
       const peerIn = (o) => (o.where ? `Your peer in ${o.where}` : 'One peer');
@@ -1408,6 +1376,146 @@ async function refreshPools() {
   const pools = await api(`/api/pools?range=${encodeURIComponent(range)}`);
   if (seq !== poolsSeq) return;
   renderPools(pools);
+  refreshPoolPick();
+}
+
+// ---- Choose pools: the public pools by country (lib/pool-catalog.js) ----
+
+let poolPick = null; // the last answer of /api/pools/catalog
+let localPoolsFound = []; // pool apps on this Umbrel not yet in the race
+let poolPickBusy = 0; // ticks on their way: no redraw under the finger
+// Not remembered either (27.11.2026): every visit opens on "Racing" and all countries.
+let poolCountry = 'all';
+// Every visit starts on the pools in the race: the whole list is long on a
+// phone (129 rows, ten screens), and what runs is what one looks at most.
+// Not remembered. "racing" falls back to all when no public pool is
+// ticked yet, as on a fresh install.
+let poolKind = 'racing';
+let poolQuery = ''; // the search: not kept, a new visit starts with the whole list
+// A routed pool has no country: a globe and "Routed" instead.
+const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
+const pickCountry = (cc) => (cc ? countryName(cc) : 'Routed');
+
+// What a row's tag means: on hover, and on a tap (a phone shows no title).
+// Was a paragraph under the list (27.11.2026).
+const TAG_WHY = {
+  solo: 'Solo: whoever finds a block keeps it.',
+  shared: "Shared: the pool's miners split the reward.",
+  routed: 'Routed: the closest server is chosen for you, so where it stands is not fixed.',
+};
+// The tag sits inside the row's label: a tap on it must not tick the pool.
+document.getElementById('pool-pick-list').addEventListener('click', (e) => {
+  const t = e.target.closest('.tag[data-why]');
+  if (!t) return;
+  e.preventDefault();
+  showToast(t.dataset.why, 'info');
+});
+
+let poolPickSeq = 0;
+async function refreshPoolPick() {
+  if (poolPickBusy) return;
+  const seq = ++poolPickSeq;
+  let answer;
+  try {
+    answer = await api('/api/pools/catalog');
+  } catch {
+    return; // the list stays as it was; the table above still works
+  }
+  // A tick sent while this was on its way makes the answer old: the refresh
+  // after the tick brings the right one.
+  if (seq !== poolPickSeq || poolPickBusy) return;
+  poolPick = answer;
+  renderPoolPick();
+}
+
+// Written only when it changed: a redraw every refresh took the keyboard
+// focus off a switch and shut an open country list on iOS.
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el && el.dataset.drawn !== html) { el.innerHTML = html; el.dataset.drawn = html; }
+}
+
+function renderPoolPick() {
+  const box = document.getElementById('pool-pick');
+  if (!box || !poolPick) return;
+  // The kind and the search first: the countries then count only pools that
+  // are left. The search looks in the name, the place and the address.
+  const q = poolQuery.trim().toLowerCase();
+  // Only public pools are listed here: a race of own or local pools alone starts on All.
+  if (poolKind === 'racing' && !box.dataset.seen && !poolPick.pools.some((p) => p.enabled)) poolKind = 'all';
+  // A search looks through every pool, also from "Racing": it is how a new one is found.
+  const kind = poolKind === 'racing' && q ? 'all' : poolKind;
+  const pools = poolPick.pools.filter((p) => (kind === 'all' || (kind === 'racing' ? p.enabled : p.kind === kind))
+    && (!q || [p.name, p.host, p.region, pickCountry(p.country), p.routed ? 'routed' : ''].some((t) => t && t.toLowerCase().includes(q))));
+  const racing = poolPick.racing;
+  // Each tab says how many pools it holds, so opening on "Racing" does not
+  // look like all there is.
+  const tabCount = { racing: poolPick.pools.filter((p) => p.enabled).length, all: poolPick.pools.length };
+  for (const p of poolPick.pools) tabCount[p.kind] = (tabCount[p.kind] || 0) + 1;
+  for (const b of document.querySelectorAll('#pool-pick-kind button')) {
+    if (!b.dataset.label) b.dataset.label = b.textContent;
+    const label = `${escapeHtml(b.dataset.label)} <b>${tabCount[b.dataset.kind] || 0}</b>`;
+    if (b.dataset.drawn !== label) { b.innerHTML = label; b.dataset.drawn = label; }
+    // While searching from "Racing" the list shows every pool: "All" says so.
+    const on = b.dataset.kind === kind;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+  const counts = new Map();
+  for (const p of pools) counts.set(p.country || '', (counts.get(p.country || '') || 0) + 1);
+  const countries = [...counts.keys()].filter(Boolean).sort((a, b) => pickCountry(a).localeCompare(pickCountry(b)));
+  // A country with nothing left shows all. While searching only for this
+  // draw: an empty search gives the country back.
+  let cc = poolCountry;
+  if (cc !== 'all' && !counts.has(cc === 'routed' ? '' : cc)) {
+    cc = 'all';
+    if (!q) poolCountry = cc;
+  }
+
+  document.getElementById('pool-pick-sum').textContent =
+    `${racing} of ${poolPick.max} racing · ${poolPick.pools.length} public pools`;
+  const foundEl = document.getElementById('pool-pick-found');
+  if (foundEl) foundEl.textContent = localPoolsFound.length ? `· ${localPoolsFound.join(', ')} found on this Umbrel` : '';
+  // A fresh install has nothing racing: the list is what to do first.
+  if (!box.dataset.seen) {
+    box.dataset.seen = '1';
+    if (!racing) box.open = true;
+  }
+
+  const options = [['all', 'All countries', pools.length]]
+    .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
+  if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
+  setHtml('pool-pick-filter', options.map(([k, t, n]) =>
+    `<button type="button" data-action="pool-country" data-cc="${escapeHtml(k)}" class="${k === cc ? 'on' : ''}" aria-pressed="${k === cc}">${escapeHtml(t)}<small>${n}</small></button>`).join(''));
+  setHtml('pool-pick-select', options.map(([k, t, n]) =>
+    `<option value="${escapeHtml(k)}"${k === cc ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join(''));
+
+  const shown = pools
+    .filter((p) => cc === 'all' || (cc === 'routed' ? !p.country : p.country === cc))
+    .sort((a, b) => (a.country ? 0 : 1) - (b.country ? 0 : 1) || pickCountry(a.country).localeCompare(pickCountry(b.country)) || a.name.localeCompare(b.name));
+  const full = racing >= poolPick.max;
+  setHtml('pool-pick-list', shown.length ? shown.map((p) => {
+    const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'closest server';
+    const tag = p.routed ? `${p.kind} · routed` : p.kind;
+    const why = [TAG_WHY[p.kind], p.routed ? TAG_WHY.routed : ''].filter(Boolean).join(' ');
+    const off = full && !p.enabled;
+    return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
+      <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
+      <span class="w">${p.paused ? '<b class="paused">Paused in the table</b> · ' : ''}${escapeHtml(where)}</span>
+      <span class="tag${p.kind === 'shared' ? ' shared' : ''}" title="${escapeHtml(why)}" data-why="${escapeHtml(why)}">${escapeHtml(tag)}</span>
+      <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
+    </label></li>`;
+  }).join('') : `<li class="hint">${q ? 'No pool matches.' : kind === 'racing' ? 'No public pool ticked yet - pick some under All.' : 'No pool of this kind here.'}</li>`);
+}
+
+function setPoolKind(kind) {
+  poolKind = kind;
+  renderPoolPick();
+}
+
+function setPoolCountry(cc) {
+  poolCountry = cc;
+  renderPoolPick();
 }
 
 function renderPools(pools) {
@@ -1416,10 +1524,12 @@ function renderPools(pools) {
   if (deferRender('pools', '#pool-table', () => renderPools(pools))) return;
   const tbody = document.querySelector('#pool-table tbody');
   if (!pools.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="hint">No pools yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="hint">No pools yet - tick some under Choose pools, or add your own.</td></tr>';
     foldSums();
     return;
   }
+  // Remove on every pool, the list's too: out of the race and the table right
+  // here, numbers kept - the same as an untick under "Choose pools" (27.11.2026).
   tbody.innerHTML = pools.map((p) => `
     <tr data-key="pool:${p.id}" tabindex="0" class="can-act${p.enabled ? '' : ' pool-off'}">
       <td><b>${escapeHtml(p.label)}</b>${p.wonLastRace ? ' <span class="trophy" title="Won the most recent race">🏆</span>' : ''}${p.enabled ? '' : ' <span class="off-tag">Off</span>'}</td>
@@ -1446,7 +1556,9 @@ function renderPools(pools) {
 // Only the panels': the block card's folds belong to the other script.
 for (const box of document.querySelectorAll('.panel details.how')) {
   box.addEventListener('click', (e) => {
-    if (!box.open || e.target.closest('summary, a, button, input')) return;
+    // A control, or a row of the pool list (its label switches the pool), is
+    // not a tap on the text: it does its own thing and the fold stays open.
+    if (!box.open || e.target.closest('summary, a, button, input, select, textarea, label, form, .plist')) return;
     if (String(window.getSelection()).length > 0) return;
     // Its title on screen: it rolls up into it, in place. Scrolled away: shut
     // at once, and the title comes back to the top of the screen.
@@ -1519,13 +1631,25 @@ function trafficChartSvg(days, W) {
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
 }
 
+// The periods as far as there is data: with eight days recorded, "Last 30
+// days" said the same as "Last 7 days" (21.11.2026). A period longer than
+// the record is named by its start instead, and only once.
+function trafficPeriods(t) {
+  const since = new Date(`${t.since}T00:00:00Z`);
+  const recorded = Math.floor((Date.now() - since.getTime()) / 86400000) + 1;
+  const sinceLabel = `Since ${since.getUTCDate()} ${since.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })}`;
+  if (recorded < 7) return [['Today', t.today], [sinceLabel, t.month]];
+  if (recorded < 30) return [['Today', t.today], ['Last 7 days', t.week], [sinceLabel, t.month]];
+  return [['Today', t.today], ['Last 7 days', t.week], ['Last 30 days', t.month]];
+}
+
 async function refreshTraffic() {
   const t = await api('/api/traffic');
   // The arrows carry the colours of the bars, so they are the legend too.
   const arrows = (v) => `<span class="up">↑ ${escapeHtml(fmtBytes(v.sent))}</span><span class="down">↓ ${escapeHtml(fmtBytes(v.recv))}</span>`;
   document.getElementById('traffic-sum').textContent = t.since ? `today ↑ ${fmtBytes(t.today.sent)} ↓ ${fmtBytes(t.today.recv)}` : '';
   document.getElementById('traffic-totals').innerHTML = t.since
-    ? [['Today', t.today], ['Last 7 days', t.week], ['Last 30 days', t.month]]
+    ? trafficPeriods(t)
       .map(([l, v]) => `<div class="t"><div class="l">${l}</div><div class="v">${arrows(v)}</div></div>`)
       .join('')
     : '<p class="hint">Nothing recorded yet - the first numbers appear within an hour of the app starting.</p>';
@@ -1718,7 +1842,10 @@ document.getElementById('slot-book-regions').addEventListener('click', async (e)
   const r = btn.dataset.region;
   if (picksSending) return;
   const now = new Set(lastSlotStatus.picked || []);
-  if (now.has(r)) now.delete(r); else now.add(r);
+  if (r === 'AUTO') {
+    if (!now.size) return; // already the usual pick
+    now.clear();
+  } else if (now.has(r)) now.delete(r); else now.add(r);
   picksSending = true;
   picksEpoch += 1;
   renderSlotBook();
@@ -1749,7 +1876,9 @@ document.getElementById('manual-test-button').addEventListener('click', async ()
   } catch (err) {
     // Refused before any test (a Tor name, a proxied network): "not reachable" would claim something nobody checked.
     const untested = /cannot be tested|doesn't use|can't tell|your own node/.test(err.message);
-    manualAddResult(`${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
+    // A typo is said as one, not as "not reachable" (21.11.2026).
+    const invalid = /not a valid|is not a name that exists|not a valid port/.test(err.message);
+    manualAddResult(invalid ? err.message : `${untested ? 'not tested' : 'not reachable'} - ${err.message}`, 'error');
   } finally {
     manualAddBusy(false);
   }
@@ -1843,6 +1972,9 @@ async function refreshLocalPools() {
   localPoolsAtMs = Date.now();
   try { list = await api('/api/pools/local'); } catch { localPoolsAtMs = 0; return; }
   localPoolTemplates = Object.fromEntries(list.map((p) => [p.key, p]));
+  // Named in the folded line too: the buttons that say so are inside the fold.
+  localPoolsFound = list.filter((p) => p.installed && !p.added).map((p) => p.label);
+  renderPoolPick();
   document.querySelectorAll('#pool-templates button[data-template]').forEach((btn) => {
     const t = localPoolTemplates[btn.dataset.template];
     const found = Boolean(t && t.installed && !t.added);
@@ -1858,6 +1990,15 @@ document.body.addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-action]');
   if (!btn) return;
   const { action, address, id, template } = btn.dataset;
+
+  if (action === 'pool-country') {
+    setPoolCountry(btn.dataset.cc);
+    return;
+  }
+  if (action === 'pool-kind') {
+    setPoolKind(btn.dataset.kind);
+    return;
+  }
 
   if (action === 'add-found-pool') {
     const p = localPoolTemplates[template];
@@ -1969,7 +2110,7 @@ document.body.addEventListener('click', async (e) => {
     }
     if (action === 'delete-pool') {
       await api(`/api/pools/${id}`, { method: 'DELETE' });
-      showToast('Pool removed.', 'success');
+      showToast('Pool removed - its numbers are kept.', 'success');
       // A removed pool app is marked "✓ found" again at once.
       localPoolsAtMs = 0;
     }
@@ -2001,7 +2142,53 @@ document.body.addEventListener('click', async (e) => {
   }
 });
 
+// Every letter narrows the list at once; Escape empties the search.
+document.getElementById('pool-pick-search')?.addEventListener('input', (e) => {
+  poolQuery = e.target.value;
+  renderPoolPick();
+});
+document.getElementById('pool-pick-search')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && e.target.value) {
+    e.preventDefault();
+    e.target.value = '';
+    poolQuery = '';
+    renderPoolPick();
+  }
+});
+
 document.body.addEventListener('change', async (e) => {
+  if (e.target.id === 'pool-pick-select') {
+    setPoolCountry(e.target.value);
+    return;
+  }
+  const pick = e.target.closest('input[data-action="pick-pool"]');
+  if (pick) {
+    const enabled = pick.checked;
+    // Full: the switch stays tappable, so a tap says why rather than doing
+    // nothing (a disabled one gave no word on a phone, 26.11.2026).
+    if (enabled && pick.classList.contains('full')) {
+      pick.checked = false;
+      showToast(`At most ${poolPick.max} pools race at once - switch one off first.`, 'error');
+      return;
+    }
+    poolPickBusy += 1;
+    actionsInFlight += 1;
+    try {
+      await api('/api/pools/catalog', { method: 'POST', body: JSON.stringify({ host: pick.dataset.host, port: Number(pick.dataset.port), enabled }) });
+      showToast(enabled ? 'Pool added to the race.' : 'Pool removed from the race.', 'success');
+      const row = pick.closest('label');
+      if (row) row.classList.toggle('on', enabled);
+    } catch (err) {
+      if (pick.isConnected) pick.checked = !enabled;
+      showToast(`Could not change the pool: ${err.message}`, 'error');
+    } finally {
+      poolPickBusy -= 1;
+      actionsInFlight -= 1;
+      refreshPools();
+      flushDeferredRenders();
+    }
+    return;
+  }
   const chk = e.target.closest('input[data-action="toggle-pool"]');
   if (chk) {
     const enabled = chk.checked;
@@ -2264,6 +2451,20 @@ function startEventStream() {
   source.addEventListener('block', (e) => {
     try {
       applyBlockUpdate(JSON.parse(e.data));
+    } catch (err) {
+      /* malformed frame - the next event supersedes it */
+    }
+  });
+  // The Stratum race while it is open, pool by pool: the block card (the
+  // peer list's script) lays it in until the recorded race arrives.
+  // Kept on window too: this script opens the stream before the peer list's
+  // (deferred) script is there to listen, and the replay on connect would be
+  // lost; the block card reads it from here when it starts.
+  source.addEventListener('stratum', (e) => {
+    try {
+      const detail = JSON.parse(e.data);
+      window.peerLabLiveRace = detail;
+      window.dispatchEvent(new CustomEvent('peerlab:stratum', { detail }));
     } catch (err) {
       /* malformed frame - the next event supersedes it */
     }

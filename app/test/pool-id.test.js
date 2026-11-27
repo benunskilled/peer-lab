@@ -72,10 +72,57 @@ test('the embedded list is the real one', () => {
   for (const [tag, name] of [
     ['Mined by AntPool', 'AntPool'],
     ['/ViaBTC/', 'ViaBTC'],
-    ['OCEAN.XYZ', 'Ocean.xyz'],
+    ['OCEAN.XYZ', 'OCEAN'],
+    // In mempool's list only (November 2026).
+    ['cloverpool', 'CloverPool'],
+    ['/trustpool/', 'TrustPool'],
+    // In bitcoin-data's list only: kept by the merge.
+    ['ckpool', 'CKPool'],
+    ['binance/', 'Binance Pool'],
   ]) {
     assert.equal(poolId.identify({ coinbaseHex: hex(tag) }).name, name);
   }
+});
+
+// scripts/mining-pools.js keeps mempool's list as the main one and only what
+// bitcoin-data alone holds as a fallback, renamed where mempool renamed the
+// pool by its tags (BTC.com is CloverPool) - not by moved addresses.
+test('the pool list build keeps the old list apart, under new names', () => {
+  const { fromMempool, merge } = require('../scripts/mining-pools');
+  const base = fromMempool([
+    { name: 'CloverPool', link: 'https://clover', tags: ['btccom', 'cloverpool'], addresses: ['1A'] },
+    { name: 'MiningKings', link: '', tags: [], addresses: ['1K'] },
+  ]);
+  const older = {
+    coinbase_tags: { btccom: { name: 'BTC.com', link: '' }, ckpool: { name: 'CKPool', link: '' } },
+    payout_addresses: { '1B': { name: 'BTC.com', link: '' }, '1K': { name: 'CKPool', link: '' }, '1C': { name: 'CKPool', link: '' } },
+  };
+  const out = merge(base, older);
+  assert.deepEqual(Object.keys(out.coinbase_tags), ['btccom', 'cloverpool']);
+  assert.deepEqual(out.fallback.payout_addresses['1B'], { name: 'CloverPool', link: 'https://clover' });
+  // An address mempool gave to another pool renames nothing.
+  assert.equal(out.fallback.payout_addresses['1C'].name, 'CKPool');
+  assert.equal(out.fallback.coinbase_tags.ckpool.name, 'CKPool');
+  assert.equal('1K' in out.fallback.payout_addresses, false);
+});
+
+// Three blocks of November 2026 that the old list got wrong, because one of
+// its addresses was checked before the pool's own tag.
+test('the old list never beats the maintained one', () => {
+  const cases = [
+    // 977125: "/trustpool/", paid to an address bitcoin-data files under ViaBTC.
+    ['/trustpool/', ['1PuJjnF476W3zXfVYmJfGnouzFDAXakkL4'], 'TrustPool'],
+    // 977231: OCEAN pays its miners directly; one of them is filed under CleanIncentive.
+    ['OCEAN.XYZ', ['bc1q2824ekxc6ewypfpzv64h69frnx9dx6rsgek6ec', 'bc1qrm09asqsxh2l7pjxjlltm53tx689dp2amzupzq'], 'OCEAN'],
+    // 976628: "cloverpool", paying an old BTC.com address too.
+    ['cloverpool', ['3J1zSHERKN7FgsEjHeTcwG9tYE3GuMWTcM', '36cWgjEtxQSFgbHTJDw5AB96ZX7fJk1URd'], 'CloverPool'],
+  ];
+  for (const [tag, addresses, name] of cases) {
+    assert.equal(poolId.identify({ coinbaseHex: hex(`\u0003abc${tag}\u0000`), addresses }).name, name, tag);
+  }
+  // With nothing else to go on, the old list still answers - renamed.
+  assert.equal(poolId.identify({ addresses: ['36cWgjEtxQSFgbHTJDw5AB96ZX7fJk1URd'] }).name, 'CloverPool');
+  assert.equal(poolId.identify({ coinbaseHex: hex('\u0003abc ckpool') }).name, 'CKPool');
 });
 
 // A block from somebody the list has never heard of still says something:

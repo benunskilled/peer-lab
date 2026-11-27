@@ -35,6 +35,26 @@ func TestEveryDisguiseHasATell(t *testing.T) {
 	}
 }
 
+// Every name the Disguised rule catches has words under its pill, whatever
+// else the peer did: a spelling added to misspeltCore without its short form
+// in misspellings would leave the line empty (19.11.2026: "/Satoshi:" without
+// the closing "/" did, and the demo data had no such peer to show it).
+func TestNameDisguisesHaveATell(t *testing.T) {
+	n := 0
+	for subver, kind := range kindExamples {
+		if kind != fakeWalletKind {
+			continue
+		}
+		n++
+		if tell := tellOf(fakeAbout(subver, "", nil), false); tell == "" {
+			t.Errorf("%q is Disguised by its name but tells nothing", subver)
+		}
+	}
+	if n == 0 {
+		t.Fatal("no Disguised name among the kind examples")
+	}
+}
+
 func TestShortReasons(t *testing.T) {
 	for _, c := range []struct{ about, want string }{
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + skippedHandshakeAbout(map[string]int64{"sendaddrv2": 1}), "no wtxidrelay"},

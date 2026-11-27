@@ -410,7 +410,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			ConnTime: r.ConnTime, Transport: r.Transport, HBTo: r.HBTo, HBFrom: r.HBFrom,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 			TrafficSent: trafficByMessage(r.BytesSentPerMsg), TrafficRecv: trafficByMessage(r.BytesRecvPerMsg),
-			Services: r.ServicesNames, Version: r.Version,
+			Services: shownServices(r.Subver, r.ServicesNames), Version: r.Version,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
 		// is Core saying nothing. Only the first is worth showing.
@@ -426,6 +426,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		p.NoRelay = p.NoRelay || p.NoServices
 		borrowedKind, borrowedAbout, borrowedName, borrowedLabel := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
 		libreKind, libreAbout, libreLabel := libreRelay(r.Subver, r.ServicesNames)
+		dogKind, dogAbout, dogLabel := dogMode(r.Subver, r.ServicesNames)
 		researcher, host, isResearch := researchHostOf(r.Addr)
 		switch {
 		case isResearch:
@@ -446,21 +447,23 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):
 			claim := claimOf(r.Subver)
 			if p.About != "" {
-				claim, _, _ = strings.Cut(p.About, ",")
-				claim = "the wallet " + claim
+				claim = walletClaim(p.About)
 			}
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+bitcoinjWhy(r, now)
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
-			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "Probably ViaBTC's relay"
+			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "ViaBTC's relay (bitpeer)"
 			labelled = p.About
 			p.PoolProof = "Found by 0xB10C, b10c.me"
 		case purityByBits(r.Subver, r.ServicesNames):
-			p.Kind, p.About, p.Label, p.NoRelay = "Other chain", purityByBitsAbout, "Probably Purity", true
+			p.Kind, p.About, p.Label, p.NoRelay = "Other chain", purityByBitsAbout, "Purity, bare Core name", true
 			labelled = p.About
 		case libreKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
+			labelled = p.About
+		case dogKind != "" && protocolMismatch(r.Subver, r.Version) == "":
+			p.Kind, p.About, p.Label = dogKind, dogAbout, dogLabel
 			labelled = p.About
 		case borrowedKind != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now) == "":
@@ -528,7 +531,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if p.Kind == noAgentKind && r.Version > 0 {
 			p.About, p.Label = noAgentLine(r.BytesRecvPerMsg, r.ConnTime, now)
 			if hemiUnnamed.MatchString(r.Subver) {
-				p.About, p.Label = hemiUnnamedAbout+"\n"+p.About, "Probably Hemi's code"
+				p.About, p.Label = hemiUnnamedAbout+"\n"+p.About, "Probably Hemi's hVM"
 			}
 			labelled = p.About
 		} else if p.Kind == noAgentKind {
@@ -536,7 +539,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			labelled = p.About
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
-		// claims nothing, so it stays "No user agent" and only the about says
+		// claims nothing, so it stays "No name" and only the about says
 		// who it probably is.
 		if isLinkingLion(r.Addr) || r.mockLinkingLion {
 			p.LinkingLion = true
@@ -594,7 +597,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			// gives the same reason live as from the record.
 			forkKind = "Other"
 		}
-		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, forkKind, r.SyncedHeaders, tip)
+		p.Fork, p.ForkWhy = forkOf(r.Subver, r.ServicesNames, forkKind, r.SyncedHeaders, tip)
 		if r.MinFeeFilter != nil && r.BytesRecvPerMsg["feefilter"] > 0 {
 			v := math.Round(*r.MinFeeFilter*1e5*10) / 10
 			p.MinFee = &v

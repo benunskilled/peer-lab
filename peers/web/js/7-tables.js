@@ -272,7 +272,10 @@
       const th = document.createElement("th");
       th.scope = "col";
       th.className = "k-" + c.key + (c.cls ? " " + c.cls : "");
-      if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
+      // As the column reads, not as its value sorts: First/Blocks sorts by the
+      // negated count and Connected by its start time, so either way round
+      // the order a reader sees is the other one (21.11.2026).
+      if (c.key === col.key) th.setAttribute("aria-sort", (s.dir > 0) !== Boolean(c.shownReversed) ? "ascending" : "descending");
       const b = document.createElement("button");
       b.textContent = c.label;
       b.dataset.focusKey = "sort " + g + " " + c.key;
@@ -335,8 +338,8 @@
     // The peer that brought the newest block, for as long as the star
     // is up - one rule for "just delivered", in the row and on the map.
     if (deliveredNow.has(p.addr)) tr.className = "delivered-now";
-    // A connection that has brought this node a block, at least once: its address in green, also on an orange row.
-    if (deliveredEver.has(p.addr) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
+    // A peer that has brought this node a block, at least once (by IP when inbound, like its "× first"): its address in green, also on an orange row.
+    if (hasDelivered(p) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
     if (p.no_relay || p.offline) tr.classList.add("weak");
     for (const c of COLS) {
       const td = document.createElement("td");
@@ -526,6 +529,18 @@
       const head = row.querySelector(".kind-head");
       if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
       else row.style.removeProperty("--kind-space");
+      // "82× first" under the pill: the address line beneath gives way only
+      // as far as it would run into it, 8px short of it.
+      // A width it may not pass, not padding: a line as wide as its text
+      // only grew by the padding and still ran into it.
+      row.style.removeProperty("--addr-max");
+      const bar = cards && head && head.querySelector(".kind-first");
+      const addr = bar && row.querySelector("td.k-peer .who-text > small");
+      if (addr) {
+        const box = addr.getBoundingClientRect();
+        const stop = bar.getBoundingClientRect().left - 8;
+        if (Math.min(box.left + addr.scrollWidth, box.right) > stop) row.style.setProperty("--addr-max", Math.floor(stop - box.left) + "px");
+      }
     }
   }
   const overflows = (wraps) => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);

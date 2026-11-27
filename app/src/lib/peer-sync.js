@@ -123,7 +123,11 @@ async function takeOverOutsideRemovals(existingAddrs, afterRestart) {
   try {
     fresh = new Set((await rpc.getAddedNodeInfo()).map((n) => keyOf(n.addednode)));
   } catch (err) {
-    return;
+    // Not confirmed either way: these are not handed back to Core this
+    // sync, and the next one still counts them as held before, so it asks
+    // again rather than taking them for new (outside review, 26.11.2026).
+    if (lastSync) lastSync.held = new Set([...lastSync.held, ...gone.map(keyOf)]);
+    return new Set(gone.map(keyOf));
   }
   const dropped = db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?');
   for (const address of gone) {
@@ -166,7 +170,7 @@ async function syncTrustedToAddnode(knownAddedNodes, { afterRestart = false } = 
   } catch (err) {
     logger.warn('taking Core\'s spelling failed, next sync', { error: err.message });
   }
-  await takeOverOutsideRemovals(existingAddrs, afterRestart);
+  const holdBack = (await takeOverOutsideRemovals(existingAddrs, afterRestart)) || new Set();
   trusted = db.instance.prepare(`SELECT address FROM trusted_peer ORDER BY created_at ASC`).all();
 
   // Peers Core already has addnode'd count against the cap too, so we don't
@@ -185,6 +189,7 @@ async function syncTrustedToAddnode(knownAddedNodes, { afterRestart = false } = 
   const wanted = (address) => Boolean(stillWanted.get(address));
   for (const { address } of trusted) {
     if (existingAddrs.has(keyOf(address))) continue;
+    if (holdBack.has(keyOf(address))) continue;
     if (slotsUsed >= config.maxManualPeers) {
       queued += 1;
       continue;
@@ -279,6 +284,7 @@ async function adoptExternalManualPeers() {
   let adopted = 0;
   const skipped = [];
   const pending = pendingRemovals();
+  const done = []; // removals finished here, and only these leave the list
   let pendingChanged = false;
   for (const { addednode } of addedNodes) {
     if (!addednode || known.has(keyOf(addednode))) continue;
@@ -288,11 +294,13 @@ async function adoptExternalManualPeers() {
       try {
         await rpc.addNode(addednode, 'remove');
         delete pending[keyOf(addednode)];
+        done.push(keyOf(addednode));
         pendingChanged = true;
         logger.info('retried addnode remove for a peer this app had dropped', { address: addednode });
       } catch (err) {
         if (notAdded(err)) {
           delete pending[keyOf(addednode)];
+          done.push(keyOf(addednode));
           pendingChanged = true;
         } else {
           logger.warn('addnode remove retry failed', { address: addednode, error: err.message });
@@ -312,7 +320,19 @@ async function adoptExternalManualPeers() {
       skipped.push(addednode);
       continue;
     }
-    insert.run(addednode, now);
+    // Counted again with the insert, under the write lock: `known` was read
+    // before the RPCs above, and in the meantime Slot Fill or an add by hand
+    // in the other process can have taken the last slot. The snapshot alone
+    // let both rows in - "9 of 8" (21.11.2026), as addTrustedPeer once did.
+    const fits = db.instance.transaction(() => {
+      if (countTrusted() >= config.maxManualPeers) return false;
+      insert.run(addednode, now);
+      return true;
+    }).immediate();
+    if (!fits) {
+      skipped.push(addednode);
+      continue;
+    }
     known.add(keyOf(addednode));
     // Same reason as in addTrustedPeer: a manual peer with no `peer` row is
     // invisible to peerRanking(), so no Slot Fill pass can ever see it while it
@@ -322,7 +342,15 @@ async function adoptExternalManualPeers() {
     adopted += 1;
     logger.info('adopted externally-managed manual peer into trusted_peer', { address: addednode });
   }
-  if (pendingChanged) savePendingRemovals(pending);
+  // Read again before writing: the dashboard (another process) may have
+  // noted a removal of its own meanwhile, and writing back the list read
+  // before the awaits above dropped it - that peer came back, padlocked
+  // (outside review, 26.11.2026).
+  if (pendingChanged) {
+    const latest = pendingRemovals();
+    for (const k of done) delete latest[k];
+    savePendingRemovals(latest);
+  }
   if (skipped.length > 0) {
     logger.warn('manual peer limit reached, addnode entries not adopted', {
       max: config.maxManualPeers,
@@ -375,7 +403,10 @@ function liveNonManualSessionsForHost(peers, address) {
   return peers.filter(
     (p) => p.connection_type !== 'manual'
       && !((p.inbound || p.connection_type === 'inbound') && SHARED_PROXY_NETWORKS.has(String(p.network || '').toLowerCase()))
-      && hostFromAddress(p.addr) === host,
+      // An inbound one by its host (it dialled from a passing port); an
+      // outbound one by its whole address: another node may listen on the
+      // same IP (outside review, 26.11.2026).
+      && ((p.inbound || p.connection_type === 'inbound') ? hostFromAddress(p.addr) === host : keyOf(p.addr) === keyOf(address)),
   );
 }
 
@@ -732,7 +763,17 @@ async function removeTrustedPeer(address0, { disconnect = true } = {}) {
   // from a moment ago would otherwise see the entry there and none here, and
   // take it back in as somebody else's addnode - padlocked.
   noteRemoved(keyOf(address));
-  db.instance.prepare(`DELETE FROM trusted_peer WHERE address = ?`).run(address);
+  // The row goes together with a lasting "remove from Core" mark, before Core
+  // is told: if the app stops between the two, the next sync removes the
+  // entry from Core instead of adopting it back, padlocked - the short
+  // "removed a moment ago" note above runs out after five minutes
+  // (review 21.11.2026). The mark is cleared once Core has let go of it.
+  db.instance.transaction(() => {
+    const pending = pendingRemovals();
+    pending[keyOf(address)] = Date.now();
+    savePendingRemovals(pending);
+    db.instance.prepare(`DELETE FROM trusted_peer WHERE address = ?`).run(address);
+  }).immediate();
   try {
     // Also tell Core to drop it as a manual/addnode entry - otherwise Core
     // keeps trying to maintain the connection even though we've forgotten
@@ -745,9 +786,7 @@ async function removeTrustedPeer(address0, { disconnect = true } = {}) {
     // means Core may still hold the entry: remember it, so the sync removes
     // it again instead of adopting it back.
     if (!notAdded(err)) {
-      const pending = pendingRemovals();
-      pending[keyOf(address)] = Date.now();
-      savePendingRemovals(pending);
+      // The mark written above stays: the next sync tries again.
       logger.warn('addnode remove failed, will retry on the next sync', { address, error: err.message });
     } else {
       logger.debug('addnode remove while untrusting peer', { address, error: err.message });

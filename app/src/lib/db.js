@@ -236,6 +236,9 @@ CREATE TABLE IF NOT EXISTS stratum_pool (
   enabled INTEGER NOT NULL DEFAULT 1,
   is_default INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
+  -- 0: unticked in the list, out of the race and the table, its races kept
+  -- for a tick later (27.11.2026). enabled is then 0 as well.
+  chosen INTEGER NOT NULL DEFAULT 1,
   UNIQUE(host, port)
 );
 
@@ -290,19 +293,10 @@ CREATE TABLE IF NOT EXISTS traffic_day (
 );
 `;
 
-// label, host, port - sourced from public solo-pool directories (Aug 2026).
-// Purely a starting point: every row is a normal stratum_pool row the user
-// can disable or delete like any other, nothing is special-cased in code.
-const DEFAULT_POOLS = [
-  ['AtlasPool', 'solo.atlaspool.io', 3333],
-  ['EU CKPool', 'eusolo.ckpool.org', 3333],
-  ['Braiins Solo', 'solo.stratum.braiins.com', 3333],
-  ['SoloHash DE', 'solo-de.solohash.co.uk', 3333],
-  ['SoloMining.de', 'pool.solomining.de', 3333],
-  ['Satoshi Radio', 'pool.satoshiradio.nl', 3333],
-  ['2Miners Solo BTC', 'solo-btc.2miners.com', 2323],
-  ['Parasite Pool', 'parasite.wtf', 42069],
-];
+// A fresh install starts with no pool at all (25.11.2026): the user picks
+// from the list of public pools (data/stratum-pools.json) or adds their own.
+// Installs from before keep the eight pools they were given then - they are
+// rows like any other, and the list shows them ticked.
 
 // A VACUUM is only worth its exclusive lock if this share of the file is
 // actually free space waiting to be reclaimed.
@@ -384,18 +378,27 @@ function openOnce() {
   // makes every connection wait up to 10s and retry instead - the timeout
   // set at the top of this function.
   db.exec(SCHEMA);
+  addChosenColumn();
   seedDefaultPools();
   logger.info('database ready', { path: config.sqlitePath });
   return db;
 }
 
+// stratum_pool.chosen came with 1.1.0; a database from 1.0 gets it here.
+// All four processes open at once: the one that loses the race to add it
+// is told the column exists, which is all it wanted.
+function addChosenColumn() {
+  if (db.prepare(`SELECT 1 FROM pragma_table_info('stratum_pool') WHERE name = 'chosen'`).get()) return;
+  try {
+    db.exec(`ALTER TABLE stratum_pool ADD COLUMN chosen INTEGER NOT NULL DEFAULT 1`);
+  } catch (err) {
+    if (!/duplicate column/i.test(err.message)) throw err;
+  }
+}
+
 function seedDefaultPools() {
   const already = db.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get();
   if (already) return;
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 1, ?)`,
-  );
-  const now = Date.now();
   const tx = db.transaction(() => {
     // Re-check inside the transaction: all four processes call open() at once, and on a fresh
     // install all four read "not seeded yet". meta.key is a PRIMARY KEY, so
@@ -405,7 +408,6 @@ function seedDefaultPools() {
     // afterwards.
     const raced = db.prepare(`SELECT value FROM meta WHERE key = 'pools_seeded'`).get();
     if (raced) return false;
-    for (const [label, host, port] of DEFAULT_POOLS) insert.run(label, host, port, now);
     db.prepare(`INSERT INTO meta (key, value) VALUES ('pools_seeded', '1')`).run();
     return true;
   });
@@ -413,7 +415,7 @@ function seedDefaultPools() {
   // the flag first and only then asks to write, and when another process
   // committed in between, SQLite refuses the upgrade at once with
   // SQLITE_BUSY_SNAPSHOT - no busy_timeout applies to that.
-  if (tx.immediate()) logger.info('seeded default stratum pools', { count: DEFAULT_POOLS.length });
+  tx.immediate();
 }
 
 // Held for the life of the process rather than compiled per call. This is on
@@ -573,14 +575,16 @@ function resetPeerData() {
 }
 
 /**
- * Throw away the stratum pool history. The configured pools themselves stay -
- * only their measured races and latencies go.
+ * Throw away the stratum pool history. The pools in the table stay - only
+ * their measured races and latencies go. Unticked or removed pools (chosen 0)
+ * were kept only for those numbers, so they go with them.
  */
 function resetPoolHistory() {
   const before = storageBreakdown().poolHistory;
   const tx = db.transaction(() => {
     db.prepare(`DELETE FROM stratum_observation`).run();
     db.prepare(`DELETE FROM stratum_race`).run();
+    db.prepare(`DELETE FROM stratum_pool WHERE chosen = 0`).run();
     // The race worker writes a race still being checked with Core later; this
     // tells it the race belongs to the history just thrown away.
     db.prepare(`INSERT INTO meta (key, value) VALUES ('stratum_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(Date.now()));

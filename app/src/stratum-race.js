@@ -19,13 +19,14 @@ const { StratumPoolConnection } = require('./lib/stratum-client');
 const toggle = require('./lib/stratum-race-toggle');
 const { canonical, encodings } = require('./lib/prevhash');
 const rpc = require('./lib/rpc');
+const live = require('./lib/stratum-live');
+const catalog = require('./lib/pool-catalog');
 
-// Pools only ever change through the dashboard, and a few minutes' delay in
-// noticing that is imperceptible - this used to run every 30 seconds, which
-// was 2,880 pointless SELECTs a day to catch an event that happens maybe
-// twice a month. Enabling or disabling a pool from the UI takes effect on
-// the next pass.
-const POOL_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+// Pools change through the dashboard. Since 26.11.2026 a tick in "Choose
+// pools" adds one and an untick deletes it - often, and a pool unticked kept
+// its socket and could still open a race for up to five minutes (R-2611-05).
+// One small SELECT every 30 seconds.
+const POOL_REFRESH_INTERVAL_MS = 30 * 1000;
 
 // The master switch is checked far more often than the pool list, and for a
 // different reason. The pool list changes maybe twice a month, so noticing it
@@ -37,6 +38,7 @@ const TOGGLE_CHECK_INTERVAL_MS = 30 * 1000;
 
 /** @type {Map<number, {conn: StratumPoolConnection, pool: object}>} */
 const active = new Map();
+const warnedLogin = new Set(); // pools whose refused login was already logged
 
 /**
  * Open races, keyed by prevhash: { createdAt, startHr, timer, reported, results }.
@@ -58,9 +60,14 @@ const active = new Map();
  * genuinely overlapping races can both stay open.
  */
 const openRaces = new Map();
+// The prevhash of the race opened last: the one the live view shows.
+let newestRace = null;
 
 // See handleNotify for why ten is already absurdly generous.
 const MAX_OPEN_RACES = 10;
+// Races one pool may have opened and still open: a pool sending made-up
+// hashes fills its own two, not the ten a real block needs (R-2611-05).
+const MAX_OPEN_RACES_PER_POOL = 2;
 
 // A stale notify must be recognised as stale without a database round-trip on
 // every single message, and without growing forever. Prevhashes are only ever
@@ -92,6 +99,8 @@ function statements() {
       recordMiss: db.instance.prepare(
         `INSERT OR IGNORE INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, NULL, NULL)`,
       ),
+      // An unticked pool (chosen 0) keeps its row but is out, like a removed one.
+      poolIds: db.instance.prepare('SELECT id FROM stratum_pool WHERE chosen = 1'),
     };
   }
   return stmts;
@@ -105,9 +114,31 @@ function rememberPrevhash(prevhash) {
   }
 }
 
+// The blocks just below Core's tip, as already seen: after a start (or the
+// switch going on) nothing is in memory, and a pool still a block behind
+// could open a race for the previous block - Core knows it, two confirmations
+// pass, and the lagging pool won while the others were charged a miss
+// (R-2611-05). The tip itself is left out: its race may still be coming.
+async function rememberRecentBlocks() {
+  try {
+    const tip = Number(await rpc.getBlockCount());
+    for (let h = tip - 1; h >= Math.max(0, tip - RECENT_BLOCKS); h -= 1) {
+      rememberPrevhash(canonical(await rpc.call('getblockhash', [h])));
+    }
+  } catch (err) {
+    logger.debug('could not read the recent blocks from Core', { error: err.message });
+  }
+}
+
 function loadEnabledPools() {
   return db.instance.prepare(`SELECT * FROM stratum_pool WHERE enabled = 1`).all();
 }
+
+// Whether the blocks just below the tip are known yet (rememberRecentBlocks):
+// until then no pool is connected, so none can open a race for one of them
+// while Core is slow to answer (R-2711-10).
+// Set false on every switch-on (applyToggle, which main() runs first).
+let recentReady = true;
 
 function syncConnections() {
   // Switched off: hold nothing open, and do not start anything for a pool that
@@ -117,6 +148,7 @@ function syncConnections() {
     shutDownRace();
     return;
   }
+  if (!recentReady) return;
 
   const pools = loadEnabledPools();
   const wanted = new Map(pools.map((p) => [p.id, p]));
@@ -166,9 +198,31 @@ function syncConnections() {
       conn.on('notify', ({ prevhash, receivedAtHr, receivedAtMs, firstAfterConnect }) =>
         handleNotify(pool, prevhash, receivedAtHr, receivedAtMs, firstAfterConnect));
       conn.on('socketError', (err) => logger.debug('pool socket error', { label: pool.label, error: err.message }));
+      // Every lost connection, at info: who ended it and why, how long it
+      // stood. A block that falls into the gap is a race this pool cannot be
+      // timed in, and this is the line that says why (25.11.2026).
+      conn.on('disconnect', (info) => {
+        if (!info || info.reason === 'stopped') return;
+        logger.info('pool connection closed', {
+          label: pool.label,
+          reason: info.reason,
+          heldMinutes: Math.round(info.heldMs / 60000),
+          jobs: info.jobs,
+          nextTryMs: info.nextTryMs,
+        });
+      });
       conn.on('protocolError', (info) => logger.warn('pool sent something unusable', { label: pool.label, ...info }));
       conn.on('authorizeResult', ({ ok, error }) => {
-        if (!ok) logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
+        if (ok) return;
+        // A pool on the list known to refuse the login and send jobs anyway
+        // (Braiins Pool): the warning would be wrong, so only at debug.
+        if (catalog.find(pool.host, pool.port)?.loginRefused) logger.debug('pool refused the login, as it always does; jobs still come', { label: pool.label });
+        else if (!warnedLogin.has(pool.id)) {
+          // Once per pool and run: a pool that refuses and sends nothing is
+          // dialled again and again, and would say it each time.
+          warnedLogin.add(pool.id);
+          logger.warn('pool rejected mining.authorize - it will likely never send us a job', { label: pool.label, error });
+        }
       });
       // Per-pool proof of life, at debug: at one line per pool every 15
       // minutes, info would be ~32 lines an hour of "still fine", burying the
@@ -219,18 +273,60 @@ function resetAt() {
   return row ? Number(row.value) : 0;
 }
 
-function writeRace(race, { misses }) {
+function writeRace(race, opts) {
   if (race.written) return;
   race.written = true;
+  // One short IMMEDIATE transaction from the reset check to the last miss: a
+  // reset or an untick in the dashboard's process lands wholly before or
+  // wholly after it, never between the check and the insert (R-2711-10).
+  // Nothing in it waits for Core.
+  try {
+    db.instance.transaction(() => writeRaceRows(race, opts)).immediate();
+  } catch (err) {
+    logger.warn('failed to record race', { prevhash: race.prevhash, error: err.message });
+  }
+}
+
+function writeRaceRows(race, { misses }) {
   let s;
   let id;
+  let results;
+  let alive;
+  let createdAt = race.createdAt;
   try {
     if (race.createdAt <= resetAt()) {
       logger.debug('race from before a reset, not recorded', { prevhash: race.prevhash });
       return;
     }
     s = statements();
-    const info = s.openRace.run(race.prevhash, race.createdAt);
+    // A pool unticked or removed while the race was open is out of the
+    // table: its row would fail, and the pool behind it would be saved as
+    // second with no first. The rest move up, timed from the first that is
+    // still there (R-2611-05).
+    results = race.results;
+    alive = null;
+    try {
+      alive = new Set(s.poolIds.all().map((r) => r.id));
+      const kept = results.filter((r) => alive.has(r.poolId));
+      if (kept.length < results.length && kept.length) {
+        const base = kept[0].elapsedMs;
+        results = kept.map((r, i) => ({ ...r, elapsedMs: r.elapsedMs - base, rank: i + 1 }));
+        // The race starts at the first still there: "Core to your pool" is
+        // measured from it.
+        createdAt += Math.round(base);
+      } else {
+        results = kept;
+      }
+      // Everyone who reported was removed: a race with no one in it says
+      // nothing, and would only charge the rest a miss.
+      if (race.results.length && !kept.length) {
+        logger.debug('every pool that reported was removed - race not recorded', { prevhash: race.prevhash });
+        return;
+      }
+    } catch (err) {
+      logger.debug('could not check which pools are still there', { error: err.message });
+    }
+    const info = s.openRace.run(race.prevhash, createdAt);
     if (info.changes === 0) {
       // Already in the database from an earlier run - the original start
       // instant is lost, so these offsets would mean nothing.
@@ -254,7 +350,7 @@ function writeRace(race, { misses }) {
   // only for some pools, which is precisely the Win%/Miss bias that once had
   // to be erased from the whole history.
   // Per-row failure costs exactly that row, and never crashes this process.
-  for (const r of race.results) {
+  for (const r of results) {
     try {
       s.recordReport.run(id, r.poolId, r.elapsedMs, r.rank);
     } catch (err) {
@@ -267,6 +363,7 @@ function writeRace(race, { misses }) {
   // written minutes later, and a pool added in between was never in it.
   for (const poolId of race.watched || active.keys()) {
     if (race.reported.has(poolId) || race.excused.has(poolId)) continue;
+    if (alive && !alive.has(poolId)) continue; // removed meanwhile
     try {
       s.recordMiss.run(id, poolId);
     } catch (err) {
@@ -352,7 +449,7 @@ async function settleRace(race, attempt = 0) {
   // races are, with no misses (review G4: it was written with them).
   // Not a block Core knows as recent: not written at all.
   if (race.generation !== generation) {
-    if (!race.written && (known === true || known === null)) writeRace(race, { misses: false });
+    if (!race.written && (known === true || (known === null && !race.unknownToCore))) writeRace(race, { misses: false });
     return undefined;
   }
   if (known === 'old') {
@@ -363,6 +460,10 @@ async function settleRace(race, attempt = 0) {
     return undefined;
   }
   if (known === true) return writeRace(race, { misses: true });
+  // Core has said it does not know this block: if the race is cut short
+  // before it is asked again, it is not written (R-2611-05: a made-up hash
+  // won a race that way, on switching off).
+  if (known === false) race.unknownToCore = true;
   if (attempt < VERIFY_RETRY_MS.length) {
     if (attempt === 0 && pendingRaces.size >= MAX_PENDING_RACES) {
       logger.warn('too many races waiting for Core, dropping this one', {
@@ -380,7 +481,7 @@ async function settleRace(race, attempt = 0) {
     pendingRaces.add(race);
     return undefined;
   }
-  if (known === null) {
+  if (known === null && !race.unknownToCore) {
     logger.warn('Core could not be asked about a race\'s block - recorded unchecked', { prevhash: race.prevhash });
     return writeRace(race, { misses: true });
   }
@@ -400,14 +501,19 @@ function finalizeRace(hash) {
   openRaces.delete(prevhash);
   clearTimeout(race.timer);
   // Charged a miss only if its connection stood for the whole race (review
-  // G4): a pool we could not reach, or that dropped meanwhile, had no
-  // chance, and Miss says "connected and silent" - how fast pools are, not
-  // whether this node reaches them.
+  // G4) and had already brought a job before it began: a pool we could not
+  // reach, that dropped meanwhile, or that was still authorising us (see
+  // readySince in lib/stratum-client.js) had no chance, and Miss says
+  // "connected and silent" - how fast pools are, not whether this node
+  // reaches them.
   race.watched = [...active].filter(([, { conn }]) => {
     const since = conn.connectedSince;
-    return since === undefined || (since != null && since <= race.createdAt);
+    if (!(since === undefined || (since != null && since <= race.createdAt))) return false;
+    const ready = conn.readySince;
+    return ready === undefined || (ready != null && ready <= race.createdAt);
   }).map(([id]) => id);
   race.generation = generation;
+  publishLive(race, true);
   return settleRace(race);
 }
 
@@ -490,6 +596,12 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
     // up. Refusing to open the eleventh costs a block nothing, because a
     // genuine new block would have to arrive while ten others are still
     // unresolved.
+    let mine = 0;
+    for (const r of openRaces.values()) if (r.openedBy === pool.id) mine += 1;
+    if (mine >= MAX_OPEN_RACES_PER_POOL) {
+      logger.warn('pool opened too many races at once, ignoring this prevhash', { open: mine, label: pool.label });
+      return;
+    }
     if (openRaces.size >= MAX_OPEN_RACES) {
       logger.warn('too many races open at once, ignoring this prevhash', {
         open: openRaces.size,
@@ -504,10 +616,12 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
     // announced the block, so a late zero made "Core to your pool" look
     // longer than it was.
     rememberPrevhash(prevhash);
+    newestRace = prevhash;
     race = {
       prevhash,
       createdAt: receivedAtMs,
       startHr: receivedAtHr,
+      openedBy: pool.id,
       reported: new Set(),
       // What each pool scored, in the order they came in. Written at the end.
       results: [],
@@ -519,14 +633,44 @@ function handleNotify(pool, hash, receivedAtHr, receivedAtMs = Date.now(), first
     openRaces.set(prevhash, race);
   }
 
-  if (race.reported.has(pool.id)) return; // only the first notify per pool counts
+  // Only the first notify per pool counts; one excused at reconnect sent its
+  // first already, so a later copy of the same job is not its arrival either.
+  if (race.reported.has(pool.id) || race.excused.has(pool.id)) return;
   race.reported.add(pool.id);
 
   const elapsedMs = Number(receivedAtHr - race.startHr) / 1e6;
   const rank = race.reported.size;
 
   race.results.push({ poolId: pool.id, label: pool.label, elapsedMs, rank });
+  // After the timestamp, and asynchronously: see lib/stratum-live.js.
+  publishLive(race);
   logger.info('pool reported job', { label: pool.label, rank, elapsedMs: Number(elapsedMs.toFixed(1)) });
+}
+
+/**
+ * The race so far, for the block card while it is still open (and once more
+ * when it closes, with the pools that sent nothing). Only labels and times:
+ * no hosts, nothing the page would not get from the database a moment later.
+ */
+function publishLive(race, done = false) {
+  // One file, so one race: the newest opened. A second race open at the same
+  // time (a lagging or made-up prevhash) shows instead of the real one if it
+  // opened later - the live view only, for the race's eight seconds; the
+  // recorded race is unaffected and replaces it on the card.
+  if (race.prevhash !== newestRace) return;
+  const own = (poolId) => {
+    const a = active.get(poolId);
+    return Boolean(a && a.pool && !a.pool.is_default);
+  };
+  const entries = race.results.map((r) => ({ label: r.label, own: own(r.poolId), latencyMs: r.elapsedMs, rank: r.rank }));
+  if (done) {
+    for (const poolId of race.watched || []) {
+      if (race.reported.has(poolId) || race.excused.has(poolId)) continue;
+      const a = active.get(poolId);
+      if (a && a.pool) entries.push({ label: a.pool.label, own: own(poolId), latencyMs: null, rank: null });
+    }
+  }
+  live.publish({ prevhash: race.prevhash, createdAt: race.createdAt, done, entries });
 }
 
 function stopAllConnections() {
@@ -545,16 +689,14 @@ function stopAllConnections() {
  * It is written without asking Core about its block (the process may be on
  * its way out): with no misses written, a made-up hash costs no other pool.
  */
+// Not written at all since 27.11.2026: Core has not vouched for the block of
+// a race still open or still waiting for it, and a pool with a made-up job
+// would have taken the win and a place in "the last 10 blocks" (R-2711-10).
+// A race lost to a restart costs one block of numbers, never a wrong one.
 function abandonOpenRaces() {
-  for (const race of openRaces.values()) {
-    clearTimeout(race.timer);
-    writeRace(race, { misses: false });
-  }
+  for (const race of openRaces.values()) clearTimeout(race.timer);
   openRaces.clear();
-  for (const race of pendingRaces) {
-    clearTimeout(race.retry);
-    writeRace(race, { misses: false });
-  }
+  for (const race of pendingRaces) clearTimeout(race.retry);
   pendingRaces.clear();
 }
 
@@ -582,7 +724,14 @@ function applyToggle() {
   lastToggleState = enabled;
   if (enabled) {
     logger.info('stratum race switched on');
-    syncConnections();
+    recentReady = false;
+    const gen = generation;
+    rememberRecentBlocks().finally(() => {
+      // Switched off (or off and on) meanwhile: that pass decides.
+      if (gen !== generation || lastToggleState !== true) return;
+      recentReady = true;
+      try { syncConnections(); } catch (err) { logger.warn('syncConnections failed', { error: err.message }); }
+    });
   } else {
     logger.info('stratum race switched off - closing every pool connection');
     shutDownRace();
@@ -618,7 +767,7 @@ function main() {
     enabled: toggle.isEnabled(),
     pools: active.size,
     openRaces: openRaces.size,
-  }));
+  }), () => openRaces.size > 0);
   applyToggle();
   // A busy database on one tick is a warning, not a reason to exit the worker.
   const guarded = (fn) => () => {

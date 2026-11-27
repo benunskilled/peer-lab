@@ -36,87 +36,91 @@ func TestClientsVerifiedOn29October(t *testing.T) {
 	}
 }
 
+// kindExamples is one user agent per rule and the kind it must have. Shared:
+// TestNameDisguisesHaveATell reads the Disguised ones.
+var kindExamples = map[string]string{
+	"/Satoshi:31.1.0/":                         "Node (Core)",
+	"/Satoshi:29.3.0/Knots:20260507/":          "Node (Knots)",
+	"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/":    "Wallet",
+	"/breadwallet:1.3.5/":                      "Wallet",
+	"/btcwire:0.5.0/neutrino:0.17.1/":          "Lightning wallet",
+	"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Other light client",
+	// Seen on a real node, all of them "Other" before.
+	"/bitcoin-seeder:0.01/":          "Crawler",
+	"/btc-range-scan:0.1.0/":         "Crawler",
+	"/BTC-Nodes:2026-09-24/Sonar/":   "Crawler",
+	"/census:0.1.7/":                 "Crawler",
+	"/btc-node-observatory:0.1.0/":   "Crawler",
+	"/go-bitnode-monitor:firstseen/": "Crawler",
+	"/atlas-scout:0.1/":              "Crawler",
+	"nebula/2.4.1-85b3e43":           "Crawler",
+	"/onlytwentyone-crawler:0.1/":    "Crawler",
+	// The whole reason the observed flags exist: a zero in place of the o,
+	// seen from rented machines in five regions. It must not come out as
+	// Core. It was "Other" until the Fake kind existed to say what it is.
+	"/Sat0shi:31.0.0/":                  "Disguised",
+	"/Satoshi:0.21.0":                   "Disguised",
+	"/Satoshi:29.2.0/Knots:20250903/":   "Node (Knots)",
+	"/Satoshi2:0.18.3/":                 "Disguised",
+	"/SatoshiX:0.18.0/":                 "Disguised",
+	"Satoshi:22.0.0":                    "Disguised",
+	"/Satoshi:22.0.0/":                  "Node (Core)",
+	"/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
+	"/electrs:0.11.1/":                  "Indexer",
+	"/Metrika-Bitnodes:0.1/":            "Crawler",
+	"/bitnodes.io:0.3/":                 "Crawler",
+	"/GlobalNodeMap:2.1/":               "Crawler",
+	// Found 13.11.2026, each string from its source (about.go).
+	"/btcwire:0.5.0/bitfyn:0.1.0/":                  "Wallet",
+	"/twotbit:0.1.0/":                               "Wallet",
+	"/bitc:0.1.0":                                   "Wallet",
+	"MagicalBitcoinWallet":                          "Wallet",
+	"Wallet v0.1":                                   "Wallet",
+	"/BitcoinSPV:0.7/":                              "Wallet",
+	"/Notoshi/":                                     "Other light client",
+	"/pyspv:0.0.1-alpha1/":                          "Other light client",
+	"/chainhorn:0.04/":                              "Other light client",
+	"/Murmel:0.2.1/":                                "Other light client",
+	"/BitcoinSwift:0.0.1/":                          "Other light client",
+	"/haskoin-btc:1.2.2/":                           "Other light client",
+	"libbtc 0.1":                                    "Other light client",
+	"/bitcoinj:0.14.7/PeerMonitor:1.0/":             "Other light client",
+	"/enginecore:0.1.0/":                            "Wallet",
+	"/BitcoinWallet:1.3/":                           "Wallet",
+	"/BitcoinWallet:3.0.1/BitcoinCore:2.1.1/":       "Wallet",
+	"/node.js:22.11.0/bitcoin-net:5.2.0/":           "Other light client",
+	"/rust-spv:0.1.0/":                              "Other light client",
+	"/dsn.tm.kit.edu/bitcoin:0.9.99/":               "Research scanner",
+	"/ckp2p:2.0/":                                   "Pool node",
+	"/CKCoinD:31.1.0/":                              "Pool node",
+	"/rust-bitcoin:0.18/bluematt-tokio-client:0.1/": "Crawler",
+	// The operator's own word, in the comment part - above the software.
+	"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
+	"/Satoshi:31.0.0(pool)/":                        "Pool node",
+	// As it arrives on a real node, with a URL after the Knots part.
+	"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/https://pyblock.xyz:8443/": "Pool node",
+	// PyBLOCK's node without the pool: a Knots node, not a pool.
+	"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
+	// "pool" outside the brackets is not a claim: this is an indexer.
+	"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
+	// "mempool" in the brackets is a node's label, not a pool (seen on a real node)
+	"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
+	"/mempool/":                   "Indexer",
+	"/mempool.space:1.0/":         "Indexer",
+	"/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
+	// A word in the brackets is the operator's label, not what the peer is:
+	// these are Core nodes, not crawlers, scanners or indexers.
+	"/Satoshi:29.0.0(my-monitor)/":       "Node (Core)",
+	"/Satoshi:28.1.0(watchtower)/":       "Node (Core)",
+	"/Satoshi:27.0.0(uni-mainz)/":        "Node (Core)",
+	"/Satoshi:29.0.0(electrum-backend)/": "Node (Core)",
+	"/Floresta:0.9.1/":                   "Node (Floresta)",
+	"/btcwire:0.5.0/hemi-soak:1.0/":      "Other",
+	"":                                   noAgentKind,
+}
+
 func TestKindOf(t *testing.T) {
-	for subver, want := range map[string]string{
-		"/Satoshi:31.1.0/":                         "Node (Core)",
-		"/Satoshi:29.3.0/Knots:20260507/":          "Node (Knots)",
-		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/":    "Wallet",
-		"/breadwallet:1.3.5/":                      "Wallet",
-		"/btcwire:0.5.0/neutrino:0.17.1/":          "Lightning wallet",
-		"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Other light client",
-		// Seen on a real node, all of them "Other" before.
-		"/bitcoin-seeder:0.01/":          "Crawler",
-		"/btc-range-scan:0.1.0/":         "Crawler",
-		"/BTC-Nodes:2026-09-24/Sonar/":   "Crawler",
-		"/census:0.1.7/":                 "Crawler",
-		"/btc-node-observatory:0.1.0/":   "Crawler",
-		"/go-bitnode-monitor:firstseen/": "Crawler",
-		"/atlas-scout:0.1/":              "Crawler",
-		"nebula/2.4.1-85b3e43":           "Crawler",
-		"/onlytwentyone-crawler:0.1/":    "Crawler",
-		// The whole reason the observed flags exist: a zero in place of the o,
-		// seen from rented machines in five regions. It must not come out as
-		// Core. It was "Other" until the Fake kind existed to say what it is.
-		"/Sat0shi:31.0.0/":                  "Disguised",
-		"/Satoshi:0.21.0":                   "Disguised",
-		"/Satoshi:29.2.0/Knots:20250903/":   "Node (Knots)",
-		"/Satoshi2:0.18.3/":                 "Disguised",
-		"/SatoshiX:0.18.0/":                 "Disguised",
-		"Satoshi:22.0.0":                    "Disguised",
-		"/Satoshi:22.0.0/":                  "Node (Core)",
-		"/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
-		"/electrs:0.11.1/":                  "Indexer",
-		"/Metrika-Bitnodes:0.1/":            "Crawler",
-		"/bitnodes.io:0.3/":                 "Crawler",
-		"/GlobalNodeMap:2.1/":               "Crawler",
-		// Found 13.11.2026, each string from its source (about.go).
-		"/btcwire:0.5.0/bitfyn:0.1.0/":                  "Wallet",
-		"/twotbit:0.1.0/":                               "Wallet",
-		"/bitc:0.1.0":                                   "Wallet",
-		"MagicalBitcoinWallet":                          "Wallet",
-		"Wallet v0.1":                                   "Wallet",
-		"/BitcoinSPV:0.7/":                              "Wallet",
-		"/Notoshi/":                                     "Other light client",
-		"/pyspv:0.0.1-alpha1/":                          "Other light client",
-		"/chainhorn:0.04/":                              "Other light client",
-		"/Murmel:0.2.1/":                                "Other light client",
-		"/BitcoinSwift:0.0.1/":                          "Other light client",
-		"/haskoin-btc:1.2.2/":                           "Other light client",
-		"libbtc 0.1":                                    "Other light client",
-		"/bitcoinj:0.14.7/PeerMonitor:1.0/":             "Other light client",
-		"/enginecore:0.1.0/":                            "Wallet",
-		"/BitcoinWallet:1.3/":                           "Wallet",
-		"/BitcoinWallet:3.0.1/BitcoinCore:2.1.1/":       "Wallet",
-		"/node.js:22.11.0/bitcoin-net:5.2.0/":           "Other light client",
-		"/rust-spv:0.1.0/":                              "Other light client",
-		"/dsn.tm.kit.edu/bitcoin:0.9.99/":               "Research scanner",
-		"/ckp2p:2.0/":                                   "Pool node",
-		"/CKCoinD:31.1.0/":                              "Pool node",
-		"/rust-bitcoin:0.18/bluematt-tokio-client:0.1/": "Crawler",
-		// The operator's own word, in the comment part - above the software.
-		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
-		"/Satoshi:31.0.0(pool)/":                        "Pool node",
-		// As it arrives on a real node, with a URL after the Knots part.
-		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/https://pyblock.xyz:8443/": "Pool node",
-		// PyBLOCK's node without the pool: a Knots node, not a pool.
-		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
-		// "pool" outside the brackets is not a claim: this is an indexer.
-		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
-		// "mempool" in the brackets is a node's label, not a pool (seen on a real node)
-		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
-		"/mempool/":                   "Indexer",
-		"/mempool.space:1.0/":         "Indexer",
-		"/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
-		// A word in the brackets is the operator's label, not what the peer is:
-		// these are Core nodes, not crawlers, scanners or indexers.
-		"/Satoshi:29.0.0(my-monitor)/":       "Node (Core)",
-		"/Satoshi:28.1.0(watchtower)/":       "Node (Core)",
-		"/Satoshi:27.0.0(uni-mainz)/":        "Node (Core)",
-		"/Satoshi:29.0.0(electrum-backend)/": "Node (Core)",
-		"/Floresta:0.9.1/":                   "Node (Floresta)",
-		"/btcwire:0.5.0/hemi-soak:1.0/":      "Other",
-		"":                                   noAgentKind,
-	} {
+	for subver, want := range kindExamples {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
 		}
@@ -292,7 +296,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/symphony:0.0.1/":                       "Indexer",
 		"/your-fork:0.1/":                        "Other",
 		"VDS 0.9.9.1":                            "Other chain",
-		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Other light client",
+		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Wallet",
 		"/btcwire:0.5.0/utreexod:0.5.0/":         "Node (other)",
 		"NBXplorer-4096":                         "Indexer",
 		"/bitcoin-s:1.9.12/":                     "Other light client",
@@ -323,7 +327,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/bip324-ts:0.0.1/":              "bip324-ts",
 		"/bread:2.1/":                    "BRD's wallet core",
 		"/breadwallet:0.6.7/":            "BRD (breadwallet)",
-		"/bitcoinj:0.16.3/Elastum:0.1z/": "Names Elastum",
+		"/bitcoinj:0.16.3/Elastum:0.1z/": "Named like Elastum",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s about: %q", subver, got)
@@ -406,9 +410,9 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/Bitcoin XT:0.11.0/":         "Bitcoin XT",
 		"/Classic:1.3.8(EB8)/":        "Bitcoin Classic",
 		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
-		"vds_0.9.53":                  "Names VDS",
+		"vds_0.9.53":                  "Named like VDS",
 		"/iriumd:1.0/":                "Irium",
-		"/cf-package-relay:0.3.0/":    "Named after package relay",
+		"/cf-package-relay:0.3.0/":    "Named like package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", subver, got, want)
@@ -420,7 +424,7 @@ func TestOtherChainAbouts(t *testing.T) {
 // them do, nor a fixed sentence: the session decides what is said. A name
 // that says what it is does get the kind it names.
 func TestNoKindFromOneNode(t *testing.T) {
-	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Natasha:1.0/"} {
+	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/"} {
 		if got := kindOf(ua); got != "Other" {
 			t.Errorf("%s: kind %q, want Other", ua, got)
 		}

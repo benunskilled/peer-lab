@@ -21,6 +21,11 @@ import (
 // 18 of them as 30.2.0, all gone straight after the version message.
 const libreRelayService = "UNKNOWN[2^29]"
 
+// rbfService is bit 26, NODE_REPLACE_BY_FEE: Knots 28.1 and 29.1 set it under
+// full RBF (src/init.cpp L1462 at v29.1.knots20250903; gone in 29.2), and so
+// does Garbageman v28.
+const rbfService = "UNKNOWN[2^26]"
+
 // libreRelay is the kind and about for a Core name offering bit 29, or "", "".
 func libreRelay(subver string, services []string) (kind, about, label string) {
 	if !slices.Contains(services, libreRelayService) {
@@ -53,6 +58,12 @@ func libreRelay(subver string, services []string) (kind, about, label string) {
 		return fakeWalletKind, "Claims: Libre Relay\nProbably: " + tool, ""
 	}
 	switch {
+	// Bit 26, NODE_REPLACE_BY_FEE, beside bit 29: Garbageman v28 adds it under
+	// full RBF (src/init.cpp L924 and L1706 at 60ae68d in chrisguida/bitcoin);
+	// Libre Relay never sets it (g_local_services in libre-relay-v28.1-1 and
+	// libre-relay-v30.2-2 is NETWORK_LIMITED | WITNESS | LIBRE_RELAY alone).
+	case slices.Contains(services, rbfService):
+		return fakeWalletKind, garbageman, ""
 	case strings.Contains(subver, "Knots:"):
 		// Libre Relay is Core; only a Garbageman built with its Knots name left in says Knots.
 		return fakeWalletKind, garbageman, ""
@@ -64,10 +75,30 @@ func libreRelay(subver string, services []string) (kind, about, label string) {
 	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it", "Libre Relay or Garbageman"
 }
 
-// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h on
-// its 29.x-knots branch; Oracle Knots sets bit 28 too, MarcanoFilms/oracle-knots): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
+// Bitcoin DOG Mode (github.com/bitcoindogmode/bitcoin, public since
+// 23.08.2026, with a guide for Umbrel at seed.dogofbitcoin.org) is Core under
+// Core's own name, "/Satoshi:31.1.0/", relaying transactions Core filters out,
+// like Libre Relay. Its sign is service bit 14, NODE_DOG_MODE, set on every
+// node (g_local_services, src/init.cpp L863); Core lists it as
+// "UNKNOWN[2^14]".
+// Source: bitcoindogmode/bitcoin src/protocol.h L342 @7503240 (checked 2026-11-24)
+const dogModeService = "UNKNOWN[2^14]"
+
+// dogMode is the kind, about and label for a Core name offering bit 14, or "".
+func dogMode(subver string, services []string) (kind, about, label string) {
+	if !slices.Contains(services, dogModeService) || !strings.HasPrefix(subver, "/Satoshi:") {
+		return "", "", ""
+	}
+	return "Node (DOG Mode)", "Bitcoin DOG Mode, a fork of Core that also relays transactions Core filters out (its service bit 14)", "DOG Mode (Core fork)"
+}
+
+// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h;
+// bit 28 in its releases since 29.4.1.knots20260508, 02.09.2026, whose notes
+// say "knots#359 Hardfork: New BLAKE2b proof-of-work algorithm" - every
+// Knots since follows that chain; Oracle Knots sets bit 28 too, MarcanoFilms/oracle-knots): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
 // ReducedData rules, bit 28 NODE_BLAKE2B, a node enforcing a hard fork to
 // BLAKE2b proof of work (and ReducedData). Core lists them as UNKNOWN[2^n].
+// Source: bitcoinknots/bitcoin src/protocol.h L351-355 @v29.5.1.knots20260508 (checked 2026-11-24)
 // In peer-observer's record of the node this was written for, 21. to
 // 25.10.2026, with that node at height 973,026: 898 sessions offering bit 28
 // from 406 addresses reported start heights around 978,000, a chain of their
@@ -89,6 +120,45 @@ const (
 	purityService      = "UNKNOWN[2^25]"
 )
 
+// shownServices is the peer's services for the panel, with the bits Core only
+// knows as "UNKNOWN[2^n]" named after the software that defines them (checked
+// 23.11.2026): 12 and 13 BIP 183's Utreexo bits (bip183/protocol.go in
+// utreexo/utreexod; Castor sets 12 too), 25 Bitcoin Purity's, 27 BIP110's,
+// 14 Bitcoin DOG Mode's, 28 Knots' BLAKE2b - or, from satd, NODE_INTACT_BLOCKS (node/src/net/peer.rs
+// in epochbtc/satd) - 29 Libre Relay's, 30 satd's NODE_NAP (nap/p2p.rs).
+// Older ones (checked 24.11.2026): 1 GETUTXO and 4 XTHIN (src/protocol.h
+// L274 and L283 at 4c27454 in bitcoinclassic/bitcoinclassic; Classic sets 4),
+// 24 the Utreexo bit before BIP 183 (Knots' UTREEXO_TMP, src/protocol.h L346
+// at v29.4.1.knots20260508; Floresta 0.8 sets it), 26 REPLACE_BY_FEE (see
+// rbfService).
+// Only for showing: forkOf and the disguise rules read Core's names.
+func shownServices(subver string, services []string) []string {
+	if services == nil {
+		return nil
+	}
+	satd := strings.HasPrefix(strings.ToLower(subver), "/satd:")
+	names := map[string]string{
+		"UNKNOWN[2^12]": "UTREEXO", "UNKNOWN[2^13]": "UTREEXO_ARCHIVE",
+		purityService: "PURITY_ASERT", reducedDataService: "REDUCED_DATA",
+		blake2bService: "BLAKE2B", libreRelayService: "LIBRE_RELAY",
+		dogModeService: "DOG_MODE",
+		"UNKNOWN[2^1]": "GETUTXO", "UNKNOWN[2^4]": "XTHIN",
+		"UNKNOWN[2^24]": "UTREEXO_TMP", rbfService: "REPLACE_BY_FEE",
+	}
+	if satd {
+		names[blake2bService] = "INTACT_BLOCKS"
+		names["UNKNOWN[2^30]"] = "NAP"
+	}
+	out := make([]string, len(services))
+	for i, s := range services {
+		if n, ok := names[s]; ok {
+			s = n
+		}
+		out[i] = s
+	}
+	return out
+}
+
 // Bitcoin Purity offers bit 25 (NODE_PURITY_ASERT) beside bit 27 by default
 // (g_local_services in src/init.cpp, github.com/saltduck/bitcoinpurity at
 // 833e2f6), and only it defines bit 25 (src/protocol.h). With -uaspoof=1 its
@@ -98,7 +168,11 @@ func purityByBits(subver string, services []string) bool {
 		slices.Contains(services, purityService) && slices.Contains(services, reducedDataService)
 }
 
-const purityByBitsAbout = "Probably Bitcoin Purity under a bare Core name: only Purity offers service bit 25, here beside BIP110's bit 27"
+// Checked 23.11.2026: -uaspoof=1 calls FormatSubVersion with base_name_only
+// (src/init.cpp L1895-1899), which leaves "Purity:" out (src/clientversion.cpp
+// L77-79); the bits stay (g_local_services, src/init.cpp L1033; bit 25 and 27
+// in src/protocol.h L351, L356).
+const purityByBitsAbout = "Bitcoin Purity under a bare Core name (its -uaspoof=1): only Purity offers service bit 25, here beside BIP110's bit 27"
 
 // forkOf is the flag and its hover text for a peer offering one of those
 // bits, or "", "". A peer whose headers reach this node's tip follows this
@@ -107,24 +181,46 @@ const purityByBitsAbout = "Probably Bitcoin Purity under a bare Core name: only 
 // header past about 961,000 while the node was thousands of blocks further;
 // the other two, a home-built node, were at the tip. synced is the peer's
 // synced_headers (nil or -1 while unknown), tip the highest of any peer.
-func forkOf(services []string, kind string, synced *int64, tip int64) (string, string) {
-	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
+//
+// satd gives bit 28 a meaning of its own, NODE_INTACT_BLOCKS: a pruned node
+// that still serves every intact block (-pruneopreturnpeers=intact;
+// node/src/net/peer.rs L7-13 in epochbtc/satd, release notes 0.7.0, checked
+// 23.11.2026). From a peer saying "/satd:" the bit is that, not BLAKE2b.
+func forkOf(subver string, services []string, kind string, synced *int64, tip int64) (string, string) {
+	if !forkApplies(kind) {
 		return "", ""
 	}
 	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced <= forkTipSlack {
 		return "", ""
 	}
-	has := map[string]bool{}
-	for _, s := range services {
-		has[s] = true
-	}
-	switch {
-	case has[blake2bService]:
-		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is on a chain of its own, not yours"
-	case has[reducedDataService]:
-		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
+	for _, b := range forkBits {
+		if !slices.Contains(services, b.service) {
+			continue
+		}
+		if b.exceptAgent != "" && strings.HasPrefix(strings.ToLower(subver), b.exceptAgent) {
+			continue
+		}
+		return b.fork, b.why
 	}
 	return "", ""
+}
+
+// forkBit is one service bit that puts a peer on a chain of its own, asked in
+// this order. exceptAgent is a lower-case name start for which the bit means
+// something else. The dashboard reads the same list (peer-rules.json).
+type forkBit struct {
+	service, fork, why, exceptAgent string
+}
+
+var forkBits = []forkBit{
+	{blake2bService, "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is probably on a chain of its own, not yours", "/satd:"},
+	{reducedDataService, "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which probably put it on a chain of its own, not yours", ""},
+}
+
+// forkApplies is whether forkOf judges a peer of this kind at all: only nodes
+// and unknown software; a wallet or crawler repeating a bit it saw is no fork.
+func forkApplies(kind string) bool {
+	return kind == "Other" || strings.HasPrefix(kind, "Node")
 }
 
 // Syncing: a peer that takes whole blocks from this node faster than the chain

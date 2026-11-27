@@ -1981,7 +1981,8 @@ test('slot fill: a candidate on another chain is out at once', async () => {
   const asia = inBook('198.18.5.10', 'AS');
   const t0 = Date.now();
   await step(setPeers([coreOut()]), t0);
-  const fork = manualSession(asia, { synced: TIP - 50000, servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^28]'] });
+  // A named node: a peer with no name is never judged by its bits.
+  const fork = manualSession(asia, { synced: TIP - 50000, subver: '/Satoshi:29.4.1/Knots:20260508/', servicesnames: ['NETWORK', 'WITNESS', 'UNKNOWN[2^28]'] });
 
   const result = await step(setPeers([coreOut(), fork]), t0 + 30 * 1000);
 
@@ -2132,16 +2133,17 @@ test('slot fill: a peer it added and the list later calls Disguised goes; locked
   for (const a of [locked, byHand, fine]) db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(a);
 });
 
-test('slot fill: switched off, its log goes; what it holds against stays', () => {
+test('slot fill: switched off, its log stays, and what it holds against', () => {
   const { logAction } = require('../src/lib/peer-rotation/log');
   logAction({ action: 'promote', address: '203.0.113.60:8333' });
   fill.markTried('198.18.7.40:8333', false, Date.now(), { reason: 'disguised' });
   peerRotation.setEnabled(true);
   assert.ok(logRows().length > 0, 'switching on keeps it');
 
+  const before = logRows().length;
   peerRotation.setEnabled(false);
 
-  assert.equal(logRows().length, 0);
+  assert.equal(logRows().length, before);
   assert.ok(db.instance.prepare('SELECT 1 FROM slot_fill_tried WHERE address = ?').get('198.18.7.40:8333'));
 });
 
@@ -2207,4 +2209,38 @@ test('after many failed candidates in a row only one is tried at a time; a kept 
   fill.settle.mock.mockImplementation(async () => ({ confirmed: 0, reverted: 0, left: 1, waiting: 0, gone: [] }));
   await peerRotation.tick({ quick: true });
   assert.equal(limits.at(-1), 3, 'switched on again');
+});
+
+// Outside review, 26.11.2026: networking switched off in Core
+// (setnetworkactive false) made every manual peer look offline, and Slot Fill
+// retired them.
+test('with Core\'s networking switched off, an offline manual peer is not retired', async () => {
+  peerRotation.setEnabled(true);
+  const address = seedOfflineTrustedPeer({ address: '198.51.100.98:8333', offlineHours: 500, eligible: 500, first: 0 });
+  const restore = rpc.getNetworkInfo;
+  mock.method(rpc, 'getNetworkInfo', async () => ({ networkactive: false, networks: [{ name: 'ipv4', reachable: true, proxy: '' }] }));
+  try {
+    await peerRotation.tick();
+    assert.ok(ranking().find((p) => p.address === address)?.trusted, 'still manual');
+    assert.equal(peerRotation.readStatus().state, 'offline');
+  } finally {
+    rpc.getNetworkInfo = restore;
+    peerRotation.setEnabled(false);
+  }
+});
+
+test('a candidate padlocked while the pass was adding stays when the pass takes it out', async () => {
+  const address = '198.51.100.99:8333';
+  db.instance.prepare('INSERT INTO trusted_peer (address, label, kept, created_at) VALUES (?, NULL, 1, ?)').run(address, Date.now());
+  const removed = [];
+  const restore = rpc.addNode;
+  mock.method(rpc, 'addNode', async (a, c) => { removed.push(`${c} ${a}`); });
+  try {
+    await fill.abandon(address);
+    assert.ok(isManual(address), 'the padlock stands');
+    assert.deepEqual(removed, []);
+  } finally {
+    rpc.addNode = restore;
+    db.instance.prepare('DELETE FROM trusted_peer WHERE address = ?').run(address);
+  }
 });

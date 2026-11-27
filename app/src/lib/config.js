@@ -35,11 +35,12 @@ module.exports = {
   // lib/write-source.js.
   trustedProxyHost: pick(process.env.TRUSTED_PROXY_HOST, ''),
   bitcoin: {
-    rpcUrl: `http://${bitcoinHost}:${bitcoinRpcPort}/`,
+    // An IPv6 literal goes in brackets, in either spelling it is given.
+    rpcUrl: `http://${bitcoinHost.includes(':') && !bitcoinHost.startsWith('[') ? `[${bitcoinHost}]` : bitcoinHost}:${bitcoinRpcPort}/`,
     rpcUser: bitcoinRpcUser,
     rpcPass: bitcoinRpcPass,
     network,
-    zmqHashBlockUrl: zmqExplicit || `tcp://${zmqHost}:${zmqPort}`,
+    zmqHashBlockUrl: zmqExplicit || `tcp://${zmqHost.includes(':') && !zmqHost.startsWith('[') ? `[${zmqHost}]` : zmqHost}:${zmqPort}`,
   },
   sqlitePath: pick(process.env.SQLITE_PATH, `${dataDir}/sqlite/peerlab.db`),
   dashboardPort: Number(pick(process.env.DASHBOARD_PORT, '8788')),

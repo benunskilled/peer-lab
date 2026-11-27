@@ -119,6 +119,8 @@
   // On a phone the bar comes down from the top, where the open inbound list
   // pins its name and "Top 10": it goes below that bar, not over it (it hid
   // both, and the button could not be tapped; 16.11.2026).
+  const CORNER_IDLE_MS = 3000;
+  let cornerIdle = 0;
   function placeJumpBar() {
     const pinned = document.querySelector(".stick.on > div");
     const r = pinned && pinned.getBoundingClientRect();
@@ -139,9 +141,21 @@
     if (phone) requestAnimationFrame(placeJumpBar);
     if (show) {
       if (!jumpBar.classList.contains("shown")) { fillJumpBar(); jumpBar.classList.add("shown"); }
+      // In the corner it stood over the last cells of whatever row was
+      // under it (21.11.2026): it goes once the scrolling stops, and comes
+      // back with the next scroll. Not while the pointer is on it.
+      if (!phone) {
+        clearTimeout(cornerIdle);
+        cornerIdle = setTimeout(() => { if (!jumpBar.matches(":hover")) jumpBar.classList.remove("shown"); }, CORNER_IDLE_MS);
+      }
     } else if (hide) jumpBar.classList.remove("shown");
     if (up || down) lastY = y;
   }, { passive: true });
+  jumpBar.addEventListener("pointerleave", () => {
+    if (!jumpBar.classList.contains("corner")) return;
+    clearTimeout(cornerIdle);
+    cornerIdle = setTimeout(() => jumpBar.classList.remove("shown"), CORNER_IDLE_MS);
+  });
 
   function hoverPlace(p, on) {
     if (!window.matchMedia("(hover: hover)").matches) return;
@@ -283,7 +297,9 @@
   }
   // The dashboard has new numbers, or has just acted on a peer.
   window.addEventListener("peerlab:ranking", () => { if (state.data && !awaitingRanking) renderWhenFree(); });
-  window.addEventListener("peerlab:acted", () => setTimeout(refresh, 1200));
+  // A removal or disconnect leaves the list and the tiles at once (the list
+  // drops what the dashboard marks gone); the fresh answer follows.
+  window.addEventListener("peerlab:acted", () => { if (state.data) renderWhenFree(); setTimeout(refresh, 1200); });
   function renderWhenFree() {
     if (busy() && (!heldSince || Date.now() - heldSince < HOLD_MAX_MS)) {
       if (!heldSince) heldSince = Date.now();
