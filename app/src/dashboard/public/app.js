@@ -1383,8 +1383,11 @@ let localPoolsFound = []; // pool apps on this Umbrel not yet in the race
 let poolPickBusy = 0; // ticks on their way: no redraw under the finger
 const POOL_COUNTRY_KEY = 'peerlab.poolCountry';
 let poolCountry = (() => { try { return localStorage.getItem(POOL_COUNTRY_KEY) || 'all'; } catch { return 'all'; } })();
-const POOL_KIND_KEY = 'peerlab.poolKind';
-let poolKind = (() => { try { return localStorage.getItem(POOL_KIND_KEY) || 'all'; } catch { return 'all'; } })();
+// Every visit starts on the pools in the race: the whole list is long on a
+// phone (129 rows, ten screens), and what runs is what one looks at most.
+// Not remembered, unlike the country. "racing" falls back to all on a
+// fresh install, where nothing races yet.
+let poolKind = 'racing';
 let poolQuery = ''; // the search: not kept, a new visit starts with the whole list
 // A routed pool has no country: a globe and "Routed" instead.
 const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
@@ -1420,7 +1423,10 @@ function renderPoolPick() {
   // The kind and the search first: the countries then count only pools that
   // are left. The search looks in the name, the place and the address.
   const q = poolQuery.trim().toLowerCase();
-  const pools = poolPick.pools.filter((p) => (poolKind === 'all' || p.kind === poolKind)
+  if (poolKind === 'racing' && !box.dataset.seen && !poolPick.racing) poolKind = 'all';
+  // A search looks through every pool, also from "Racing": it is how a new one is found.
+  const kind = poolKind === 'racing' && q ? 'all' : poolKind;
+  const pools = poolPick.pools.filter((p) => (kind === 'all' || (kind === 'racing' ? p.enabled : p.kind === kind))
     && (!q || [p.name, p.host, p.region, pickCountry(p.country), p.routed ? 'routed' : ''].some((t) => t && t.toLowerCase().includes(q))));
   const racing = poolPick.racing;
   for (const b of document.querySelectorAll('#pool-pick-kind button')) {
@@ -1428,14 +1434,13 @@ function renderPoolPick() {
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
   }
-  const ticked = pools.filter((p) => p.enabled).length;
   const counts = new Map();
   for (const p of pools) counts.set(p.country || '', (counts.get(p.country || '') || 0) + 1);
   const countries = [...counts.keys()].filter(Boolean).sort((a, b) => pickCountry(a).localeCompare(pickCountry(b)));
   // A country with nothing left shows all. While searching only for this
   // draw: an empty search gives the country back.
   let cc = poolCountry;
-  if (cc !== 'all' && cc !== 'on' && !counts.has(cc === 'routed' ? '' : cc)) {
+  if (cc !== 'all' && !counts.has(cc === 'routed' ? '' : cc)) {
     cc = 'all';
     if (!q) poolCountry = cc;
   }
@@ -1450,7 +1455,7 @@ function renderPoolPick() {
     if (!racing) box.open = true;
   }
 
-  const options = [['all', 'All countries', pools.length], ['on', 'Ticked', ticked]]
+  const options = [['all', 'All countries', pools.length]]
     .concat(countries.map((c) => [c, `${pickFlag(c)} ${pickCountry(c)}`, counts.get(c)]));
   if (counts.has('')) options.push(['routed', `${pickFlag('')} Routed`, counts.get('')]);
   setHtml('pool-pick-filter', options.map(([k, t, n]) =>
@@ -1459,11 +1464,11 @@ function renderPoolPick() {
     `<option value="${escapeHtml(k)}"${k === cc ? ' selected' : ''}>${escapeHtml(t)} (${n})</option>`).join(''));
 
   const shown = pools
-    .filter((p) => cc === 'all' || (cc === 'on' ? p.enabled : cc === 'routed' ? !p.country : p.country === cc))
+    .filter((p) => cc === 'all' || (cc === 'routed' ? !p.country : p.country === cc))
     .sort((a, b) => (a.country ? 0 : 1) - (b.country ? 0 : 1) || pickCountry(a.country).localeCompare(pickCountry(b.country)) || a.name.localeCompare(b.name));
   const full = racing >= poolPick.max;
   setHtml('pool-pick-list', shown.length ? shown.map((p) => {
-    const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'location not known';
+    const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'closest server';
     const tag = p.routed ? `${p.kind} · routed` : p.kind;
     const off = full && !p.enabled;
     return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
@@ -1472,12 +1477,11 @@ function renderPoolPick() {
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
-  }).join('') : `<li class="hint">${cc === 'on' ? (q ? 'No ticked pool matches.' : 'None ticked yet.') : q ? 'No pool matches.' : 'No pool of this kind here.'}</li>`);
+  }).join('') : `<li class="hint">${q ? 'No pool matches.' : kind === 'racing' ? 'None racing yet - pick some under All.' : 'No pool of this kind here.'}</li>`);
 }
 
 function setPoolKind(kind) {
   poolKind = kind;
-  try { localStorage.setItem(POOL_KIND_KEY, kind); } catch { /* private window: fine */ }
   renderPoolPick();
 }
 
