@@ -1576,7 +1576,7 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .pool-pick > summary { font-weight: 600; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
 .pool-pick > summary .pick-sum { font-weight: 400; font-size: 13px; color: var(--muted); }
 .pool-pick > summary::after { align-self: center; }
-.pool-pick .pick-kind { margin: 10px 0 0; }
+.pool-pick .pick-kind { margin: 10px 0 0; flex-wrap: wrap; border-radius: 16px; }
 /* The count beside the name, as on Slot Fill's region pills. */
 .pool-pick .pick-kind button { white-space: nowrap; }
 .pool-pick .pick-kind button b { margin-left: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }

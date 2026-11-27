@@ -1388,8 +1388,8 @@ let poolPickBusy = 0; // ticks on their way: no redraw under the finger
 let poolCountry = 'all';
 // Every visit starts on the pools in the race: the whole list is long on a
 // phone (129 rows, ten screens), and what runs is what one looks at most.
-// Not remembered, unlike the country. "racing" falls back to all on a
-// fresh install, where nothing races yet.
+// Not remembered. "racing" falls back to all when no public pool is
+// ticked yet, as on a fresh install.
 let poolKind = 'racing';
 let poolQuery = ''; // the search: not kept, a new visit starts with the whole list
 // A routed pool has no country: a globe and "Routed" instead.
