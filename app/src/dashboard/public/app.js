@@ -1423,7 +1423,8 @@ function renderPoolPick() {
   // The kind and the search first: the countries then count only pools that
   // are left. The search looks in the name, the place and the address.
   const q = poolQuery.trim().toLowerCase();
-  if (poolKind === 'racing' && !box.dataset.seen && !poolPick.racing) poolKind = 'all';
+  // Only public pools are listed here: a race of own or local pools alone starts on All.
+  if (poolKind === 'racing' && !box.dataset.seen && !poolPick.pools.some((p) => p.enabled)) poolKind = 'all';
   // A search looks through every pool, also from "Racing": it is how a new one is found.
   const kind = poolKind === 'racing' && q ? 'all' : poolKind;
   const pools = poolPick.pools.filter((p) => (kind === 'all' || (kind === 'racing' ? p.enabled : p.kind === kind))
@@ -1477,7 +1478,7 @@ function renderPoolPick() {
       <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
-  }).join('') : `<li class="hint">${q ? 'No pool matches.' : kind === 'racing' ? 'None racing yet - pick some under All.' : 'No pool of this kind here.'}</li>`);
+  }).join('') : `<li class="hint">${q ? 'No pool matches.' : kind === 'racing' ? 'No public pool ticked yet - pick some under All.' : 'No pool of this kind here.'}</li>`);
 }
 
 function setPoolKind(kind) {
