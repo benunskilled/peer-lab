@@ -644,7 +644,7 @@
     },
     {
       "kind": "Research scanner",
-      "pattern": "kit\\.edu",
+      "pattern": "^.*kit\\.edu",
       "flags": "i",
       "reads": "bare",
       "relays": false

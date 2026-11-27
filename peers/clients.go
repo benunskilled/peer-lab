@@ -550,7 +550,7 @@ var clients = []client{
 	// BlockchainAnalyzer (catena2w/BlockchainAnalyzer, IOHK's Scorex):
 	// peerGroup.setUserAgent("SmartContract.com", "0.1") on mainnet.
 	// Source: catena2w/BlockchainAnalyzer src/main/scala/iohk/scorex/bitcoin/Analyzer.scala L63 @5e20e76 (checked 2026-11-25)
-	{re: regexp.MustCompile(`/SmartContract\.com:`), text: "BlockchainAnalyzer, a research tool that reads the chain through bitcoinj", label: "BlockchainAnalyzer"},
+	{re: regexp.MustCompile(`^/bitcoinj:[^/]*/SmartContract\.com:`), text: "BlockchainAnalyzer, a research tool that reads the chain through bitcoinj", label: "BlockchainAnalyzer"},
 	// You've Got Bitcoin (duncannevin/youvegotbitcoin), sending bitcoin by
 	// email: peerGroup.setUserAgent("email bitcoin", "0.1").
 	// Source: duncannevin/youvegotbitcoin src/main/scala/com/duncannevin/youvegotbitcoin/bitcoin/BitcoinClient.scala L152 @1804b0f (checked 2026-11-25)
@@ -1046,7 +1046,9 @@ var clients = []client{
 	// /dataforge-observer:/ only listened to what was announced.
 	// DaeConn, a measurement tool for Bitcoin-derived networks, says
 	// "/connector/" (app/network/scanner.py in DogukanBaysal/DaeConn).
-	{re: regexp.MustCompile(`(?i)kit\.edu`), kind: "Research scanner"},
+	// Anchored at the start like the other host-like names (CodeQL, 27.11.2026):
+	// KIT's scanners carry kit.edu anywhere in the name.
+	{re: regexp.MustCompile(`(?i)^.*kit\.edu`), kind: "Research scanner"},
 	{re: regexp.MustCompile(`(?i)dsn\.tm`), kind: "Research scanner"},
 	{re: regexp.MustCompile(`(?i)dsn\.kastel`), kind: "Research scanner"},
 	{re: regexp.MustCompile(`(?i)\.ac\.`), kind: "Research scanner"},
