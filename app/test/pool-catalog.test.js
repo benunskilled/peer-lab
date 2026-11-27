@@ -139,6 +139,15 @@ test('paused, then unticked and ticked again: back running, under the list\'s na
   await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
 });
 
+test('a pool in the table in another spelling is not added a second time', async () => {
+  // A 1.0 database kept the host as typed; the form now writes it in lower case.
+  db.instance.prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES ('Legacy', 'Legacy.Example', 3333, 1, 0, 1)`).run();
+  const r = await api('/api/pools', { label: 'Again', host: 'legacy.example', port: 3333 });
+  assert.equal(r.status, 409);
+  assert.equal(db.instance.prepare("SELECT COUNT(*) AS n FROM stratum_pool WHERE lower(host) = 'legacy.example'").get().n, 1);
+  db.instance.prepare("DELETE FROM stratum_pool WHERE lower(host) = 'legacy.example'").run();
+});
+
 test('only a pool on the list can be ticked', async () => {
   const r = await api('/api/pools/catalog', { host: 'evil.example', port: 3333, enabled: true });
   assert.equal(r.status, 400);

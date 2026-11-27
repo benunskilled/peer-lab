@@ -1597,12 +1597,14 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; }
 .plist label { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--panel-2); }
 .plist label:hover { border-color: var(--muted); }
-.plist label.on { border-color: rgba(247, 147, 26, .45); }
+/* Ticked rows keep the plain frame (27.11.2026): under "Racing" every row is
+   ticked, and an orange frame on each was the only one in the app; the
+   switch already says it. */
 .plist .n { color: var(--text); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plist .w { grid-column: 1; color: var(--muted); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plist .w .paused { color: var(--accent); font-weight: 500; }
 .plist .tag { grid-row: 1 / 3; grid-column: 2; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
-.plist .tag.shared { color: var(--accent); border-color: rgba(247, 147, 26, .4); }
+.plist .tag.shared { color: var(--accent); }
 .plist input[type="checkbox"] {
   grid-row: 1 / 3; grid-column: 3; appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
   width: 34px; height: 20px; border-radius: 999px; background: #2a3541; position: relative; transition: background .15s;
@@ -1615,13 +1617,13 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .plist li.hint { grid-column: 1 / -1; }
 .pick-own { margin: 4px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .pick-own .inline-form:last-child { margin-bottom: 0; }
-/* The pool apps of this Umbrel in a colour of their own (violet, after
-   Umbrel's), so the row is seen; one found here is filled - a tap adds it. */
-.panel #pool-templates button.secondary { color: #b4a6ff; border-color: rgba(139,124,246,.55); background: linear-gradient(rgba(139,124,246,.10), rgba(139,124,246,.10)), var(--panel); }
-.panel #pool-templates button.secondary:hover { color: #d4cbff; border-color: #8b7cf6; }
-.panel #pool-templates button[data-action="add-found-pool"] { color: #fff; background: #7a68f0; border-color: #7a68f0; }
-/* A heading like "Choose pools" below it: the colour stays on what can be tapped. */
-.panel #pool-templates .hint { color: var(--text); font-weight: 600; font-size: inherit; }
+/* The pool apps of this Umbrel as pills, like Slot Fill's regions; one found
+   here is filled orange like a picked one - a tap adds it. The line before
+   them is a sub-heading like the others in the panels. */
+.panel #pool-templates button.secondary { font-size: 13px; font-weight: 500; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.panel #pool-templates button.secondary:hover { color: var(--text); border-color: var(--muted); }
+.panel #pool-templates button[data-action="add-found-pool"] { color: #1a1200; background: var(--accent); border-color: var(--accent); }
+.panel #pool-templates .hint { color: var(--text); font-weight: 600; font-size: 13px; }
 .pool-pick > summary .pick-found { font-weight: 400; font-size: 13px; color: var(--accent); }
 @media (max-width: 600px) {
   .cc-filter { display: none; }

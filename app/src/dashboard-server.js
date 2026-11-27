@@ -1035,15 +1035,19 @@ const routes = {
     const entry = poolCatalog.find(body.host, body.port);
     if (!entry) return sendJson(res, 400, { ok: false, error: 'not a pool on the list' });
     if (typeof body.enabled !== 'boolean') return sendJson(res, 400, { ok: false, error: 'enabled must be true or false' });
-    const row = db.instance.prepare('SELECT id, enabled, chosen FROM stratum_pool WHERE lower(host) = lower(?) AND port = ?').get(entry.host, entry.port);
+    // Case-insensitively, and the chosen one first: a 1.0 database may hold the
+    // same address twice in two spellings (R-2711-10).
+    const row = db.instance.prepare('SELECT id, enabled, chosen FROM stratum_pool WHERE lower(host) = lower(?) AND port = ? ORDER BY chosen DESC, id').get(entry.host, entry.port);
     const back = row && !row.chosen;
     if (body.enabled && (!row || back) && enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - untick one first` });
     }
     try {
       if (!body.enabled) {
-        if (row) db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE id = ?').run(row.id);
+        if (row) db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE lower(host) = lower(?) AND port = ?').run(entry.host, entry.port);
       } else if (back) {
+        // Back in the table takes a place there, like a new one.
+        if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
         // Under the list's name of today, should it have changed since.
         db.instance.prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1, label = ? WHERE id = ?').run(entry.name, row.id);
       } else if (!row) {
@@ -1073,37 +1077,43 @@ const routes = {
     // single typo in this form. See lib/validate.js.
     const parsed = validatePool(body);
     if (!parsed.ok) return sendJson(res, 400, { error: parsed.error });
-    // A host that does not exist would only ever show dashes, with nothing to
-    // say why (21.11.2026: "qa-unreachable.invalid" was taken). An IP is
-    // taken as it is: whether a pool answers there is the race's to show.
-    if (!net.isIP(parsed.value.host)) {
-      try {
-        await require('dns').promises.lookup(parsed.value.host);
-      } catch {
-        return sendJson(res, 400, { error: `${parsed.value.host} is not a name that exists` });
-      }
-    }
     // Every pool is a socket held open and a row per block; without a limit
-    // the form could open them until the app ran out of either.
+    // the form could open them until the app ran out of either. Checked before
+    // anything else, the name lookup included: a name that cannot be added is
+    // not sent to a resolver either (R-2711-10).
     if (enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - pause one first` });
     }
+    const { label, host, port } = parsed.value;
     try {
-      // The same address removed or unticked before: back in the race, numbers
-      // and all, rather than "already exists" for a pool nowhere to be seen.
-      // Added by hand now, so the owner's own under the name typed - unless it is
-      // a pool on the list, whose past races must not turn into "Your pool".
-      const own = poolCatalog.find(parsed.value.host, parsed.value.port) ? 'is_default' : '0';
-      const kept = db.instance
-        .prepare(`UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = ${own}, label = ? WHERE lower(host) = lower(?) AND port = ? AND chosen = 0`)
-        .run(parsed.value.label, parsed.value.host, parsed.value.port);
-      if (kept.changes) return sendJson(res, 200, { ok: true });
+      // The address in any spelling, the chosen one first (a 1.0 database may
+      // hold it twice, R-2711-10). In the table already: said so. Removed or
+      // unticked before: back in the race, numbers and all - exactly that one
+      // row. Added by hand now, so the owner's own under the name typed, unless
+      // it is a pool on the list, whose past races must not turn into "Your pool".
+      const row = db.instance.prepare('SELECT id, chosen FROM stratum_pool WHERE lower(host) = lower(?) AND port = ? ORDER BY chosen DESC, id').get(host, port);
+      if (row && row.chosen) return sendJson(res, 409, { ok: false, error: 'a pool with this host and port already exists' });
       if (poolRows() >= MAX_POOL_ROWS) {
         return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
       }
+      if (row) {
+        const own = poolCatalog.find(host, port) ? 'is_default' : '0';
+        db.instance.prepare(`UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = ${own}, label = ? WHERE id = ?`).run(label, row.id);
+        return sendJson(res, 200, { ok: true });
+      }
+      // A host that does not exist would only ever show dashes, with nothing to
+      // say why (21.11.2026: "qa-unreachable.invalid" was taken). An IP is
+      // taken as it is: whether a pool answers there is the race's to show.
+      if (!net.isIP(host)) {
+        try {
+          await require('dns').promises.lookup(host);
+        } catch {
+          return sendJson(res, 400, { error: `${host} is not a name that exists` });
+        }
+      }
       db.instance
         .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 0, ?)`)
-        .run(parsed.value.label, parsed.value.host, parsed.value.port, Date.now());
+        .run(label, host, port, Date.now());
       return sendJson(res, 200, { ok: true });
     } catch (err) {
       // Only UNIQUE(host, port) means a duplicate. A full disk or a locked

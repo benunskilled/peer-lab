@@ -134,6 +134,12 @@ function loadEnabledPools() {
   return db.instance.prepare(`SELECT * FROM stratum_pool WHERE enabled = 1`).all();
 }
 
+// Whether the blocks just below the tip are known yet (rememberRecentBlocks):
+// until then no pool is connected, so none can open a race for one of them
+// while Core is slow to answer (R-2711-10).
+// Set false on every switch-on (applyToggle, which main() runs first).
+let recentReady = true;
+
 function syncConnections() {
   // Switched off: hold nothing open, and do not start anything for a pool that
   // was added in the meantime. Cheap and idempotent, so the periodic pass can
@@ -142,6 +148,7 @@ function syncConnections() {
     shutDownRace();
     return;
   }
+  if (!recentReady) return;
 
   const pools = loadEnabledPools();
   const wanted = new Map(pools.map((p) => [p.id, p]));
@@ -266,9 +273,21 @@ function resetAt() {
   return row ? Number(row.value) : 0;
 }
 
-function writeRace(race, { misses }) {
+function writeRace(race, opts) {
   if (race.written) return;
   race.written = true;
+  // One short IMMEDIATE transaction from the reset check to the last miss: a
+  // reset or an untick in the dashboard's process lands wholly before or
+  // wholly after it, never between the check and the insert (R-2711-10).
+  // Nothing in it waits for Core.
+  try {
+    db.instance.transaction(() => writeRaceRows(race, opts)).immediate();
+  } catch (err) {
+    logger.warn('failed to record race', { prevhash: race.prevhash, error: err.message });
+  }
+}
+
+function writeRaceRows(race, { misses }) {
   let s;
   let id;
   let results;
@@ -670,16 +689,14 @@ function stopAllConnections() {
  * It is written without asking Core about its block (the process may be on
  * its way out): with no misses written, a made-up hash costs no other pool.
  */
+// Not written at all since 27.11.2026: Core has not vouched for the block of
+// a race still open or still waiting for it, and a pool with a made-up job
+// would have taken the win and a place in "the last 10 blocks" (R-2711-10).
+// A race lost to a restart costs one block of numbers, never a wrong one.
 function abandonOpenRaces() {
-  for (const race of openRaces.values()) {
-    clearTimeout(race.timer);
-    writeRace(race, { misses: false });
-  }
+  for (const race of openRaces.values()) clearTimeout(race.timer);
   openRaces.clear();
-  for (const race of pendingRaces) {
-    clearTimeout(race.retry);
-    if (!race.unknownToCore) writeRace(race, { misses: false });
-  }
+  for (const race of pendingRaces) clearTimeout(race.retry);
   pendingRaces.clear();
 }
 
@@ -707,8 +724,14 @@ function applyToggle() {
   lastToggleState = enabled;
   if (enabled) {
     logger.info('stratum race switched on');
-    rememberRecentBlocks();
-    syncConnections();
+    recentReady = false;
+    const gen = generation;
+    rememberRecentBlocks().finally(() => {
+      // Switched off (or off and on) meanwhile: that pass decides.
+      if (gen !== generation || lastToggleState !== true) return;
+      recentReady = true;
+      try { syncConnections(); } catch (err) { logger.warn('syncConnections failed', { error: err.message }); }
+    });
   } else {
     logger.info('stratum race switched off - closing every pool connection');
     shutDownRace();

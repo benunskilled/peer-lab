@@ -249,9 +249,8 @@ test('switching off abandons an open race instead of charging everyone a miss', 
   race.shutDownRace();
 
   assert.equal(race.openRaces.size, 0, 'the open race is gone');
-  const rows = observationsFor(prevhash(70));
-  assert.equal(rows.length, 1, 'only the pool that really reported has a row');
-  assert.ok(rows[0].latencyMs != null, 'and it is a real result, not a miss charged to the other pool');
+  // Not written: Core never vouched for its block (R-2711-10), and nobody is charged a miss.
+  assert.equal(observationsFor(prevhash(70)).length, 0);
 });
 
 test('shutting the process down abandons an open race instead of charging everyone a miss', async () => {
@@ -269,9 +268,7 @@ test('shutting the process down abandons an open race instead of charging everyo
   race.handleProcessShutdown();
 
   assert.equal(race.openRaces.size, 0, 'the open race is gone');
-  const rows = observationsFor(prevhash(71));
-  assert.equal(rows.length, 1, 'only the pool that really reported has a row');
-  assert.ok(rows[0].latencyMs != null, 'and B is not charged a miss for a restart it had no part in');
+  assert.equal(observationsFor(prevhash(71)).length, 0, 'no unverified win, and B is not charged a miss for a restart');
 });
 
 test('a race that really timed out still charges a miss', async () => {
@@ -485,13 +482,13 @@ test('an open race writes nothing, so a locked database cannot delay a timestamp
 
 // Switching the race off mid-race charges nobody a miss, but what really did
 // report is kept - it was measured on a connection that was listening.
-test('an abandoned race keeps its reports and records no misses', async () => {
+test('an abandoned race is not written: no unverified win, no misses', async () => {
   const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
   watchPools(a, b);
   race.handleNotify(a, prevhash(78), hr());
   race.abandonOpenRaces();
   const rows = observationsFor(prevhash(78));
-  assert.deepEqual(rows.map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+  assert.deepEqual(rows, []);
 });
 
 test('the same prevhash in another spelling joins the race instead of opening a second one', async () => {
@@ -568,7 +565,7 @@ test('a pool added while a race waits for Core is not charged for it', async (t)
   assert.deepEqual(observationsFor(prevhash(95)).map((r) => [r.poolId, r.latencyMs]), [[1, 0], [2, null]]);
 });
 
-test('a race waiting for Core is written without misses when the worker stops', async (t) => {
+test('a race still waiting for Core is dropped when the worker stops', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const [a, b] = [fakePool(1, 'A'), fakePool(2, 'B')];
   watchPools(a, b);
@@ -579,7 +576,7 @@ test('a race waiting for Core is written without misses when the worker stops', 
   assert.equal(race.pendingRaces.size, 1);
   race.abandonOpenRaces();
   assert.equal(race.pendingRaces.size, 0);
-  assert.deepEqual(observationsFor(prevhash(96)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
+  assert.deepEqual(observationsFor(prevhash(96)), []);
 });
 
 test('a race Core said it does not know is not written when the worker stops', async (t) => {

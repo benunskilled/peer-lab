@@ -1456,7 +1456,8 @@ function renderPoolPick() {
     if (!b.dataset.label) b.dataset.label = b.textContent;
     const label = `${escapeHtml(b.dataset.label)} <b>${tabCount[b.dataset.kind] || 0}</b>`;
     if (b.dataset.drawn !== label) { b.innerHTML = label; b.dataset.drawn = label; }
-    const on = b.dataset.kind === poolKind;
+    // While searching from "Racing" the list shows every pool: "All" says so.
+    const on = b.dataset.kind === kind;
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
   }

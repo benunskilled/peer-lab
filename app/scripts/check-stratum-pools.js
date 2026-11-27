@@ -34,6 +34,7 @@ function check(p) {
         buf = buf.slice(i + 1);
         let m;
         try { m = JSON.parse(line); } catch { continue; }
+        if (!m || typeof m !== 'object') continue; // "null" parses too, and m.id would throw
         if (m.id === 2) r.auth = m.result === true;
         if (m.method === 'mining.notify' && Array.isArray(m.params)) { r.jobs += 1; if (!r.prev) r.prev = canonical(String(m.params[1])); }
       }

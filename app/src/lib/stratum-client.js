@@ -83,6 +83,8 @@ const SILENCE_CHECK_MS = 10_000;
 // teach the rhythm.
 const SILENCE_GAP_MIN_MS = 5_000;
 const SILENCE_FIRST_JOB_MS = 5 * 60_000;
+// After a first job, before the rhythm is learned (silentTooLong).
+const SILENCE_UNLEARNED_MS = 90 * 60 * 1000;
 
 class StratumPoolConnection extends EventEmitter {
   constructor({ host, port, label, idleTimeoutMs = 6 * 60 * 60 * 1000, authorizeAddress = '1BitcoinEaterAddressDontSendf59kuE' }) {
@@ -159,8 +161,12 @@ class StratumPoolConnection extends EventEmitter {
     if (this._lastNotifyAt == null) {
       return this._connectedAt != null && now - this._connectedAt > Math.max(limit || 0, SILENCE_FIRST_JOB_MS);
     }
-    if (limit == null) return false;
-    return now - this._lastNotifyAt > limit;
+    // A job came, but too few gaps yet to know the pool's rhythm: a long,
+    // finite wait instead of none, or a pool that sent one job and then only
+    // other lines was charged a miss for every block from then on (R-2711-10).
+    // Long enough for a pool that sends jobs only on a new block and a slow
+    // hour of blocks.
+    return now - this._lastNotifyAt > (limit == null ? SILENCE_UNLEARNED_MS : limit);
   }
 
   stop() {
