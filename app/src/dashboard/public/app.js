@@ -1527,6 +1527,8 @@ function renderPools(pools) {
     foldSums();
     return;
   }
+  // Remove only on the owner's own pools: one on the list comes and goes by
+  // its tick under "Choose pools", and both keep the numbers (27.11.2026).
   tbody.innerHTML = pools.map((p) => `
     <tr data-key="pool:${p.id}" tabindex="0" class="can-act${p.enabled ? '' : ' pool-off'}">
       <td><b>${escapeHtml(p.label)}</b>${p.wonLastRace ? ' <span class="trophy" title="Won the most recent race">🏆</span>' : ''}${p.enabled ? '' : ' <span class="off-tag">Off</span>'}</td>
@@ -1540,7 +1542,7 @@ function renderPools(pools) {
       <td class="pool-enabled">
         <label class="switch-label"><input type="checkbox" data-action="toggle-pool" data-id="${p.id}" ${p.enabled ? 'checked' : ''} /><span class="sr-only">Enabled</span></label>
       </td>
-      <td><button class="secondary danger" data-action="delete-pool" data-id="${p.id}">Remove</button></td>
+      <td>${p.isDefault ? '' : `<button class="secondary danger" data-action="delete-pool" data-id="${p.id}">Remove</button>`}</td>
     </tr>
   `).join('');
   markOpenRow();
