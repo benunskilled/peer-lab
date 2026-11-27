@@ -1023,7 +1023,7 @@ function lastTryText(st) {
   // above a candidate in Australia still being tested (17.11.2026).
   return ` An earlier peer${where ? ` in ${where}` : ''} ${whyText(l.reason)}.`;
 }
-// "8 of 8 slots used", then "Pick from 4,812 addresses" with a button per
+// "8 of 8 slots used", then "Pick from" with "Auto 4,812" and a button per
 // region to pick it (15.11.2026; always shown since 17.11.2026). A region with none shows 0 on
 // its button; the line does not repeat it (16.11.2026).
 const BOOK_REGIONS = { AF: 'Africa', AS: 'Asia', EU: 'Europe', NA: 'North & Central America', OC: 'Oceania', SA: 'South America', TOR: 'Tor', I2P: 'I2P' };
@@ -1051,10 +1051,13 @@ function renderSlotBook() {
   const picked = (s.picked || []).filter((r) => BOOK_REGIONS[r]);
   const names = (list) => list.map((r) => BOOK_REGIONS[r]).join(', ');
   document.getElementById('slot-book-sum').textContent = `${used} of ${MAX_MANUAL_PEERS} slots used${testing}`;
-  document.getElementById('slot-book-pick').textContent = `Pick from ${n(b.total)} address${b.total === 1 ? '' : 'es'}`;
+  document.getElementById('slot-book-pick').textContent = 'Pick from';
   // Each region a switch (15.11.2026): picked, the next free slots go there.
   // One with nothing to pick from cannot be picked, but stays to be unpicked.
-  const html = buttons.map(([r, c]) => {
+  // "Auto" first (27.11.2026): every address Slot Fill can use, chosen while
+  // no region is; a tap on it drops all picked regions at once.
+  const auto = !picked.length;
+  const html = `<button type="button" class="region-pick${auto ? ' on' : ''}" data-region="AUTO" aria-pressed="${auto}"${picksSending ? ' disabled' : ''}>Auto <b>${n(b.total)}</b></button>` + buttons.map(([r, c]) => {
     const on = picked.includes(r);
     return `<button type="button" class="region-pick${on ? ' on' : ''}" data-region="${escapeHtml(r)}" aria-pressed="${on}"${(!c && !on) || picksSending ? ' disabled' : ''}>${escapeHtml(BOOK_REGIONS[r] || r)} <b>${n(c)}</b></button>`;
   }).join('');
@@ -1814,7 +1817,10 @@ document.getElementById('slot-book-regions').addEventListener('click', async (e)
   const r = btn.dataset.region;
   if (picksSending) return;
   const now = new Set(lastSlotStatus.picked || []);
-  if (now.has(r)) now.delete(r); else now.add(r);
+  if (r === 'AUTO') {
+    if (!now.size) return; // already the usual pick
+    now.clear();
+  } else if (now.has(r)) now.delete(r); else now.add(r);
   picksSending = true;
   picksEpoch += 1;
   renderSlotBook();
