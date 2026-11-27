@@ -1384,8 +1384,8 @@ async function refreshPools() {
 let poolPick = null; // the last answer of /api/pools/catalog
 let localPoolsFound = []; // pool apps on this Umbrel not yet in the race
 let poolPickBusy = 0; // ticks on their way: no redraw under the finger
-const POOL_COUNTRY_KEY = 'peerlab.poolCountry';
-let poolCountry = (() => { try { return localStorage.getItem(POOL_COUNTRY_KEY) || 'all'; } catch { return 'all'; } })();
+// Not remembered either (27.11.2026): every visit opens on "Racing" and all countries.
+let poolCountry = 'all';
 // Every visit starts on the pools in the race: the whole list is long on a
 // phone (129 rows, ten screens), and what runs is what one looks at most.
 // Not remembered, unlike the country. "racing" falls back to all on a
@@ -1433,7 +1433,14 @@ function renderPoolPick() {
   const pools = poolPick.pools.filter((p) => (kind === 'all' || (kind === 'racing' ? p.enabled : p.kind === kind))
     && (!q || [p.name, p.host, p.region, pickCountry(p.country), p.routed ? 'routed' : ''].some((t) => t && t.toLowerCase().includes(q))));
   const racing = poolPick.racing;
+  // Each tab says how many pools it holds, so opening on "Racing" does not
+  // look like all there is.
+  const tabCount = { racing: poolPick.pools.filter((p) => p.enabled).length, all: poolPick.pools.length };
+  for (const p of poolPick.pools) tabCount[p.kind] = (tabCount[p.kind] || 0) + 1;
   for (const b of document.querySelectorAll('#pool-pick-kind button')) {
+    if (!b.dataset.label) b.dataset.label = b.textContent;
+    const label = `${escapeHtml(b.dataset.label)} <b>${tabCount[b.dataset.kind] || 0}</b>`;
+    if (b.dataset.drawn !== label) { b.innerHTML = label; b.dataset.drawn = label; }
     const on = b.dataset.kind === poolKind;
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
@@ -1491,7 +1498,6 @@ function setPoolKind(kind) {
 
 function setPoolCountry(cc) {
   poolCountry = cc;
-  try { localStorage.setItem(POOL_COUNTRY_KEY, cc); } catch { /* private window: fine */ }
   renderPoolPick();
 }
 

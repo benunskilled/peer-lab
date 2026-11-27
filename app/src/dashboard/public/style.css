@@ -1577,6 +1577,11 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .pool-pick > summary .pick-sum { font-weight: 400; font-size: 13px; color: var(--muted); }
 .pool-pick > summary::after { align-self: center; }
 .pool-pick .pick-kind { margin: 10px 0 0; }
+/* The count beside the name, as on Slot Fill's region pills. */
+.pool-pick .pick-kind button { white-space: nowrap; }
+.pool-pick .pick-kind button b { margin-left: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Four tabs with counts fit a 360 px phone only a little tighter. */
+@media (max-width: 420px) { .panel .pool-pick .pick-kind button { padding: 3px 7px; } .pool-pick .pick-kind button b { margin-left: 3px; } }
 /* 16px: a smaller font makes the iPhone zoom in on a tap. */
 .pick-search { display: block; margin: 10px 0 0; max-width: 320px; }
 .pick-search input { box-sizing: border-box; width: 100%; font: inherit; font-size: 16px; padding: 7px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
