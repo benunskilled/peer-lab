@@ -1620,7 +1620,8 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .panel #pool-templates button.secondary { color: #b4a6ff; border-color: rgba(139,124,246,.55); background: linear-gradient(rgba(139,124,246,.10), rgba(139,124,246,.10)), var(--panel); }
 .panel #pool-templates button.secondary:hover { color: #d4cbff; border-color: #8b7cf6; }
 .panel #pool-templates button[data-action="add-found-pool"] { color: #fff; background: #7a68f0; border-color: #7a68f0; }
-.panel #pool-templates .hint { color: #b4a6ff; }
+/* A heading like "Choose pools" below it: the colour stays on what can be tapped. */
+.panel #pool-templates .hint { color: var(--text); font-weight: 600; font-size: inherit; }
 .pool-pick > summary .pick-found { font-weight: 400; font-size: 13px; color: var(--accent); }
 @media (max-width: 600px) {
   .cc-filter { display: none; }
