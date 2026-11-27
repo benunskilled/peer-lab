@@ -146,7 +146,9 @@ function sendBody(res, status, headers, body) {
 const MAX_POOLS = 20;
 const MAX_POOL_ROWS = poolCatalog.size + MAX_POOLS;
 const enabledPools = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE enabled = 1').get().n;
-const poolRows = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n;
+// Rows in the table: a removed or unticked one (chosen 0) is only kept for its
+// numbers and goes with them, so it takes no place here - Remove frees one.
+const poolRows = () => db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE chosen = 1').get().n;
 
 function sendJson(res, status, data) {
   sendBody(res, status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(data));
@@ -1089,9 +1091,11 @@ const routes = {
     try {
       // The same address removed or unticked before: back in the race, numbers
       // and all, rather than "already exists" for a pool nowhere to be seen.
-      // Added by hand now, so the owner's own, under the name typed.
+      // Added by hand now, so the owner's own under the name typed - unless it is
+      // a pool on the list, whose past races must not turn into "Your pool".
+      const own = poolCatalog.find(parsed.value.host, parsed.value.port) ? 'is_default' : '0';
       const kept = db.instance
-        .prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = 0, label = ? WHERE lower(host) = lower(?) AND port = ? AND chosen = 0')
+        .prepare(`UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = ${own}, label = ? WHERE lower(host) = lower(?) AND port = ? AND chosen = 0`)
         .run(parsed.value.label, parsed.value.host, parsed.value.port);
       if (kept.changes) return sendJson(res, 200, { ok: true });
       if (poolRows() >= MAX_POOL_ROWS) {

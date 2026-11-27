@@ -126,7 +126,7 @@ test('paused, then unticked and ticked again: back running, under the list\'s na
   await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
   const r = await api('/api/pools', { label: 'Mine', host: p.host, port: p.port });
   assert.equal(r.status, 200);
-  assert.deepEqual([row().chosen, row().enabled, row().label, row().is_default], [1, 1, 'Mine', 0]);
+  assert.deepEqual([row().chosen, row().enabled, row().label, row().is_default], [1, 1, 'Mine', 1], 'a pool on the list stays a list pool');
   // Removed in the table: out, numbers kept, a tick in the list brings it back.
   const id = row().id;
   let d = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
