@@ -1615,6 +1615,11 @@ details.card.panel summary::before { margin: 0 2px 0 1px; width: 6px; height: 6p
 .plist li.hint { grid-column: 1 / -1; }
 .pick-own { margin: 4px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .pick-own .inline-form:last-child { margin-bottom: 0; }
+/* The pool apps of this Umbrel in a colour of their own (violet, after
+   Umbrel's), so the row is seen; one found here is filled - a tap adds it. */
+.panel #pool-templates button.secondary { color: #b4a6ff; border-color: rgba(139,124,246,.55); background: linear-gradient(rgba(139,124,246,.10), rgba(139,124,246,.10)), var(--panel); }
+.panel #pool-templates button.secondary:hover { color: #d4cbff; border-color: #8b7cf6; }
+.panel #pool-templates button[data-action="add-found-pool"] { color: #fff; background: #7a68f0; border-color: #7a68f0; }
 .pool-pick > summary .pick-found { font-weight: 400; font-size: 13px; color: var(--accent); }
 @media (max-width: 600px) {
   .cc-filter { display: none; }
