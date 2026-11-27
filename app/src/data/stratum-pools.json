@@ -617,11 +617,12 @@
    "name": "AtlasPool",
    "host": "solo.atlaspool.io",
    "port": 3333,
-   "country": "US",
-   "region": "Washington",
+   "country": null,
+   "region": null,
    "kind": "solo",
-   "source": null,
-   "since": "1.0.0"
+   "source": "https://atlaspool.io/why-atlaspool.html",
+   "since": "1.0.0",
+   "routed": true
   },
   {
    "name": "Solo Cat",
@@ -640,6 +641,42 @@
    "region": "New York",
    "kind": "solo",
    "source": "https://letsmine.it/en/posts/tutorial/faq"
+  },
+  {
+   "name": "LetsMine.it UK",
+   "host": "gb1.letsmine.it",
+   "port": 3332,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": "https://letsmine.it/solo/btc"
+  },
+  {
+   "name": "LetsMine.it DE",
+   "host": "de1.letsmine.it",
+   "port": 3332,
+   "country": "DE",
+   "region": null,
+   "kind": "solo",
+   "source": "https://letsmine.it/solo/btc"
+  },
+  {
+   "name": "LetsMine.it France",
+   "host": "fr1.letsmine.it",
+   "port": 3332,
+   "country": "FR",
+   "region": "Grand Est",
+   "kind": "solo",
+   "source": "https://letsmine.it/solo/btc"
+  },
+  {
+   "name": "LetsMine.it Poland",
+   "host": "pl1.letsmine.it",
+   "port": 3332,
+   "country": "PL",
+   "region": "Mazovia",
+   "kind": "solo",
+   "source": "https://letsmine.it/solo/btc"
   },
   {
    "name": "LuckyHash",
@@ -775,6 +812,33 @@
    "region": "Hauts-de-France",
    "kind": "solo",
    "source": "https://heliospool.com/"
+  },
+  {
+   "name": "HeliosPool Australia",
+   "host": "btc-au-south.heliospool.com",
+   "port": 3333,
+   "country": "AU",
+   "region": "New South Wales",
+   "kind": "solo",
+   "source": "https://heliospool.com/miner-setup/"
+  },
+  {
+   "name": "HeliosPool US East",
+   "host": "btc-us-east.heliospool.com",
+   "port": 3333,
+   "country": "US",
+   "region": "Virginia",
+   "kind": "solo",
+   "source": "https://heliospool.com/miner-setup/"
+  },
+  {
+   "name": "HeliosPool US West",
+   "host": "btc-us-west.heliospool.com",
+   "port": 3333,
+   "country": "US",
+   "region": "Oregon",
+   "kind": "solo",
+   "source": "https://heliospool.com/miner-setup/"
   },
   {
    "name": "SoloHash Canada",
