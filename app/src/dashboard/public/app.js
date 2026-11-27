@@ -1396,6 +1396,21 @@ let poolQuery = ''; // the search: not kept, a new visit starts with the whole l
 const pickFlag = (cc) => (cc ? flagOf(cc) : '\u{1F310}');
 const pickCountry = (cc) => (cc ? countryName(cc) : 'Routed');
 
+// What a row's tag means: on hover, and on a tap (a phone shows no title).
+// Was a paragraph under the list (27.11.2026).
+const TAG_WHY = {
+  solo: 'Solo: whoever finds a block keeps it.',
+  shared: "Shared: the pool's miners split the reward.",
+  routed: 'Routed: the closest server is chosen for you, so where it stands is not fixed.',
+};
+// The tag sits inside the row's label: a tap on it must not tick the pool.
+document.getElementById('pool-pick-list').addEventListener('click', (e) => {
+  const t = e.target.closest('.tag[data-why]');
+  if (!t) return;
+  e.preventDefault();
+  showToast(t.dataset.why, 'info');
+});
+
 let poolPickSeq = 0;
 async function refreshPoolPick() {
   if (poolPickBusy) return;
@@ -1481,11 +1496,12 @@ function renderPoolPick() {
   setHtml('pool-pick-list', shown.length ? shown.map((p) => {
     const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'closest server';
     const tag = p.routed ? `${p.kind} · routed` : p.kind;
+    const why = [TAG_WHY[p.kind], p.routed ? TAG_WHY.routed : ''].filter(Boolean).join(' ');
     const off = full && !p.enabled;
     return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
       <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
       <span class="w">${p.paused ? '<b class="paused">Paused in the table</b> · ' : ''}${escapeHtml(where)}</span>
-      <span class="tag${p.kind === 'shared' ? ' shared' : ''}">${escapeHtml(tag)}</span>
+      <span class="tag${p.kind === 'shared' ? ' shared' : ''}" title="${escapeHtml(why)}" data-why="${escapeHtml(why)}">${escapeHtml(tag)}</span>
       <input type="checkbox" data-action="pick-pool" data-host="${escapeHtml(p.host)}" data-port="${p.port}" aria-label="${escapeHtml(p.name)}" ${p.enabled ? 'checked' : ''}${off ? ' class="full" aria-disabled="true"' : ''} />
     </label></li>`;
   }).join('') : `<li class="hint">${q ? 'No pool matches.' : kind === 'racing' ? 'No public pool ticked yet - pick some under All.' : 'No pool of this kind here.'}</li>`);
