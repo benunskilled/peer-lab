@@ -78,7 +78,7 @@ test('a tick adds the pool under the list\'s name, an untick takes it out but ke
   db.instance.prepare('INSERT INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, 0, 1)').run(race, row().id);
   r = await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
   assert.equal(r.status, 200);
-  assert.equal(row().enabled, -1, 'kept, unticked');
+  assert.deepEqual([row().chosen, row().enabled], [0, 0], 'kept, unticked');
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_observation WHERE race_id = ?').get(race).n, 1);
   assert.ok(!(await api('/api/pools')).body.some((x) => x.host === p.host), 'not in the table, not even "Off"');
   let shown = (await api('/api/pools/catalog')).body.pools.find((x) => x.host === p.host);
@@ -89,7 +89,7 @@ test('a tick adds the pool under the list\'s name, an untick takes it out but ke
   r = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
   assert.equal(r.status, 404);
   r = await api('/api/pools/catalog', { host: p.host.toUpperCase(), port: p.port, enabled: true });
-  assert.equal(row().enabled, 1, 'ticked again: back, with its numbers');
+  assert.deepEqual([row().chosen, row().enabled], [1, 1], 'ticked again: back, with its numbers');
   assert.equal(row().id, id);
   const back = (await api('/api/pools')).body.find((x) => x.host === p.host);
   assert.equal(back.seen, 1);
@@ -109,6 +109,23 @@ test('paused by the table\'s switch: still ticked, marked paused; an untick take
   await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
   shown = (await api('/api/pools/catalog')).body.pools.find((x) => x.host === p.host);
   assert.deepEqual([shown.enabled, shown.paused, shown.id], [false, false, null]);
+});
+
+test('paused, then unticked and ticked again: back running, under the list\'s name', async () => {
+  const p = list.pools.find((x) => x.host === 'jp-btc.solofury.com');
+  const row = () => db.instance.prepare('SELECT * FROM stratum_pool WHERE host = ?').get(p.host);
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: true });
+  await fetch(`${baseUrl}/api/pools/${row().id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) });
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
+  db.instance.prepare('UPDATE stratum_pool SET label = ? WHERE host = ?').run('An old name', p.host);
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: true });
+  assert.deepEqual([row().chosen, row().enabled, row().label], [1, 1, p.name]);
+  // Unticked, then the same address added by hand: back, not "already exists".
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
+  const r = await api('/api/pools', { label: 'Mine', host: p.host, port: p.port });
+  assert.equal(r.status, 200);
+  assert.deepEqual([row().chosen, row().enabled, row().label], [1, 1, 'Mine']);
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
 });
 
 test('only a pool on the list can be ticked', async () => {

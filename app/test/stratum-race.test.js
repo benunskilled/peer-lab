@@ -414,7 +414,7 @@ test('a pool excused at reconnect is not timed on a later copy of the same job',
   assert.deepEqual(observationsFor(prevhash(3100)).map((r) => [r.poolId, r.latencyMs]), [[1, 0]]);
 });
 
-test('a pool unticked while its race is open: the others move up, timed from the first still there', async () => {
+test('a pool removed while its race is open: the others move up, timed from the first still there', async () => {
   const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
   watchPools(a, b, c);
   const t0 = hr();
@@ -433,6 +433,24 @@ test('a pool unticked while its race is open: the others move up, timed from the
   } finally {
     const cols = Object.keys(saved);
     db.instance.prepare(`INSERT INTO stratum_pool (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map((k) => saved[k]));
+  }
+});
+
+test('a pool unticked (kept) while its race is open: out of the race, no miss, the others move up', async () => {
+  const [a, b, c] = [fakePool(1, 'A'), fakePool(2, 'B'), fakePool(3, 'C')];
+  watchPools(a, b, c);
+  const t0 = hr();
+  const t0Ms = Date.now();
+  race.handleNotify(a, prevhash(3250), t0, t0Ms);
+  race.handleNotify(b, prevhash(3250), t0 + 20_000_000n, t0Ms + 20);
+  db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE id = 1').run();
+  try {
+    await race.finalizeRace(prevhash(3250));
+    const rows = observationsFor(prevhash(3250)).map((r) => [r.poolId, r.latencyMs == null ? null : Math.round(r.latencyMs), r.rank]);
+    assert.ok(!rows.some((r) => r[0] === 1), 'nothing for the unticked pool, not even a miss');
+    assert.deepEqual(rows.find((r) => r[0] === 2), [2, 0, 1]);
+  } finally {
+    db.instance.prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1 WHERE id = 1').run();
   }
 });
 

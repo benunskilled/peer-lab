@@ -40,10 +40,10 @@ function withRows(rows) {
       kind: p.kind,
       routed: Boolean(p.routed),
       // Ticked: in the race table, running or paused by its switch there.
-      // An unticked row (enabled -1) only keeps the numbers for a tick later.
-      id: row && row.enabled !== -1 ? row.id : null,
-      enabled: Boolean(row && row.enabled !== -1),
-      paused: Boolean(row && row.enabled === 0),
+      // An unticked row (chosen 0) only keeps the numbers for a tick later.
+      id: row && row.chosen ? row.id : null,
+      enabled: Boolean(row && row.chosen),
+      paused: Boolean(row && row.chosen && !row.enabled),
     };
   });
 }

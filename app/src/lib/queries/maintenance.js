@@ -25,9 +25,9 @@ function pruneOldData({
       .prepare(`DELETE FROM stratum_observation WHERE race_id IN (SELECT id FROM stratum_race WHERE created_at < ?)`)
       .run(stratumCutoff);
     const stratumRacesDeleted = db.instance.prepare(`DELETE FROM stratum_race WHERE created_at < ?`).run(stratumCutoff).changes;
-    // An unticked pool (enabled -1) whose numbers have all aged out keeps nothing.
+    // An unticked pool (chosen 0) whose numbers have all aged out keeps nothing.
     db.instance
-      .prepare(`DELETE FROM stratum_pool WHERE enabled = -1 AND id NOT IN (SELECT DISTINCT pool_id FROM stratum_observation)`)
+      .prepare(`DELETE FROM stratum_pool WHERE chosen = 0 AND id NOT IN (SELECT DISTINCT pool_id FROM stratum_observation)`)
       .run();
 
     // Only a CLOSED session (ended_at IS NOT NULL - a currently-live one is

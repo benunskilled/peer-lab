@@ -99,8 +99,8 @@ function statements() {
       recordMiss: db.instance.prepare(
         `INSERT OR IGNORE INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, NULL, NULL)`,
       ),
-      // An unticked pool (enabled -1) keeps its row but is out, like a removed one.
-      poolIds: db.instance.prepare('SELECT id FROM stratum_pool WHERE enabled >= 0'),
+      // An unticked pool (chosen 0) keeps its row but is out, like a removed one.
+      poolIds: db.instance.prepare('SELECT id FROM stratum_pool WHERE chosen = 1'),
     };
   }
   return stmts;

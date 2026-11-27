@@ -28,8 +28,8 @@ function raceIdsForRange(range) {
 const rankingCache = new Map();
 
 function stratumRanking(range = '10') {
-  // Unticked pools (enabled -1) keep their rows for a tick later, out of the table.
-  const pools = db.instance.prepare(`SELECT * FROM stratum_pool WHERE enabled >= 0 ORDER BY is_default DESC, label ASC`).all();
+  // Unticked pools (chosen 0) keep their rows for a tick later, out of the table.
+  const pools = db.instance.prepare(`SELECT * FROM stratum_pool WHERE chosen = 1 ORDER BY is_default DESC, label ASC`).all();
   // The newest race and the newest observation row, both read off the end of
   // their table: a race finished after a newer one opened still changes it.
   // And how many races there are: the daily prune takes old ones out, which

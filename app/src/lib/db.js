@@ -236,6 +236,9 @@ CREATE TABLE IF NOT EXISTS stratum_pool (
   enabled INTEGER NOT NULL DEFAULT 1,
   is_default INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
+  -- 0: unticked in the list, out of the race and the table, its races kept
+  -- for a tick later (27.11.2026). enabled is then 0 as well.
+  chosen INTEGER NOT NULL DEFAULT 1,
   UNIQUE(host, port)
 );
 
@@ -375,9 +378,22 @@ function openOnce() {
   // makes every connection wait up to 10s and retry instead - the timeout
   // set at the top of this function.
   db.exec(SCHEMA);
+  addChosenColumn();
   seedDefaultPools();
   logger.info('database ready', { path: config.sqlitePath });
   return db;
+}
+
+// stratum_pool.chosen came with 1.1.0; a database from 1.0 gets it here.
+// All four processes open at once: the one that loses the race to add it
+// is told the column exists, which is all it wanted.
+function addChosenColumn() {
+  if (db.prepare(`SELECT 1 FROM pragma_table_info('stratum_pool') WHERE name = 'chosen'`).get()) return;
+  try {
+    db.exec(`ALTER TABLE stratum_pool ADD COLUMN chosen INTEGER NOT NULL DEFAULT 1`);
+  } catch (err) {
+    if (!/duplicate column/i.test(err.message)) throw err;
+  }
 }
 
 function seedDefaultPools() {

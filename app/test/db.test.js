@@ -170,12 +170,13 @@ test('REGRESSION: the all-time stratum ranking forgets races the prune took out'
   assert.equal(winsOfA(), before - 1);
 });
 
-test('an unticked pool (enabled -1) goes with the prune once its numbers have aged out', () => {
+test('an unticked pool (chosen 0) goes with the prune once its numbers have aged out', () => {
   const insertPool = db.instance.prepare(
-    `INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, -1, 1, ?)`,
+    `INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 0, 1, ?)`,
   );
   const old = insertPool.run('Unticked old', 'unticked-old.example', 3333, Date.now()).lastInsertRowid;
   const kept = insertPool.run('Unticked kept', 'unticked-kept.example', 3333, Date.now()).lastInsertRowid;
+  db.instance.prepare('UPDATE stratum_pool SET chosen = 0 WHERE id IN (?, ?)').run(old, kept);
   const insertRace = db.instance.prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)');
   const insertObs = db.instance.prepare('INSERT INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, ?, ?)');
   insertObs.run(insertRace.run('unticked-aged', Date.now() - 400 * 24 * 60 * 60 * 1000).lastInsertRowid, old, 0, 1);
