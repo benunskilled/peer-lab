@@ -21,6 +21,8 @@ const { server } = require('../src/dashboard-server');
 
 let baseUrl;
 test.before(async () => {
+  // No network in the tests (as in dashboard-api.test.js): every name resolves.
+  require('dns').promises.lookup = async () => ({ address: '192.0.2.1', family: 4 });
   db.open();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -124,7 +126,16 @@ test('paused, then unticked and ticked again: back running, under the list\'s na
   await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
   const r = await api('/api/pools', { label: 'Mine', host: p.host, port: p.port });
   assert.equal(r.status, 200);
-  assert.deepEqual([row().chosen, row().enabled, row().label], [1, 1, 'Mine']);
+  assert.deepEqual([row().chosen, row().enabled, row().label, row().is_default], [1, 1, 'Mine', 0]);
+  // Removed in the table: out, numbers kept, a tick in the list brings it back.
+  const id = row().id;
+  let d = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+  assert.equal(d.status, 200);
+  assert.deepEqual([row().chosen, row().enabled, row().id], [0, 0, id]);
+  d = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+  assert.equal(d.status, 404, 'already out');
+  await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: true });
+  assert.equal(row().chosen, 1);
   await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
 });
 

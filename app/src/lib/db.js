@@ -575,14 +575,16 @@ function resetPeerData() {
 }
 
 /**
- * Throw away the stratum pool history. The configured pools themselves stay -
- * only their measured races and latencies go.
+ * Throw away the stratum pool history. The pools in the table stay - only
+ * their measured races and latencies go. Unticked or removed pools (chosen 0)
+ * were kept only for those numbers, so they go with them.
  */
 function resetPoolHistory() {
   const before = storageBreakdown().poolHistory;
   const tx = db.transaction(() => {
     db.prepare(`DELETE FROM stratum_observation`).run();
     db.prepare(`DELETE FROM stratum_race`).run();
+    db.prepare(`DELETE FROM stratum_pool WHERE chosen = 0`).run();
     // The race worker writes a race still being checked with Core later; this
     // tells it the race belongs to the history just thrown away.
     db.prepare(`INSERT INTO meta (key, value) VALUES ('stratum_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(Date.now()));

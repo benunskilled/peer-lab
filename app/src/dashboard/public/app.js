@@ -2107,7 +2107,7 @@ document.body.addEventListener('click', async (e) => {
     }
     if (action === 'delete-pool') {
       await api(`/api/pools/${id}`, { method: 'DELETE' });
-      showToast('Pool removed.', 'success');
+      showToast('Pool removed - its numbers are kept.', 'success');
       // A removed pool app is marked "✓ found" again at once.
       localPoolsAtMs = 0;
     }

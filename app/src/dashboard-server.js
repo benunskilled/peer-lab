@@ -1010,7 +1010,8 @@ const routes = {
   },
 
   'GET /api/pools/local': async (req, res, url) => {
-    const configured = db.instance.prepare('SELECT host, port FROM stratum_pool').all();
+    // A removed one (chosen 0) can be added again from its button.
+    const configured = db.instance.prepare('SELECT host, port FROM stratum_pool WHERE chosen = 1').all();
     return sendJson(res, 200, await localPools.list(configured));
   },
 
@@ -1026,7 +1027,7 @@ const routes = {
   // later brings them back (27.11.2026; until then an untick deleted them,
   // and before 26.11. it paused). About 3 MB a pool a year, pruned with the
   // races after a year. Pausing is the table's own switch, and a paused pool
-  // stays ticked. Remove in the table is what deletes.
+  // stays ticked. Remove in the table keeps them too; "Reset pool history" deletes.
   'POST /api/pools/catalog': async (req, res, url) => {
     const body = await readBody(req);
     const entry = poolCatalog.find(body.host, body.port);
@@ -1085,16 +1086,17 @@ const routes = {
     if (enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - pause one first` });
     }
-    if (poolRows() >= MAX_POOL_ROWS) {
-      return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
-    }
     try {
-      // The same address unticked in the list: back in the race, numbers and all,
-      // rather than "already exists" for a pool nowhere to be seen.
+      // The same address removed or unticked before: back in the race, numbers
+      // and all, rather than "already exists" for a pool nowhere to be seen.
+      // Added by hand now, so the owner's own, under the name typed.
       const kept = db.instance
-        .prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1, label = ? WHERE lower(host) = lower(?) AND port = ? AND chosen = 0')
+        .prepare('UPDATE stratum_pool SET chosen = 1, enabled = 1, is_default = 0, label = ? WHERE lower(host) = lower(?) AND port = ? AND chosen = 0')
         .run(parsed.value.label, parsed.value.host, parsed.value.port);
       if (kept.changes) return sendJson(res, 200, { ok: true });
+      if (poolRows() >= MAX_POOL_ROWS) {
+        return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
+      }
       db.instance
         .prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, 1, 0, ?)`)
         .run(parsed.value.label, parsed.value.host, parsed.value.port, Date.now());
@@ -1137,14 +1139,17 @@ const routes = {
 
 };
 
-// /api/pools/<id>: switch a pool on or off, or delete it.
+// /api/pools/<id>: switch a pool on or off, or take it out of the table.
+// Remove keeps its numbers like an untick in the list (chosen 0): adding or
+// ticking it again brings them back. Deleting is "Reset pool history" under
+// Data, on purpose (27.11.2026).
 async function poolRoute(req, res, id) {
   if (req.method === 'DELETE') {
     let removed;
     try {
-      removed = queries.deletePool(id);
+      removed = db.instance.prepare('UPDATE stratum_pool SET chosen = 0, enabled = 0 WHERE id = ? AND chosen = 1').run(id).changes;
     } catch (err) {
-      logger.error('deleting a pool failed', { id, error: err.message });
+      logger.error('removing a pool failed', { id, error: err.message });
       return sendJson(res, 500, { ok: false, error: 'internal error' });
     }
     if (!removed) return sendJson(res, 404, { ok: false, error: 'no such pool' });
@@ -1157,7 +1162,7 @@ async function poolRoute(req, res, id) {
     return sendJson(res, 400, { error: 'enabled must be true or false' });
   }
   if (body.enabled) {
-    const row = db.instance.prepare('SELECT enabled FROM stratum_pool WHERE id = ?').get(id);
+    const row = db.instance.prepare('SELECT enabled FROM stratum_pool WHERE id = ? AND chosen = 1').get(id);
     if (row && !row.enabled && enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { error: `at most ${MAX_POOLS} pools race at once - pause one first` });
     }

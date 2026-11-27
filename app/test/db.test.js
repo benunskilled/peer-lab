@@ -877,9 +877,10 @@ test('resetPeerData leaves the delete trigger in place, so the rollup stays main
   assert.equal(db.instance.prepare('SELECT eligible AS e FROM peer_relay_stats WHERE peer_id = ?').get(peer.id).e, 0, 'the trigger still counts down');
 });
 
-test('resetPoolHistory clears the races but keeps the configured pools', () => {
-  const pool = db.instance.prepare('SELECT id FROM stratum_pool LIMIT 1').get();
-  const poolsBefore = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n;
+test('resetPoolHistory clears the races, keeps the pools in the table, drops the ones kept only for their numbers', () => {
+  const pool = db.instance.prepare('SELECT id FROM stratum_pool WHERE chosen = 1 LIMIT 1').get();
+  db.instance.prepare(`INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at, chosen) VALUES ('Gone', 'reset-gone.example', 3333, 0, 1, 1, 0)`).run();
+  const poolsBefore = db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE chosen = 1').get().n;
   const raceId = db.instance
     .prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)')
     .run('reset-pool-prevhash', Date.now()).lastInsertRowid;
@@ -889,7 +890,7 @@ test('resetPoolHistory clears the races but keeps the configured pools', () => {
 
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_race').get().n, 0);
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_observation').get().n, 0);
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, poolsBefore, 'the pool list is configuration, not history');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool').get().n, poolsBefore, 'the pools in the table stay, the kept ones go');
 });
 
 // One host has one spelling: brackets and ports go, so an IPv6 peer is never
