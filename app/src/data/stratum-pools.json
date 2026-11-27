@@ -1132,6 +1132,60 @@
    "region": "California",
    "kind": "solo",
    "source": "https://solomininghq.com/"
+  },
+  {
+   "name": "CWI-theMINE",
+   "host": "btc.cwi-themine.com",
+   "port": 30002,
+   "country": "GB",
+   "region": "England",
+   "kind": "shared",
+   "source": "https://cwi-themine.com/pplns-btc-sha256d/connect"
+  },
+  {
+   "name": "CTRL Pool US St. Louis",
+   "host": "us.stratum.ctrlpool.com",
+   "port": 4334,
+   "country": "US",
+   "region": "Missouri",
+   "kind": "shared",
+   "source": "https://ctrlpool.com/mine"
+  },
+  {
+   "name": "CTRL Pool US Seattle",
+   "host": "us1.stratum.ctrlpool.com",
+   "port": 4334,
+   "country": "US",
+   "region": "Washington",
+   "kind": "shared",
+   "source": "https://ctrlpool.com/mine"
+  },
+  {
+   "name": "UnlockPool",
+   "host": "pool.unlockpool.com",
+   "port": 3334,
+   "country": "TH",
+   "region": "Bangkok",
+   "kind": "shared",
+   "source": "https://pool.unlockpool.com/"
+  },
+  {
+   "name": "NKPOOL",
+   "host": "btc.nkpool.org",
+   "port": 3333,
+   "country": "KR",
+   "region": "Gyeonggi-do",
+   "kind": "solo",
+   "source": "https://btc.nkpool.org/en"
+  },
+  {
+   "name": "VeinPool",
+   "host": "veinpool.fr",
+   "port": 3602,
+   "country": "GB",
+   "region": "England",
+   "kind": "solo",
+   "source": "https://veinpool.fr/en/coin/btc"
   }
  ]
 }

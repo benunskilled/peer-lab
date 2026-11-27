@@ -1464,7 +1464,7 @@ function renderPoolPick() {
   const full = racing >= poolPick.max;
   setHtml('pool-pick-list', shown.length ? shown.map((p) => {
     const where = p.country ? [p.region, pickCountry(p.country)].filter(Boolean).join(', ') : 'location not known';
-    const tag = p.routed ? 'shared · routed' : p.kind;
+    const tag = p.routed ? `${p.kind} · routed` : p.kind;
     const off = full && !p.enabled;
     return `<li><label class="${p.enabled ? 'on' : ''}"${off ? ` title="At most ${poolPick.max} pools race at once - switch one off first"` : ''}>
       <span class="n">${pickFlag(p.country)} ${escapeHtml(p.name)}</span>
