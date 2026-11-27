@@ -62,7 +62,7 @@ A locked manual peer that Core has connected to at least once never loses its sl
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `STRATUM_RACE_TIMEOUT_MS` | Race window, starting with the first pool; a missing matching job counts as a miss | `8000` |
+| `STRATUM_RACE_TIMEOUT_MS` | Race window, starting with the first pool; a pool whose connection had already brought a job and that sends no matching one in time is charged a miss | `8000` |
 | `STRATUM_IDLE_TIMEOUT_MS` | Socket inactivity timeout before reconnecting | `21600000` (6h) |
 | `STRATUM_AUTHORIZE_ADDRESS` | Address sent in `mining.authorize` | `1BitcoinEaterAddressDontSendf59kuE` |
 | `STRATUM_HISTORY_RETENTION_DAYS` | How long stratum race history is kept | `365` |
@@ -71,7 +71,9 @@ The default authorisation address is a public burn address used to subscribe to 
 
 TCP keepalive helps detect broken connections. The socket inactivity timeout provides a separate fallback for a connection that remains silent.
 
-Stratum Race is controlled from the dashboard. Switched off, its pool connections close within half a minute.
+Stratum Race is controlled from the dashboard. A new install races no public pool until you tick some under Choose pools; an install updated from 1.0 keeps the pools it had. At most 20 race at once. Unticking a pool or removing it from the table keeps its numbers for when it comes back; Reset pool history under Data deletes them. Switched off, its pool connections close within half a minute.
+
+A connection that goes quiet for much longer than the pool usually takes between jobs is replaced. A pool that sends no job after connecting is tried again after one minute, then less and less often, up to every 30 minutes.
 
 ## Peer history retention
 
