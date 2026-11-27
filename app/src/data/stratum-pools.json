@@ -141,10 +141,11 @@
    "name": "NexusPool Solo",
    "host": "solo.nexuspool.io",
    "port": 3350,
-   "country": "DE",
-   "region": "Hesse",
+   "country": null,
+   "region": null,
    "kind": "solo",
-   "source": "https://nexuspool.io/docs/technical"
+   "source": "https://nexuspool.io/docs/technical",
+   "routed": true
   },
   {
    "name": "WhitePool Solo",
@@ -199,11 +200,21 @@
    "name": "Parasite Pool",
    "host": "parasite.wtf",
    "port": 42069,
+   "country": null,
+   "region": null,
+   "kind": "shared",
+   "source": null,
+   "since": "1.0.0",
+   "routed": true
+  },
+  {
+   "name": "Parasite DE",
+   "host": "fkb.parasite.wtf",
+   "port": 42069,
    "country": "DE",
    "region": "Hesse",
    "kind": "shared",
-   "source": null,
-   "since": "1.0.0"
+   "source": "https://fkb.parasite.wtf/"
   },
   {
    "name": "Parasite US Wisconsin",
@@ -808,10 +819,20 @@
    "name": "HeliosPool",
    "host": "btc.heliospool.com",
    "port": 3333,
+   "country": null,
+   "region": null,
+   "kind": "solo",
+   "source": "https://heliospool.com/",
+   "routed": true
+  },
+  {
+   "name": "HeliosPool France",
+   "host": "btc-eu-west.heliospool.com",
+   "port": 3333,
    "country": "FR",
    "region": "Hauts-de-France",
    "kind": "solo",
-   "source": "https://heliospool.com/"
+   "source": "https://heliospool.com/miner-setup/"
   },
   {
    "name": "HeliosPool Australia",
@@ -853,10 +874,11 @@
    "name": "Cruxpool",
    "host": "btc-eu.cruxpool.com",
    "port": 1111,
-   "country": "DE",
-   "region": "Baden-Wurttemberg",
+   "country": null,
+   "region": null,
    "kind": "shared",
-   "source": "https://cruxpool.com/btc/tutorial"
+   "source": "https://cruxpool.com/btc/tutorial",
+   "routed": true
   },
   {
    "name": "Cédric Crispin",
@@ -979,10 +1001,11 @@
    "name": "Rabid Pool",
    "host": "btc.rabidmining.com",
    "port": 5333,
-   "country": "CA",
-   "region": "Quebec",
+   "country": null,
+   "region": null,
    "kind": "shared",
-   "source": "https://pool.rabidmining.com/hosting"
+   "source": "https://pool.rabidmining.com/hosting",
+   "routed": true
   },
   {
    "name": "Molepool",
