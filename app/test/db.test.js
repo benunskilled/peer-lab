@@ -170,6 +170,23 @@ test('REGRESSION: the all-time stratum ranking forgets races the prune took out'
   assert.equal(winsOfA(), before - 1);
 });
 
+test('an unticked pool (enabled -1) goes with the prune once its numbers have aged out', () => {
+  const insertPool = db.instance.prepare(
+    `INSERT INTO stratum_pool (label, host, port, enabled, is_default, created_at) VALUES (?, ?, ?, -1, 1, ?)`,
+  );
+  const old = insertPool.run('Unticked old', 'unticked-old.example', 3333, Date.now()).lastInsertRowid;
+  const kept = insertPool.run('Unticked kept', 'unticked-kept.example', 3333, Date.now()).lastInsertRowid;
+  const insertRace = db.instance.prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)');
+  const insertObs = db.instance.prepare('INSERT INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, ?, ?)');
+  insertObs.run(insertRace.run('unticked-aged', Date.now() - 400 * 24 * 60 * 60 * 1000).lastInsertRowid, old, 0, 1);
+  insertObs.run(insertRace.run('unticked-recent', Date.now()).lastInsertRowid, kept, 0, 1);
+  queries.pruneOldData({ stratumHistoryRetentionDays: 365 });
+  const has = (id) => Boolean(db.instance.prepare('SELECT 1 FROM stratum_pool WHERE id = ?').get(id));
+  assert.equal(has(old), false, 'nothing left to keep');
+  assert.equal(has(kept), true, 'still has numbers');
+  assert.ok(!queries.stratumRanking('all').some((p) => p.id === kept), 'never in the table');
+});
+
 test('deletePool removes a pool that already has observation history without throwing', () => {
   // Reproduces the "Remove" button's 500 "internal error": stratum_pool has
   // no ON DELETE CASCADE from stratum_observation, and foreign keys are

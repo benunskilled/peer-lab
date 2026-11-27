@@ -65,7 +65,7 @@ test('a fresh install races nothing, and the list shows every pool unticked', as
   assert.ok(body.pools.every((p) => !p.enabled && p.id === null));
 });
 
-test('a tick adds the pool under the list\'s name, an untick removes it with its numbers', async () => {
+test('a tick adds the pool under the list\'s name, an untick takes it out but keeps its numbers', async () => {
   const p = list.pools.find((x) => x.host === 'jp-btc.solofury.com');
   let r = await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: true });
   assert.equal(r.status, 200);
@@ -73,19 +73,30 @@ test('a tick adds the pool under the list\'s name, an untick removes it with its
   assert.equal(row().label, p.name);
   assert.equal(row().enabled, 1);
   assert.equal(row().is_default, 1, 'a public pool, not the owner\'s own');
-  // A race it took part in: removing it takes its numbers too.
+  // A race it took part in: an untick keeps it, out of the race and the table.
   const race = db.instance.prepare('INSERT INTO stratum_race (prevhash, created_at) VALUES (?, ?)').run('ab'.repeat(32), Date.now()).lastInsertRowid;
   db.instance.prepare('INSERT INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, 0, 1)').run(race, row().id);
   r = await api('/api/pools/catalog', { host: p.host, port: p.port, enabled: false });
   assert.equal(r.status, 200);
-  assert.equal(row(), undefined, 'gone from the table, not left there "Off"');
-  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_observation WHERE race_id = ?').get(race).n, 0);
+  assert.equal(row().enabled, -1, 'kept, unticked');
+  assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_observation WHERE race_id = ?').get(race).n, 1);
+  assert.ok(!(await api('/api/pools')).body.some((x) => x.host === p.host), 'not in the table, not even "Off"');
+  let shown = (await api('/api/pools/catalog')).body.pools.find((x) => x.host === p.host);
+  assert.deepEqual([shown.enabled, shown.paused, shown.id], [false, false, null]);
+  assert.equal((await api('/api/pools/catalog')).body.racing, 0);
+  // The table's switch cannot bring it back past the list.
+  const id = row().id;
+  r = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
+  assert.equal(r.status, 404);
   r = await api('/api/pools/catalog', { host: p.host.toUpperCase(), port: p.port, enabled: true });
-  assert.equal(row().enabled, 1, 'ticked again: back, from nothing');
+  assert.equal(row().enabled, 1, 'ticked again: back, with its numbers');
+  assert.equal(row().id, id);
+  const back = (await api('/api/pools')).body.find((x) => x.host === p.host);
+  assert.equal(back.seen, 1);
   assert.equal(db.instance.prepare('SELECT COUNT(*) AS n FROM stratum_pool WHERE host = ?').get(p.host).n, 1);
 });
 
-test('paused by the table\'s switch: still ticked, marked paused; an untick removes it', async () => {
+test('paused by the table\'s switch: still ticked, marked paused; an untick takes it out', async () => {
   const p = list.pools.find((x) => x.host === 'jp-btc.solofury.com');
   const id = db.instance.prepare('SELECT id FROM stratum_pool WHERE host = ?').get(p.host).id;
   let r = await fetch(`${baseUrl}/api/pools/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) });

@@ -39,10 +39,11 @@ function withRows(rows) {
       region: p.region,
       kind: p.kind,
       routed: Boolean(p.routed),
-      id: row ? row.id : null,
       // Ticked: in the race table, running or paused by its switch there.
-      enabled: Boolean(row),
-      paused: Boolean(row && !row.enabled),
+      // An unticked row (enabled -1) only keeps the numbers for a tick later.
+      id: row && row.enabled !== -1 ? row.id : null,
+      enabled: Boolean(row && row.enabled !== -1),
+      paused: Boolean(row && row.enabled === 0),
     };
   });
 }

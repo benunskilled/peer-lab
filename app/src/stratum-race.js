@@ -99,7 +99,8 @@ function statements() {
       recordMiss: db.instance.prepare(
         `INSERT OR IGNORE INTO stratum_observation (race_id, pool_id, latency_ms, rank) VALUES (?, ?, NULL, NULL)`,
       ),
-      poolIds: db.instance.prepare('SELECT id FROM stratum_pool'),
+      // An unticked pool (enabled -1) keeps its row but is out, like a removed one.
+      poolIds: db.instance.prepare('SELECT id FROM stratum_pool WHERE enabled >= 0'),
     };
   }
   return stmts;
@@ -279,7 +280,7 @@ function writeRace(race, { misses }) {
       return;
     }
     s = statements();
-    // A pool deleted while the race was open (an untick) is gone from the
+    // A pool unticked or removed while the race was open is out of the
     // table: its row would fail, and the pool behind it would be saved as
     // second with no first. The rest move up, timed from the first that is
     // still there (R-2611-05).

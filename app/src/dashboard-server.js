@@ -140,7 +140,8 @@ function sendBody(res, status, headers, body) {
 }
 
 // How many pools may race at once: each one is a socket held open and a row
-// per block. Paused pools keep their rows (their history) and do not count;
+// per block. Paused pools (enabled 0) and unticked ones (enabled -1, see the
+// list below) keep their rows and their history, and do not count;
 // the rows themselves are bounded too, at the public list plus this many.
 const MAX_POOLS = 20;
 const MAX_POOL_ROWS = poolCatalog.size + MAX_POOLS;
@@ -1020,21 +1021,27 @@ const routes = {
   },
 
   // A tick in that list: { host, port, enabled }. Only a pool on the list;
-  // its name comes from the list. A tick adds it, an untick removes it with
-  // its numbers (26.11.2026; it used to pause and stay in the table as
-  // "Off"). Pausing is the table's own switch, and a paused pool stays ticked.
+  // its name comes from the list. A tick adds it, an untick takes it out of
+  // the race and the table but keeps its numbers: enabled -1, so a tick
+  // later brings them back (27.11.2026; until then an untick deleted them,
+  // and before 26.11. it paused). About 3 MB a pool a year, pruned with the
+  // races after a year. Pausing is the table's own switch, and a paused pool
+  // stays ticked. Remove in the table is what deletes.
   'POST /api/pools/catalog': async (req, res, url) => {
     const body = await readBody(req);
     const entry = poolCatalog.find(body.host, body.port);
     if (!entry) return sendJson(res, 400, { ok: false, error: 'not a pool on the list' });
     if (typeof body.enabled !== 'boolean') return sendJson(res, 400, { ok: false, error: 'enabled must be true or false' });
     const row = db.instance.prepare('SELECT id, enabled FROM stratum_pool WHERE lower(host) = lower(?) AND port = ?').get(entry.host, entry.port);
-    if (body.enabled && !row && enabledPools() >= MAX_POOLS) {
+    const back = row && row.enabled === -1;
+    if (body.enabled && (!row || back) && enabledPools() >= MAX_POOLS) {
       return sendJson(res, 409, { ok: false, error: `at most ${MAX_POOLS} pools race at once - untick one first` });
     }
     try {
       if (!body.enabled) {
-        if (row) queries.deletePool(row.id);
+        if (row) db.instance.prepare('UPDATE stratum_pool SET enabled = -1 WHERE id = ?').run(row.id);
+      } else if (back) {
+        db.instance.prepare('UPDATE stratum_pool SET enabled = 1 WHERE id = ?').run(row.id);
       } else if (!row) {
         if (poolRows() >= MAX_POOL_ROWS) return sendJson(res, 409, { ok: false, error: 'too many pools - remove one first' });
         db.instance
@@ -1148,8 +1155,9 @@ async function poolRoute(req, res, id) {
       return sendJson(res, 409, { error: `at most ${MAX_POOLS} pools race at once - pause one first` });
     }
   }
+  // Not an unticked one (-1): that is the list's to bring back.
   const updated = db.instance
-    .prepare(`UPDATE stratum_pool SET enabled = ? WHERE id = ?`)
+    .prepare(`UPDATE stratum_pool SET enabled = ? WHERE id = ? AND enabled >= 0`)
     .run(body.enabled ? 1 : 0, id);
   if (updated.changes === 0) return sendJson(res, 404, { error: `no pool with id ${id}` });
   return sendJson(res, 200, { ok: true, enabled: body.enabled });
