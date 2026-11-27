@@ -848,6 +848,267 @@
    "region": "Quebec",
    "kind": "solo",
    "source": "https://solohash.co.uk/"
+  },
+  {
+   "name": "Cruxpool",
+   "host": "btc-eu.cruxpool.com",
+   "port": 1111,
+   "country": "DE",
+   "region": "Baden-Wurttemberg",
+   "kind": "shared",
+   "source": "https://cruxpool.com/btc/tutorial"
+  },
+  {
+   "name": "Cédric Crispin",
+   "host": "bitcoin.cedric-crispin.com",
+   "port": 4544,
+   "country": "TH",
+   "region": "Phuket",
+   "kind": "solo",
+   "source": "https://bitcoin.cedric-crispin.com/start-mining/"
+  },
+  {
+   "name": "Grand Pool Kazakhstan",
+   "host": "kz.grandpool.io",
+   "port": 5070,
+   "country": "KZ",
+   "region": "Almaty",
+   "kind": "solo",
+   "source": "https://grandpool.io/pools/bitcoin/solo"
+  },
+  {
+   "name": "Grand Pool France",
+   "host": "fr.grandpool.io",
+   "port": 5070,
+   "country": "FR",
+   "region": "Ile-de-France",
+   "kind": "solo",
+   "source": "https://grandpool.io/pools/bitcoin/solo"
+  },
+  {
+   "name": "Grand Pool US",
+   "host": "us.grandpool.io",
+   "port": 5070,
+   "country": "US",
+   "region": "New York",
+   "kind": "solo",
+   "source": "https://grandpool.io/pools/bitcoin/solo"
+  },
+  {
+   "name": "NMMiner SoloBTC",
+   "host": "solobtc.nmminer.com",
+   "port": 3333,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://wiki.nmminer.com/docs/reference/pool-list/"
+  },
+  {
+   "name": "NMMiner SoloBTC Australia",
+   "host": "au.solobtc.nmminer.com",
+   "port": 3333,
+   "country": "AU",
+   "region": "New South Wales",
+   "kind": "solo",
+   "source": "https://wiki.nmminer.com/docs/reference/pool-list/"
+  },
+  {
+   "name": "1Miner.Net US",
+   "host": "1miner.net",
+   "port": 5002,
+   "country": "US",
+   "region": "Texas",
+   "kind": "solo",
+   "source": "https://1miner.net/pool/btc2/connect"
+  },
+  {
+   "name": "1Miner.Net EU",
+   "host": "eu1.1miner.net",
+   "port": 5002,
+   "country": "DE",
+   "region": "Bavaria",
+   "kind": "solo",
+   "source": "https://1miner.net/pool/btc2/connect"
+  },
+  {
+   "name": "Les Chauffagistes",
+   "host": "chauffagistes-pool.fr",
+   "port": 3333,
+   "country": "FR",
+   "region": "Hauts-de-France",
+   "kind": "solo",
+   "source": "https://chauffagistes-pool.fr/en/about.html"
+  },
+  {
+   "name": "SoloPool.fr",
+   "host": "solopool.fr",
+   "port": 3333,
+   "country": "FR",
+   "region": "Hauts-de-France",
+   "kind": "shared",
+   "source": "https://solopool.fr/faq.html"
+  },
+  {
+   "name": "69Pool",
+   "host": "solo.69pool.org",
+   "port": 3333,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://69pool.org/"
+  },
+  {
+   "name": "EchoPool",
+   "host": "solo.echopool.org",
+   "port": 3333,
+   "country": "US",
+   "region": "Illinois",
+   "kind": "solo",
+   "source": "https://www.echopool.org/"
+  },
+  {
+   "name": "BCMonster",
+   "host": "bcmonster.com",
+   "port": 3333,
+   "country": "US",
+   "region": "North Carolina",
+   "kind": "shared",
+   "source": "https://www.bcmonster.com/bitcoin-solo-mining-pool.html"
+  },
+  {
+   "name": "Rabid Pool",
+   "host": "btc.rabidmining.com",
+   "port": 5333,
+   "country": "CA",
+   "region": "Quebec",
+   "kind": "shared",
+   "source": "https://pool.rabidmining.com/hosting"
+  },
+  {
+   "name": "Molepool",
+   "host": "eu.molepool.com",
+   "port": 3450,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://btc.molepool.com/help"
+  },
+  {
+   "name": "SoloPool.eu",
+   "host": "btc.solopool.eu",
+   "port": 3337,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "solo",
+   "source": "https://solopool.eu/btc"
+  },
+  {
+   "name": "MySoloPool",
+   "host": "btc.mysolopool.com",
+   "port": 3334,
+   "country": "OM",
+   "region": "Muscat",
+   "kind": "solo",
+   "source": "https://mysolopool.com/"
+  },
+  {
+   "name": "XP Pool",
+   "host": "in.xppool.in",
+   "port": 3334,
+   "country": "IN",
+   "region": "West Bengal",
+   "kind": "solo",
+   "source": "https://xppool.in/"
+  },
+  {
+   "name": "X39 Mining",
+   "host": "mining.x39matrix.org",
+   "port": 3333,
+   "country": "US",
+   "region": "Illinois",
+   "kind": "solo",
+   "source": "https://mining.x39matrix.org/"
+  },
+  {
+   "name": "MergedHash",
+   "host": "mine.mergedhash.com",
+   "port": 3345,
+   "country": "US",
+   "region": "Washington",
+   "kind": "solo",
+   "source": "https://mergedhash.com/guides"
+  },
+  {
+   "name": "SoloMineLab",
+   "host": "btc.solominelab.com",
+   "port": 3333,
+   "country": "ES",
+   "region": "Madrid",
+   "kind": "solo",
+   "source": "https://github.com/tootb/SoloMineLab"
+  },
+  {
+   "name": "FenixPool",
+   "host": "fenixpool.com",
+   "port": 8888,
+   "country": "US",
+   "region": "Texas",
+   "kind": "solo",
+   "source": "https://www.fenixpool.com/connect"
+  },
+  {
+   "name": "BTC PoW Lab Pool",
+   "host": "stratum.btcpowlab-pool.com",
+   "port": 3333,
+   "country": "DE",
+   "region": "Bavaria",
+   "kind": "shared",
+   "source": "https://btcpowlab-pool.com/start"
+  },
+  {
+   "name": "Firepool",
+   "host": "firepool.io",
+   "port": 4433,
+   "country": "US",
+   "region": "Pennsylvania",
+   "kind": "solo",
+   "source": "https://firepool.io/guide.html"
+  },
+  {
+   "name": "Sunnydecree",
+   "host": "pool.sunnydecree.de",
+   "port": 3333,
+   "country": "FR",
+   "region": "Ile-de-France",
+   "kind": "solo",
+   "source": "https://pool.sunnydecree.de/"
+  },
+  {
+   "name": "Coinovo",
+   "host": "pool.coinovo.app",
+   "port": 3333,
+   "country": "FI",
+   "region": "Uusimaa",
+   "kind": "solo",
+   "source": "https://coinovo.app/solo-pool/?netz=btc"
+  },
+  {
+   "name": "Solo100",
+   "host": "bitcoin.solo100.org",
+   "port": 3333,
+   "country": "DE",
+   "region": "Hesse",
+   "kind": "shared",
+   "source": "https://solo100.org/"
+  },
+  {
+   "name": "SoloMiningHQ",
+   "host": "btc.solomininghq.com",
+   "port": 8002,
+   "country": "US",
+   "region": "California",
+   "kind": "solo",
+   "source": "https://solomininghq.com/"
   }
  ]
 }
