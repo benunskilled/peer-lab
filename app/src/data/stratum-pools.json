@@ -253,15 +253,6 @@
    "source": "https://pool.nerdminer.de/"
   },
   {
-   "name": "Noderunners",
-   "host": "pool.noderunners.network",
-   "port": 1337,
-   "country": "DE",
-   "region": "Bavaria",
-   "kind": "solo",
-   "source": "https://noderunners.network/en/pool"
-  },
-  {
    "name": "PowerPool Solo EU",
    "host": "btc.eu.stratum.solo.powerpool.io",
    "port": 3333,
